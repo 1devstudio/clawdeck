@@ -4,7 +4,6 @@ import SwiftUI
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
 
-    @Environment(\.dismiss) private var dismiss
 
     @State private var name = "Default"
     @State private var host = "localhost"
@@ -34,23 +33,32 @@ struct ConnectionSetupView: View {
             .padding(.top, 24)
             .padding(.bottom, 20)
 
-            // Form
-            Form {
-                Section {
+            // Fields
+            VStack(spacing: 12) {
+                LabeledContent("Name") {
                     TextField("Connection Name", text: $name)
-                    TextField("Host", text: $host)
-                        .textContentType(.URL)
-                    TextField("Port", text: $port)
-                    Toggle("Use TLS (wss://)", isOn: $useTLS)
+                        .textFieldStyle(.roundedBorder)
                 }
+                LabeledContent("Host") {
+                    TextField("Host", text: $host)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.URL)
+                }
+                LabeledContent("Port") {
+                    TextField("Port", text: $port)
+                        .textFieldStyle(.roundedBorder)
+                }
+                Toggle("Use TLS (wss://)", isOn: $useTLS)
 
-                Section("Authentication") {
+                Divider()
+
+                LabeledContent("Token") {
                     SecureField("Gateway Token (optional)", text: $token)
+                        .textFieldStyle(.roundedBorder)
                         .textContentType(.password)
                 }
             }
-            .formStyle(.grouped)
-            .frame(maxHeight: 280)
+            .padding(.horizontal, 24)
 
             // Error
             if let error = errorMessage {
@@ -68,7 +76,7 @@ struct ConnectionSetupView: View {
             // Actions
             HStack {
                 Button("Skip") {
-                    dismiss()
+                    appViewModel.showConnectionSetup = false
                 }
                 .buttonStyle(.plain)
 
@@ -110,7 +118,7 @@ struct ConnectionSetupView: View {
         await appViewModel.connect(with: profile)
 
         if appViewModel.connectionManager.isConnected {
-            dismiss()
+            appViewModel.showConnectionSetup = false
         } else {
             errorMessage = appViewModel.connectionManager.lastError ?? "Failed to connect"
         }

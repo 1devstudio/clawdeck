@@ -39,8 +39,8 @@ enum GatewayClientError: Error, LocalizedError {
 ///
 /// Lifecycle:
 /// 1. Connect WebSocket to ws://host:port
-/// 2. Receive event: connect.challenge with nonce
-/// 3. Send req: connect with client info, auth token, device identity
+/// 2. Receive event: connect.challenge
+/// 3. Send req: connect with client info and auth token
 /// 4. Receive res: hello-ok with protocol version, snapshot, features
 /// 5. Now connected — send requests, receive events
 actor GatewayClient {
@@ -49,7 +49,6 @@ actor GatewayClient {
     private let profile: ConnectionProfile
     private var webSocketTask: URLSessionWebSocketTask?
     private let urlSession: URLSession
-    private let deviceId: String
 
     /// Pending request continuations keyed by request ID.
     private var pendingRequests: [String: CheckedContinuation<ResponseFrame, Error>] = [:]
@@ -75,7 +74,6 @@ actor GatewayClient {
     init(profile: ConnectionProfile) {
         self.profile = profile
         self.urlSession = URLSession(configuration: .default)
-        self.deviceId = Self.getOrCreateDeviceId()
 
         var continuation: AsyncStream<EventFrame>.Continuation!
         self.eventStream = AsyncStream { continuation = $0 }
@@ -95,22 +93,36 @@ actor GatewayClient {
             throw GatewayClientError.invalidURL
         }
 
+        // Clean up any previous connection attempt
+        receiveTask?.cancel()
+        receiveTask = nil
+        webSocketTask?.cancel(with: .goingAway, reason: nil)
+        webSocketTask = nil
+        cancelAllPendingRequests()
+        isHandshakeComplete = false
+
         await setState(.connecting)
         shouldReconnect = true
-        reconnectDelay = GatewayProtocol.Reconnect.initialDelaySeconds
 
-        let request = URLRequest(url: url)
-        let task = urlSession.webSocketTask(with: request)
+        let task = urlSession.webSocketTask(with: url)
         self.webSocketTask = task
         task.resume()
 
-        // Start receiving messages
+        // Perform handshake by receiving directly on the WebSocket —
+        // no separate Task needed, so there's no actor scheduling delay.
+        do {
+            try await performHandshake()
+        } catch {
+            webSocketTask?.cancel(with: .goingAway, reason: nil)
+            webSocketTask = nil
+            await setState(.disconnected)
+            throw error
+        }
+
+        // Handshake succeeded — start the receive loop for normal operation
         receiveTask = Task { [weak self] in
             await self?.receiveLoop()
         }
-
-        // Wait for challenge + handshake (with timeout)
-        try await performHandshake()
     }
 
     /// Disconnect from the gateway.
@@ -214,22 +226,32 @@ actor GatewayClient {
     // MARK: - Private: Handshake
 
     private func performHandshake() async throws {
-        // The challenge event will be received in receiveLoop;
-        // we use a continuation to await it.
-        let challenge: ConnectChallenge = try await withCheckedThrowingContinuation { continuation in
-            self.challengeContinuation = continuation
+        guard let ws = webSocketTask else {
+            throw GatewayClientError.notConnected
         }
 
-        // Step 3: Send connect request
+        // Step 1: Receive connect.challenge from the WebSocket.
+        // Performed directly on the actor (no separate Task) to avoid scheduling delay.
+        let challengeData = try await receiveData(from: ws)
+        let challengeFrame = try GatewayFrameDecoder.decode(from: challengeData)
+
+        guard case .event(let event) = challengeFrame,
+              event.event == GatewayEvent.connectChallenge else {
+            throw GatewayClientError.handshakeFailed("Expected connect.challenge, got unexpected frame")
+        }
+
+        // Step 2: Send connect request
         let connectParams = ConnectParams(
-            protocol_: GatewayProtocol.version,
+            minProtocol: GatewayProtocol.version,
+            maxProtocol: GatewayProtocol.version,
             client: .init(
-                name: GatewayProtocol.clientName,
+                id: GatewayProtocol.clientName,
                 version: GatewayProtocol.clientVersion,
-                platform: GatewayProtocol.platform
+                platform: GatewayProtocol.platform,
+                mode: "ui"
             ),
             auth: profile.token.map { ConnectParams.AuthInfo(token: $0) },
-            device: .init(id: deviceId, name: deviceName)
+            device: nil
         )
 
         let requestId = UUID().uuidString
@@ -238,9 +260,12 @@ actor GatewayClient {
         let frame = RequestFrame(id: requestId, method: GatewayMethod.connect, params: AnyCodable(paramsJSON))
         try await sendFrame(frame)
 
-        // Step 4: Await hello-ok response
-        let response: ResponseFrame = try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[requestId] = continuation
+        // Step 3: Receive hello-ok response
+        let responseData = try await receiveData(from: ws)
+        let responseFrame = try GatewayFrameDecoder.decode(from: responseData)
+
+        guard case .response(let response) = responseFrame else {
+            throw GatewayClientError.handshakeFailed("Expected hello-ok response, got unexpected frame")
         }
 
         guard response.ok else {
@@ -257,8 +282,21 @@ actor GatewayClient {
         await setState(.connected)
     }
 
-    /// Continuation for waiting on the connect.challenge event.
-    private var challengeContinuation: CheckedContinuation<ConnectChallenge, Error>?
+    /// Extract raw data from a WebSocket message.
+    private func receiveData(from ws: URLSessionWebSocketTask) async throws -> Data {
+        let message = try await ws.receive()
+        switch message {
+        case .data(let d):
+            return d
+        case .string(let s):
+            guard let d = s.data(using: .utf8) else {
+                throw GatewayClientError.encodingError("Invalid UTF-8 in WebSocket message")
+            }
+            return d
+        @unknown default:
+            throw GatewayClientError.encodingError("Unknown WebSocket message type")
+        }
+    }
 
     // MARK: - Private: Receive loop
 
@@ -282,8 +320,12 @@ actor GatewayClient {
 
                 try handleReceivedData(data)
             } catch {
-                // Connection lost
-                if !Task.isCancelled {
+                // Always clean up pending continuations to prevent leaks
+                cancelAllPendingRequests()
+
+                // Only trigger reconnection if we were previously connected.
+                // During handshake, connect() handles the failure itself.
+                if !Task.isCancelled && isHandshakeComplete {
                     await handleDisconnection()
                 }
                 return
@@ -310,26 +352,8 @@ actor GatewayClient {
     }
 
     private func handleEvent(_ event: EventFrame) {
-        // Handle connect.challenge during handshake
-        if event.event == GatewayEvent.connectChallenge {
-            if let continuation = challengeContinuation {
-                challengeContinuation = nil
-                if let payload = event.payload {
-                    do {
-                        let challenge = try payload.decode(ConnectChallenge.self)
-                        continuation.resume(returning: challenge)
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                } else {
-                    // Empty challenge is valid
-                    continuation.resume(returning: ConnectChallenge(nonce: ""))
-                }
-            }
-            return
-        }
-
-        // Forward all other events to the stream
+        // Forward events to the stream for UI consumption.
+        // connect.challenge is handled directly in performHandshake().
         eventContinuation?.yield(event)
     }
 
@@ -347,14 +371,21 @@ actor GatewayClient {
 
     // MARK: - Private: Reconnection
 
+    private var isReconnecting = false
+
     private func handleDisconnection() async {
         isHandshakeComplete = false
-        cancelAllPendingRequests()
+
+        // Prevent concurrent reconnection loops
+        guard !isReconnecting else { return }
 
         guard shouldReconnect else {
             await setState(.disconnected)
             return
         }
+
+        isReconnecting = true
+        defer { isReconnecting = false }
 
         await setState(.reconnecting)
 
@@ -386,11 +417,6 @@ actor GatewayClient {
             continuation.resume(throwing: GatewayClientError.cancelled)
         }
         pendingRequests.removeAll()
-
-        if let cc = challengeContinuation {
-            challengeContinuation = nil
-            cc.resume(throwing: GatewayClientError.cancelled)
-        }
     }
 
     // MARK: - Private: State management
@@ -400,23 +426,4 @@ actor GatewayClient {
         state = newState
     }
 
-    // MARK: - Private: Device identity
-
-    private var deviceName: String {
-        #if os(macOS)
-        return Host.current().localizedName ?? "Mac"
-        #else
-        return "ClawdDeck"
-        #endif
-    }
-
-    private static func getOrCreateDeviceId() -> String {
-        let key = "com.clawdbot.deck.deviceId"
-        if let existing = UserDefaults.standard.string(forKey: key) {
-            return existing
-        }
-        let newId = UUID().uuidString
-        UserDefaults.standard.set(newId, forKey: key)
-        return newId
-    }
 }

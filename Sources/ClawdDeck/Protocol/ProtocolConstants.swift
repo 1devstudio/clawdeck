@@ -3,7 +3,7 @@ import Foundation
 /// Constants for the Clawdbot Gateway Protocol v3.
 enum GatewayProtocol {
     static let version = 3
-    static let clientName = "ClawdDeck"
+    static let clientName = "clawdbot-macos"
     static let clientVersion = "0.1.0"
     static let platform = "macOS"
 
@@ -45,14 +45,13 @@ enum ChatEventState: String, Codable, Sendable {
 }
 
 /// Gateway error codes.
-enum GatewayErrorCode: Int, Codable {
-    case unknown = -1
-    case badRequest = 400
-    case unauthorized = 401
-    case forbidden = 403
-    case notFound = 404
-    case conflict = 409
-    case rateLimited = 429
-    case internalError = 500
-    case unavailable = 503
+enum GatewayErrorCode: String, Codable {
+    case invalidRequest = "INVALID_REQUEST"
+    case unauthorized = "UNAUTHORIZED"
+    case forbidden = "FORBIDDEN"
+    case notFound = "NOT_FOUND"
+    case conflict = "CONFLICT"
+    case rateLimited = "RATE_LIMITED"
+    case internalError = "INTERNAL_ERROR"
+    case unavailable = "UNAVAILABLE"
 }

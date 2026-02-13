@@ -12,8 +12,17 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
 
     /// WebSocket URL for this profile.
     var webSocketURL: URL? {
-        let scheme = useTLS ? "wss" : "ws"
-        return URL(string: "\(scheme)://\(host):\(port)")
+        var components = URLComponents()
+        components.scheme = useTLS ? "wss" : "ws"
+        // Host may contain a path (e.g. "example.com/ws"), split it out.
+        if let slashIndex = host.firstIndex(of: "/") {
+            components.host = String(host[host.startIndex..<slashIndex])
+            components.path = String(host[slashIndex...])
+        } else {
+            components.host = host
+        }
+        components.port = port
+        return components.url
     }
 
     /// Display string for the connection.

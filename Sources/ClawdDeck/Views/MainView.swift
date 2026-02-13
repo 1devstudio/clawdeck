@@ -41,9 +41,6 @@ struct MainView: View {
                 .help("Toggle Inspector")
             }
         }
-        .sheet(isPresented: $appViewModel.showConnectionSetup) {
-            ConnectionSetupView(appViewModel: appViewModel)
-        }
     }
 
     // MARK: - Connection status

@@ -114,7 +114,7 @@ struct EventFrame: Codable, Sendable {
 
 /// Error shape in response frames.
 struct ErrorShape: Codable, Sendable {
-    let code: Int?
+    let code: String?
     let message: String?
     let details: AnyCodable?
 }

@@ -4,20 +4,17 @@ import Foundation
 
 /// Parameters for the connect request (step 3 of handshake).
 struct ConnectParams: Codable, Sendable {
-    let protocol_: Int
+    let minProtocol: Int
+    let maxProtocol: Int
     let client: ClientInfo
     let auth: AuthInfo?
     let device: DeviceInfo?
 
-    enum CodingKeys: String, CodingKey {
-        case protocol_ = "protocol"
-        case client, auth, device
-    }
-
     struct ClientInfo: Codable, Sendable {
-        let name: String
+        let id: String
         let version: String
         let platform: String
+        let mode: String
     }
 
     struct AuthInfo: Codable, Sendable {
@@ -26,7 +23,9 @@ struct ConnectParams: Codable, Sendable {
 
     struct DeviceInfo: Codable, Sendable {
         let id: String
-        let name: String
+        let publicKey: String
+        let signature: String
+        let signedAt: Int
     }
 }
 
