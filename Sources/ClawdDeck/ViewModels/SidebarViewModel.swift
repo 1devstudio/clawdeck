@@ -124,4 +124,9 @@ final class SidebarViewModel {
         renamingSessionKey = nil
         renameText = ""
     }
+
+    /// Create a new session.
+    func createNewSession() async {
+        await appViewModel.createNewSession()
+    }
 }
