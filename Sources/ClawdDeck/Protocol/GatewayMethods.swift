@@ -80,41 +80,72 @@ struct HelloOk: Codable, Sendable {
 
 // MARK: - Agent types
 
-/// Lightweight agent representation from the API.
+/// Lightweight agent representation from the gateway.
+/// The gateway returns minimal info: just `id` and optionally a few fields.
 struct AgentSummary: Codable, Sendable {
     let id: String
-    let name: String
+    let name: String?
     let avatar: String?
-    let online: Bool?
-    let capabilities: [String]?
+    let `default`: Bool?
+
+    // The gateway may only return `id` — all other fields are optional.
 }
 
 /// Result of agents.list.
 struct AgentsListResult: Codable, Sendable {
+    let defaultId: String?
+    let mainKey: String?
+    let scope: String?
     let agents: [AgentSummary]
 }
 
 /// Result of agent.identity.
 struct AgentIdentityResult: Codable, Sendable {
-    let id: String
-    let name: String
+    let agentId: String
+    let name: String?
     let avatar: String?
-    let model: String?
 }
 
 // MARK: - Session types
 
-/// Lightweight session representation from the API.
+/// Session representation matching the actual gateway response.
+/// The gateway returns timestamps as epoch milliseconds (numbers), not ISO strings.
 struct SessionSummary: Codable, Sendable {
     let key: String
+    let kind: String?               // "direct", "group", etc.
+    let displayName: String?
+    let channel: String?
+    let chatType: String?
     let label: String?
     let derivedTitle: String?
+    let lastMessagePreview: String?
+    let sessionId: String?
     let model: String?
-    let agentId: String?
-    let lastMessage: String?
-    let lastMessageAt: String?
-    let createdAt: String?
-    let updatedAt: String?
+    let modelProvider: String?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let totalTokens: Int?
+    let contextTokens: Int?
+    let updatedAt: Double?          // epoch ms
+    let systemSent: Bool?
+    let abortedLastRun: Bool?
+
+    // Nested structures
+    let origin: SessionOrigin?
+    let deliveryContext: DeliveryContext?
+
+    struct SessionOrigin: Codable, Sendable {
+        let label: String?
+        let provider: String?
+        let surface: String?
+        let chatType: String?
+    }
+
+    struct DeliveryContext: Codable, Sendable {
+        let channel: String?
+        let to: String?
+        let accountId: String?
+    }
 }
 
 /// Parameters for sessions.list.
@@ -122,11 +153,34 @@ struct SessionsListParams: Codable, Sendable {
     let limit: Int?
     let includeDerivedTitles: Bool?
     let includeLastMessage: Bool?
+    let agentId: String?
+    let label: String?
+    let search: String?
+
+    init(limit: Int? = nil, includeDerivedTitles: Bool? = nil, includeLastMessage: Bool? = nil,
+         agentId: String? = nil, label: String? = nil, search: String? = nil) {
+        self.limit = limit
+        self.includeDerivedTitles = includeDerivedTitles
+        self.includeLastMessage = includeLastMessage
+        self.agentId = agentId
+        self.label = label
+        self.search = search
+    }
 }
 
 /// Result of sessions.list.
 struct SessionsListResult: Codable, Sendable {
+    let ts: Double?
+    let path: String?
+    let count: Int?
+    let defaults: SessionDefaults?
     let sessions: [SessionSummary]
+
+    struct SessionDefaults: Codable, Sendable {
+        let modelProvider: String?
+        let model: String?
+        let contextTokens: Int?
+    }
 }
 
 /// Parameters for sessions.patch.
@@ -139,6 +193,12 @@ struct SessionsPatchParams: Codable, Sendable {
 /// Parameters for sessions.delete.
 struct SessionsDeleteParams: Codable, Sendable {
     let key: String
+    let deleteTranscript: Bool?
+
+    init(key: String, deleteTranscript: Bool? = nil) {
+        self.key = key
+        self.deleteTranscript = deleteTranscript
+    }
 }
 
 // MARK: - Chat types
@@ -147,9 +207,9 @@ struct SessionsDeleteParams: Codable, Sendable {
 struct ChatSendParams: Codable, Sendable {
     let sessionKey: String
     let message: String
-    let idempotencyKey: String?
+    let idempotencyKey: String
 
-    init(sessionKey: String, message: String, idempotencyKey: String? = UUID().uuidString) {
+    init(sessionKey: String, message: String, idempotencyKey: String = UUID().uuidString) {
         self.sessionKey = sessionKey
         self.message = message
         self.idempotencyKey = idempotencyKey
@@ -160,6 +220,7 @@ struct ChatSendParams: Codable, Sendable {
 struct ChatSendResult: Codable, Sendable {
     let runId: String?
     let sessionKey: String?
+    let status: String?
 }
 
 /// Parameters for chat.history.
@@ -185,6 +246,12 @@ struct ChatHistoryResult: Codable, Sendable {
 /// Parameters for chat.abort.
 struct ChatAbortParams: Codable, Sendable {
     let sessionKey: String
+    let runId: String?
+
+    init(sessionKey: String, runId: String? = nil) {
+        self.sessionKey = sessionKey
+        self.runId = runId
+    }
 }
 
 /// Payload of a `chat` event (streaming response).
@@ -192,9 +259,11 @@ struct ChatEventPayload: Codable, Sendable {
     let runId: String
     let sessionKey: String
     let seq: Int?
-    let state: String  // "delta", "final", "error"
+    let state: String  // "delta", "final", "aborted", "error"
     let message: ChatEventMessage?
-    let error: ErrorShape?
+    let errorMessage: String?
+    let usage: AnyCodable?
+    let stopReason: String?
 }
 
 /// The message portion of a chat event.
@@ -211,4 +280,15 @@ struct PresencePayload: Codable, Sendable {
     let agentId: String?
     let deviceId: String?
     let status: String?  // "online", "offline"
+}
+
+// MARK: - Error shape
+
+/// Gateway error details — used in response.error.
+struct ErrorShape: Codable, Sendable {
+    let code: String?
+    let message: String?
+    let details: AnyCodable?
+    let retryable: Bool?
+    let retryAfterMs: Int?
 }

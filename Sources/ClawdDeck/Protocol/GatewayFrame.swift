@@ -112,12 +112,7 @@ struct EventFrame: Codable, Sendable {
     let payload: AnyCodable?
 }
 
-/// Error shape in response frames.
-struct ErrorShape: Codable, Sendable {
-    let code: Int?
-    let message: String?
-    let details: AnyCodable?
-}
+// ErrorShape is defined in GatewayMethods.swift
 
 // MARK: - Frame decoder
 
