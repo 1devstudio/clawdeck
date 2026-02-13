@@ -6,15 +6,6 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $viewModel.selectedSessionKey) {
-            // Agents section
-            if !viewModel.agents.isEmpty {
-                Section("Agents") {
-                    ForEach(viewModel.agents) { agent in
-                        AgentRow(agent: agent)
-                    }
-                }
-            }
-
             // Sessions grouped by time
             ForEach(viewModel.groupedSessions, id: \.title) { group in
                 Section(group.title) {
@@ -47,11 +38,11 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .searchable(text: $viewModel.searchText, prompt: "Search sessions")
         .overlay {
-            if viewModel.filteredSessions.isEmpty && viewModel.agents.isEmpty {
+            if viewModel.filteredSessions.isEmpty {
                 ContentUnavailableView(
                     "No Sessions",
                     systemImage: "tray",
-                    description: Text("Connect to a gateway to see your sessions.")
+                    description: Text("Start a conversation or connect to a gateway.")
                 )
             }
         }

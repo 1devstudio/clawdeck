@@ -6,24 +6,42 @@ struct MainView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(viewModel: appViewModel.sidebarViewModel)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
-        } detail: {
-            if let sessionKey = appViewModel.selectedSessionKey {
-                chatArea(sessionKey: sessionKey)
-            } else {
-                ContentUnavailableView(
-                    "No Session Selected",
-                    systemImage: "bubble.left.and.bubble.right",
-                    description: Text("Select a session from the sidebar or create a new one.")
-                )
+        HStack(spacing: 0) {
+            // Agent rail (leftmost)
+            AgentRailView(
+                profiles: appViewModel.connectionManager.profiles,
+                activeProfileId: appViewModel.connectionManager.activeProfile?.id,
+                connectionState: appViewModel.connectionManager.connectionState,
+                onSelect: { profile in
+                    Task { await appViewModel.switchAgent(profile) }
+                },
+                onAdd: {
+                    appViewModel.showAgentSettings = true
+                }
+            )
+
+            Divider()
+
+            // Main content: sidebar + detail
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView(viewModel: appViewModel.sidebarViewModel)
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
+            } detail: {
+                if let sessionKey = appViewModel.selectedSessionKey {
+                    chatArea(sessionKey: sessionKey)
+                } else {
+                    ContentUnavailableView(
+                        "No Session Selected",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("Select a session from the sidebar or create a new one.")
+                    )
+                }
             }
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 connectionStatusView
-                
+
                 Button {
                     appViewModel.isInspectorVisible.toggle()
                 } label: {
@@ -31,6 +49,9 @@ struct MainView: View {
                 }
                 .help("Toggle Inspector")
             }
+        }
+        .sheet(isPresented: $appViewModel.showAgentSettings) {
+            AgentSettingsSheet(appViewModel: appViewModel)
         }
     }
 

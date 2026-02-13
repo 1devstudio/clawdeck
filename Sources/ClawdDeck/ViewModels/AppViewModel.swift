@@ -32,6 +32,12 @@ final class AppViewModel {
     /// Whether the onboarding/connection setup is shown.
     var showConnectionSetup = false
 
+    /// Whether the agent settings sheet is shown.
+    var showAgentSettings = false
+
+    /// Profile ID being edited (nil = adding new, non-nil = editing).
+    var editingAgentProfileId: String?
+
     /// Currently selected session.
     var selectedSession: Session? {
         sessions.first { $0.key == selectedSessionKey }
@@ -87,6 +93,13 @@ final class AppViewModel {
         sessions.removeAll()
         selectedSessionKey = nil
         messageStore.clearAll()
+    }
+
+    /// Switch to a different agent (connection profile).
+    func switchAgent(_ profile: ConnectionProfile) async {
+        guard profile.id != connectionManager.activeProfile?.id else { return }
+        disconnect()
+        await connect(with: profile)
     }
 
     // MARK: - Data loading

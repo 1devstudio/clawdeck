@@ -4,12 +4,14 @@ import Foundation
 struct ConnectionProfile: Identifiable, Codable, Hashable {
     let id: String
     var name: String
+    var displayName: String
     var host: String
     var port: Int
     var path: String
     var useTLS: Bool
     var token: String?
     var isDefault: Bool
+    var avatarName: String?  // "sf:robot" for SF Symbols, or "filename.png" for custom
 
     /// WebSocket URL for this profile.
     var webSocketURL: URL? {
@@ -32,33 +34,48 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
         return "\(host)\(portSuffix)\(path)"
     }
 
+    /// Initials for display (first 1-2 chars of displayName).
+    var initials: String {
+        let parts = displayName.split(separator: " ")
+        if parts.count >= 2 {
+            return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
+        }
+        return String(displayName.prefix(2)).uppercased()
+    }
+
     init(
         id: String = UUID().uuidString,
         name: String = "Default",
+        displayName: String? = nil,
         host: String = "vps-0a60f62f.vps.ovh.net",
         port: Int = 443,
         path: String = "/ws",
         useTLS: Bool = true,
         token: String? = nil,
-        isDefault: Bool = true
+        isDefault: Bool = true,
+        avatarName: String? = nil
     ) {
         self.id = id
         self.name = name
+        self.displayName = displayName ?? name
         self.host = host
         self.port = port
         self.path = path
         self.useTLS = useTLS
         self.token = token
         self.isDefault = isDefault
+        self.avatarName = avatarName
     }
 
     /// Default local development profile.
     static let localhost = ConnectionProfile(
         name: "Local",
+        displayName: "Local",
         host: "localhost",
         port: 18789,
         path: "",
-        useTLS: false
+        useTLS: false,
+        avatarName: "sf:desktopcomputer"
     )
 }
 

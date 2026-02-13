@@ -6,12 +6,23 @@ struct ConnectionSetupView: View {
 
 
     @State private var name = "Default"
+    @State private var displayName = "My Agent"
     @State private var host = "vps-0a60f62f.vps.ovh.net"
     @State private var port = "443"
     @State private var token = ""
     @State private var useTLS = false
+    @State private var selectedAvatar = "sf:robot"
     @State private var isConnecting = false
     @State private var errorMessage: String?
+
+    /// Built-in SF Symbol avatars.
+    private let builtInAvatars = [
+        "robot", "desktopcomputer", "brain.head.profile", "cpu",
+        "cloud", "server.rack", "antenna.radiowaves.left.and.right",
+        "globe", "bolt.circle", "wand.and.stars", "sparkles",
+        "terminal", "chevron.left.forwardslash.chevron.right",
+        "gearshape", "atom"
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,7 +46,43 @@ struct ConnectionSetupView: View {
 
             // Fields
             VStack(spacing: 12) {
-                LabeledContent("Name") {
+                LabeledContent("Agent Name") {
+                    TextField("Agent Name", text: $displayName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                // Avatar selection
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Avatar")
+                        .font(.headline)
+                    
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 8), count: 8), spacing: 8) {
+                        ForEach(builtInAvatars, id: \.self) { symbol in
+                            let avatarKey = "sf:\(symbol)"
+                            Button {
+                                selectedAvatar = avatarKey
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(selectedAvatar == avatarKey ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: symbol)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(selectedAvatar == avatarKey ? Color.accentColor : Color.secondary)
+                                }
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(selectedAvatar == avatarKey ? Color.accentColor : Color.clear, lineWidth: 2)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Divider()
+
+                LabeledContent("Connection Name") {
                     TextField("Connection Name", text: $name)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -92,7 +139,7 @@ struct ConnectionSetupView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .frame(width: 440, height: 520)
+        .frame(width: 440, height: 640)
     }
 
     private func connect() async {
@@ -107,11 +154,13 @@ struct ConnectionSetupView: View {
 
         let profile = ConnectionProfile(
             name: name.isEmpty ? "Default" : name,
+            displayName: displayName.isEmpty ? "My Agent" : displayName,
             host: host,
             port: portNumber,
             useTLS: useTLS,
             token: token.isEmpty ? nil : token,
-            isDefault: true
+            isDefault: true,
+            avatarName: selectedAvatar
         )
 
         appViewModel.connectionManager.addProfile(profile)
