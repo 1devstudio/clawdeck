@@ -54,7 +54,7 @@ struct MainView: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(activeAgentName)
                         .font(.headline)
 
@@ -66,9 +66,14 @@ struct MainView: View {
                         }
                         appViewModel.showAgentSettings = true
                     } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                        ZStack {
+                            Circle()
+                                .fill(Color.gray.opacity(0.15))
+                                .frame(width: 24, height: 24)
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .buttonStyle(.plain)
                     .help("Edit Agent Settings")
