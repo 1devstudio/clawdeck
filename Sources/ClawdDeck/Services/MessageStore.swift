@@ -61,8 +61,9 @@ final class MessageStore {
         switch event.state {
         case "delta":
             if let existing = streamingMessages[runId] {
-                // Append content delta
-                existing.content += event.message?.content ?? ""
+                // Replace with latest cumulative content — the gateway sends
+                // the full accumulated text in each delta, not incremental chunks.
+                existing.content = event.message?.content ?? existing.content
             } else {
                 // Create new streaming message
                 let message = ChatMessage.streamPlaceholder(
