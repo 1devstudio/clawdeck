@@ -53,10 +53,10 @@ struct MainView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 6) {
                     Text(activeAgentName)
-                        .font(.headline)
+                        .font(.body)
 
                     Button {
                         if let profileId = appViewModel.connectionManager.activeProfile?.id {
