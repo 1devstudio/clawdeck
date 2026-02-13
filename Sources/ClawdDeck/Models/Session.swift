@@ -15,6 +15,8 @@ final class Session: Identifiable, Hashable {
     var agentId: String?
     var lastMessage: String?
     var lastMessageAt: Date?
+    /// When the session was first seen (stable sort key).
+    var createdAt: Date
     var updatedAt: Date
     var isActive: Bool
     var totalTokens: Int?
@@ -61,6 +63,7 @@ final class Session: Identifiable, Hashable {
         agentId: String? = nil,
         lastMessage: String? = nil,
         lastMessageAt: Date? = nil,
+        createdAt: Date = Date(),
         updatedAt: Date = Date(),
         isActive: Bool = true,
         totalTokens: Int? = nil
@@ -77,6 +80,7 @@ final class Session: Identifiable, Hashable {
         self.agentId = agentId
         self.lastMessage = lastMessage
         self.lastMessageAt = lastMessageAt
+        self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isActive = isActive
         self.totalTokens = totalTokens
@@ -132,6 +136,7 @@ extension Session {
             agentId: agentId,
             lastMessage: summary.lastMessagePreview,
             lastMessageAt: updatedDate,
+            createdAt: updatedDate,  // Best proxy; stable after first load
             updatedAt: updatedDate,
             isActive: true,
             totalTokens: summary.totalTokens

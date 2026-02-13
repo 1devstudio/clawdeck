@@ -39,9 +39,9 @@ final class SidebarViewModel {
         }
     }
 
-    /// Sessions grouped by time period.
+    /// Sessions grouped by creation time (stable order that doesn't shift on activity).
     var groupedSessions: [(title: String, sessions: [Session])] {
-        let sorted = filteredSessions.sorted { ($0.updatedAt) > ($1.updatedAt) }
+        let sorted = filteredSessions.sorted { ($0.createdAt) > ($1.createdAt) }
         let calendar = Calendar.current
         let now = Date()
 
@@ -51,12 +51,12 @@ final class SidebarViewModel {
         var older: [Session] = []
 
         for session in sorted {
-            if calendar.isDateInToday(session.updatedAt) {
+            if calendar.isDateInToday(session.createdAt) {
                 today.append(session)
-            } else if calendar.isDateInYesterday(session.updatedAt) {
+            } else if calendar.isDateInYesterday(session.createdAt) {
                 yesterday.append(session)
             } else if let weekAgo = calendar.date(byAdding: .day, value: -7, to: now),
-                      session.updatedAt > weekAgo {
+                      session.createdAt > weekAgo {
                 thisWeek.append(session)
             } else {
                 older.append(session)

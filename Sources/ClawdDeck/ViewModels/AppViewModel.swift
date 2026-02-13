@@ -123,9 +123,22 @@ final class AppViewModel {
         do {
             let result = try await client.listSessions()
             print("[AppViewModel] sessions.list returned \(result.sessions.count) sessions")
+
+            // Build a lookup of existing createdAt values so we don't lose them on refresh.
+            let existingCreatedAt = Dictionary(uniqueKeysWithValues:
+                sessions.map { ($0.key, $0.createdAt) }
+            )
+
             sessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
-                .map { Session.from(summary: $0) }
+                .map { summary in
+                    let session = Session.from(summary: summary)
+                    // Preserve the original createdAt if we've seen this session before.
+                    if let existing = existingCreatedAt[session.key] {
+                        session.createdAt = existing
+                    }
+                    return session
+                }
         } catch {
             print("[AppViewModel] Failed to list sessions: \(error)")
         }
