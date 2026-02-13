@@ -129,4 +129,10 @@ final class SidebarViewModel {
     func createNewSession() async {
         await appViewModel.createNewSession()
     }
+
+    /// Show the agent settings sheet for the active agent.
+    func showAgentSettings() {
+        appViewModel.editingAgentProfileId = appViewModel.connectionManager.activeProfile?.id
+        appViewModel.showAgentSettings = true
+    }
 }

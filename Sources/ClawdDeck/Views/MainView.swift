@@ -52,26 +52,8 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .navigationTitle(activeAgentName)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: 8) {
-                    Text(activeAgentName)
-                        .font(.headline)
-
-                    Button {
-                        if let profileId = appViewModel.connectionManager.activeProfile?.id {
-                            appViewModel.editingAgentProfileId = profileId
-                        } else {
-                            appViewModel.editingAgentProfileId = nil
-                        }
-                        appViewModel.showAgentSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .help("Edit Agent Settings")
-                }
-            }
-
             ToolbarItemGroup(placement: .primaryAction) {
                 connectionStatusView
 
@@ -92,7 +74,7 @@ struct MainView: View {
 
     /// Display name of the currently active agent (connection profile).
     private var activeAgentName: String {
-        appViewModel.connectionManager.activeProfile?.displayName ?? "Clawd Deck"
+        appViewModel.connectionManager.activeProfile?.displayName ?? ""
     }
 
     // MARK: - Chat area with optional inspector
