@@ -66,6 +66,7 @@ struct MainView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 8)
     }
 
     private func statusColor(for state: ConnectionState) -> Color {
