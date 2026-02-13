@@ -9,24 +9,15 @@ struct MainView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(viewModel: SidebarViewModel(appViewModel: appViewModel))
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
-        } content: {
+        } detail: {
             if let sessionKey = appViewModel.selectedSessionKey {
-                ChatView(viewModel: ChatViewModel(
-                    sessionKey: sessionKey,
-                    appViewModel: appViewModel
-                ))
-                .navigationSplitViewColumnWidth(min: 400, ideal: 600, max: .infinity)
+                chatArea(sessionKey: sessionKey)
             } else {
                 ContentUnavailableView(
                     "No Session Selected",
                     systemImage: "bubble.left.and.bubble.right",
                     description: Text("Select a session from the sidebar or create a new one.")
                 )
-            }
-        } detail: {
-            if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
-                InspectorView(session: session, appViewModel: appViewModel)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
             }
         }
         .toolbar {
@@ -39,6 +30,25 @@ struct MainView: View {
                     Image(systemName: "sidebar.right")
                 }
                 .help("Toggle Inspector")
+            }
+        }
+    }
+
+    // MARK: - Chat area with optional inspector
+
+    @ViewBuilder
+    private func chatArea(sessionKey: String) -> some View {
+        HStack(spacing: 0) {
+            ChatView(viewModel: ChatViewModel(
+                sessionKey: sessionKey,
+                appViewModel: appViewModel
+            ))
+            .frame(maxWidth: .infinity)
+
+            if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
+                Divider()
+                InspectorView(session: session, appViewModel: appViewModel)
+                    .frame(width: 280)
             }
         }
     }
