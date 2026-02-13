@@ -264,11 +264,58 @@ struct ChatEventPayload: Codable, Sendable {
     let stopReason: String?
 }
 
+/// A single content block within a chat event message.
+struct ContentBlock: Codable, Sendable {
+    let type: String
+    let text: String?
+}
+
 /// The message portion of a chat event.
-struct ChatEventMessage: Codable, Sendable {
+///
+/// The gateway sends `content` as an array of content blocks:
+/// `[{"type":"text","text":"..."}]`
+/// We decode the array and extract text blocks into a convenience property.
+struct ChatEventMessage: Sendable {
     let role: String?
-    let content: String?
+    let contentBlocks: [ContentBlock]?
     let agentId: String?
+
+    /// Convenience: joined text from all "text" content blocks.
+    var content: String? {
+        guard let blocks = contentBlocks else { return nil }
+        let texts = blocks.compactMap { $0.type == "text" ? $0.text : nil }
+        return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+    }
+}
+
+extension ChatEventMessage: Codable {
+    enum CodingKeys: String, CodingKey {
+        case role
+        case content
+        case agentId
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        role = try container.decodeIfPresent(String.self, forKey: .role)
+        agentId = try container.decodeIfPresent(String.self, forKey: .agentId)
+
+        // content can be either a plain string or an array of content blocks
+        if let blocks = try? container.decodeIfPresent([ContentBlock].self, forKey: .content) {
+            contentBlocks = blocks
+        } else if let plainText = try? container.decodeIfPresent(String.self, forKey: .content) {
+            contentBlocks = plainText.isEmpty ? nil : [ContentBlock(type: "text", text: plainText)]
+        } else {
+            contentBlocks = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(role, forKey: .role)
+        try container.encodeIfPresent(agentId, forKey: .agentId)
+        try container.encodeIfPresent(contentBlocks, forKey: .content)
+    }
 }
 
 // MARK: - Presence types

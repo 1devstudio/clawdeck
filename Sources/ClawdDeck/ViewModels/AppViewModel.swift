@@ -221,9 +221,13 @@ final class AppViewModel {
     }
 
     private func handleChatEvent(_ event: EventFrame) {
-        guard let payload = event.payload else { return }
+        guard let payload = event.payload else {
+            print("[AppViewModel] chat event has no payload")
+            return
+        }
         do {
             let chatEvent = try payload.decode(ChatEventPayload.self)
+            print("[AppViewModel] chat event: state=\(chatEvent.state) runId=\(chatEvent.runId) sessionKey=\(chatEvent.sessionKey) content=\(chatEvent.message?.content?.prefix(80) ?? "nil")")
             messageStore.handleChatEvent(chatEvent)
 
             // Update session's last message
@@ -235,7 +239,15 @@ final class AppViewModel {
                 }
             }
         } catch {
-            // Failed to decode chat event
+            print("[AppViewModel] ❌ Failed to decode chat event: \(error)")
+            // Log the raw payload for debugging
+            if let dict = payload.dictValue {
+                print("[AppViewModel] Raw payload keys: \(dict.keys.sorted())")
+                if let msg = dict["message"] as? [String: Any] {
+                    print("[AppViewModel] message keys: \(msg.keys.sorted())")
+                    print("[AppViewModel] content type: \(type(of: msg["content"] as Any))")
+                }
+            }
         }
     }
 
