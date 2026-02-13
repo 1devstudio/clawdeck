@@ -41,6 +41,11 @@ final class ChatViewModel {
         appViewModel.sessions.first { $0.key == sessionKey }
     }
 
+    /// Tracks streaming content updates — observe to trigger auto-scroll.
+    var streamingContentVersion: Int {
+        appViewModel.messageStore.streamingContentVersion
+    }
+
     // MARK: - Init
 
     init(sessionKey: String, appViewModel: AppViewModel) {

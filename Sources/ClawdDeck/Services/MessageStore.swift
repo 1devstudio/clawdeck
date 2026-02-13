@@ -10,6 +10,9 @@ final class MessageStore {
     /// Active streaming messages by runId.
     private var streamingMessages: [String: ChatMessage] = [:]
 
+    /// Incremented on every streaming delta — observe this to trigger auto-scroll.
+    private(set) var streamingContentVersion: Int = 0
+
     // MARK: - Read
 
     /// Get all messages for a session, ordered by timestamp.
@@ -64,6 +67,7 @@ final class MessageStore {
                 // Replace with latest cumulative content — the gateway sends
                 // the full accumulated text in each delta, not incremental chunks.
                 existing.content = event.message?.content ?? existing.content
+                streamingContentVersion += 1
             } else {
                 // Create new streaming message
                 let message = ChatMessage.streamPlaceholder(

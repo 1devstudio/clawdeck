@@ -17,7 +17,8 @@ struct ChatView: View {
                                 .id(message.id)
                         }
 
-                        if viewModel.isStreaming {
+                        if viewModel.isStreaming && viewModel.messages.last?.state != .streaming {
+                            // Show typing indicator while waiting for first delta
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
@@ -31,6 +32,9 @@ struct ChatView: View {
                 }
                 .onChange(of: viewModel.isStreaming) { _, _ in
                     scrollToBottom(proxy: proxy)
+                }
+                .onChange(of: viewModel.streamingContentVersion) { _, _ in
+                    scrollToBottom(proxy: proxy, animated: false)
                 }
             }
 
@@ -77,13 +81,16 @@ struct ChatView: View {
         }
     }
 
-    private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.2)) {
-            if viewModel.isStreaming {
-                proxy.scrollTo("typing-indicator", anchor: .bottom)
-            } else if let lastId = viewModel.messages.last?.id {
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        let scroll = {
+            if let lastId = viewModel.messages.last?.id {
                 proxy.scrollTo(lastId, anchor: .bottom)
             }
+        }
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) { scroll() }
+        } else {
+            scroll()
         }
     }
 }
