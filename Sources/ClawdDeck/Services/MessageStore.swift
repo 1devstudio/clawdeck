@@ -82,9 +82,14 @@ final class MessageStore {
 
         case "final":
             if let existing = streamingMessages[runId] {
-                // Finalize the streaming message
-                if let content = event.message?.content {
-                    existing.content = content // Replace with final content
+                // Finalize the streaming message.
+                // Only replace content if the streaming message is empty —
+                // deltas already provided the text progressively, and the
+                // final may only contain the last text block (post tool-use),
+                // which would overwrite earlier streamed content.
+                if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let content = event.message?.content {
+                    existing.content = content
                 }
                 existing.state = .complete
                 streamingMessages.removeValue(forKey: runId)
