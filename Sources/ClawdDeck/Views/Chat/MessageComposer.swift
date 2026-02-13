@@ -31,7 +31,7 @@ struct MessageComposer: View {
             )
             .focused($isFocused)
 
-            // Send / Abort button
+            // Abort button (only visible during streaming)
             if isStreaming {
                 Button(action: onAbort) {
                     Image(systemName: "stop.circle.fill")
@@ -41,15 +41,6 @@ struct MessageComposer: View {
                 .buttonStyle(.plain)
                 .help("Stop generation (Esc)")
                 .keyboardShortcut(.escape, modifiers: [])
-            } else {
-                Button(action: onSend) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSend)
-                .help("Send message (Enter)")
             }
         }
         .padding(.horizontal, 16)
@@ -126,6 +117,12 @@ struct ComposerTextEditor: NSViewRepresentable {
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // Check if Shift or Option is held → insert newline
+                let flags = NSApp.currentEvent?.modifierFlags ?? []
+                if flags.contains(.shift) || flags.contains(.option) {
+                    textView.insertNewlineIgnoringFieldEditor(nil)
+                    return true
+                }
                 // Plain Enter → send
                 parent.onEnterSend()
                 return true
