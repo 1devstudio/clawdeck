@@ -218,6 +218,26 @@ final class AppViewModel {
         }
     }
 
+    // MARK: - New session
+
+    /// Create a new session by generating a unique key and selecting it.
+    /// The session is created on the gateway implicitly when the first message is sent.
+    func createNewSession() async {
+        let defaultAgent = agents.first { $0.isDefault }?.id ?? agents.first?.id ?? "main"
+        let shortId = UUID().uuidString.prefix(8).lowercased()
+        let sessionKey = "agent:\(defaultAgent):\(shortId)"
+
+        let newSession = Session(
+            key: sessionKey,
+            agentId: defaultAgent,
+            updatedAt: Date(),
+            isActive: true
+        )
+        sessions.insert(newSession, at: 0)
+        selectedSessionKey = sessionKey
+        print("[AppViewModel] Created new session: \(sessionKey)")
+    }
+
     // MARK: - Event handling
 
     private func handleEvent(_ event: EventFrame) {

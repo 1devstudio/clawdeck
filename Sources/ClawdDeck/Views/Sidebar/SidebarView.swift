@@ -56,7 +56,15 @@ struct SidebarView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    Task { await viewModel.createNewSession() }
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                }
+                .help("New Session (⌘N)")
+                .keyboardShortcut("n", modifiers: .command)
+
                 Button {
                     Task { await viewModel.refreshSessions() }
                 } label: {
