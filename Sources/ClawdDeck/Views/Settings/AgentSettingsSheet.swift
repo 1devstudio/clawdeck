@@ -67,11 +67,11 @@ struct AgentSettingsSheet: View {
                                 } else if let avatar = selectedAvatar, avatar.hasPrefix("sf:") {
                                     Image(systemName: String(avatar.dropFirst(3)))
                                         .font(.system(size: 28))
-                                        .foregroundStyle(.accentColor)
+                                        .foregroundStyle(Color.accentColor)
                                 } else {
                                     Text(initials(for: displayName))
                                         .font(.system(size: 24, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.accentColor)
+                                        .foregroundStyle(Color.accentColor)
                                 }
                             }
 

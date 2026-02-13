@@ -34,7 +34,7 @@ struct ConnectionSetupView: View {
                     if selectedAvatar.hasPrefix("sf:") {
                         Image(systemName: String(selectedAvatar.dropFirst(3)))
                             .font(.system(size: 28))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
 
