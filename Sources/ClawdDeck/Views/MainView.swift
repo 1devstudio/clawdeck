@@ -74,12 +74,9 @@ struct MainView: View {
     @ViewBuilder
     private func chatArea(sessionKey: String) -> some View {
         HStack(spacing: 0) {
-            ChatView(viewModel: ChatViewModel(
-                sessionKey: sessionKey,
-                appViewModel: appViewModel
-            ))
+            ChatView(viewModel: appViewModel.chatViewModel(for: sessionKey))
             .frame(maxWidth: .infinity)
-            .id(sessionKey) // Stabilize: only recreate ChatView when session actually changes
+            .id(sessionKey)
 
             if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
                 Divider()

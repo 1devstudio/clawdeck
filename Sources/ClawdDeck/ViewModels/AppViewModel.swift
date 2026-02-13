@@ -15,6 +15,20 @@ final class AppViewModel {
     /// Sidebar view model — owned here so it survives re-renders.
     private(set) var sidebarViewModel: SidebarViewModel!
 
+    /// Cached chat view models keyed by session key — prevents draft text
+    /// loss on re-renders.
+    private var chatViewModels: [String: ChatViewModel] = [:]
+
+    /// Get or create a ChatViewModel for a session key.
+    func chatViewModel(for sessionKey: String) -> ChatViewModel {
+        if let existing = chatViewModels[sessionKey] {
+            return existing
+        }
+        let vm = ChatViewModel(sessionKey: sessionKey, appViewModel: self)
+        chatViewModels[sessionKey] = vm
+        return vm
+    }
+
     // MARK: - State
 
     /// All known agents.
@@ -93,6 +107,7 @@ final class AppViewModel {
         sessions.removeAll()
         selectedSessionKey = nil
         messageStore.clearAll()
+        chatViewModels.removeAll()
     }
 
     /// Switch to a different agent (connection profile).
