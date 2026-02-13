@@ -46,6 +46,11 @@ final class ChatViewModel {
         appViewModel.messageStore.streamingContentVersion
     }
 
+    /// Display name of the active agent (from the connection profile).
+    var agentDisplayName: String {
+        appViewModel.connectionManager.activeProfile?.displayName ?? "Assistant"
+    }
+
     // MARK: - Init
 
     init(sessionKey: String, appViewModel: AppViewModel) {

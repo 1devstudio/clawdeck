@@ -5,6 +5,7 @@ import HighlightSwift
 /// Renders a single chat message with role-appropriate styling.
 struct MessageBubble: View {
     let message: ChatMessage
+    var agentDisplayName: String = "Assistant"
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -100,7 +101,7 @@ struct MessageBubble: View {
     private var roleLabel: String {
         switch message.role {
         case .user: return "You"
-        case .assistant: return message.agentId ?? "Assistant"
+        case .assistant: return agentDisplayName
         case .system: return "System"
         case .toolCall: return "Tool Call"
         case .toolResult: return "Tool Result"

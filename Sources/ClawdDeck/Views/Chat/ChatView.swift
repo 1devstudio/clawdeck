@@ -13,8 +13,11 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(viewModel.messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
+                            MessageBubble(
+                                message: message,
+                                agentDisplayName: viewModel.agentDisplayName
+                            )
+                            .id(message.id)
                         }
 
                         if viewModel.isStreaming && viewModel.messages.last?.state != .streaming {
