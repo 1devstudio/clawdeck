@@ -52,23 +52,27 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle(activeAgentName)
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button {
-                    if let profileId = appViewModel.connectionManager.activeProfile?.id {
-                        appViewModel.editingAgentProfileId = profileId
-                    } else {
-                        appViewModel.editingAgentProfileId = nil
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 6) {
+                    Text(activeAgentName)
+                        .font(.headline)
+
+                    Button {
+                        if let profileId = appViewModel.connectionManager.activeProfile?.id {
+                            appViewModel.editingAgentProfileId = profileId
+                        } else {
+                            appViewModel.editingAgentProfileId = nil
+                        }
+                        appViewModel.showAgentSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                     }
-                    appViewModel.showAgentSettings = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .help("Edit Agent Settings")
                 }
-                .buttonStyle(.plain)
-                .help("Edit Agent Settings")
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
