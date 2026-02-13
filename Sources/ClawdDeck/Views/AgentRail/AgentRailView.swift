@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Narrow vertical rail showing agent avatars, like Slack's workspace switcher.
 struct AgentRailView: View {
