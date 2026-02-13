@@ -4,8 +4,6 @@ import SwiftUI
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
 
-
-    @State private var name = "Default"
     @State private var displayName = "My Agent"
     @State private var host = "vps-0a60f62f.vps.ovh.net"
     @State private var port = "443"
@@ -15,7 +13,6 @@ struct ConnectionSetupView: View {
     @State private var isConnecting = false
     @State private var errorMessage: String?
 
-    /// Built-in SF Symbol avatars.
     private let builtInAvatars = [
         "robot", "desktopcomputer", "brain.head.profile", "cpu",
         "cloud", "server.rack", "antenna.radiowaves.left.and.right",
@@ -28,84 +25,95 @@ struct ConnectionSetupView: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.tint)
+                // Live avatar preview
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.accentColor.opacity(0.15))
+                        .frame(width: 64, height: 64)
 
-                Text("Connect to Gateway")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                Text("Enter the address and token for your Clawdbot gateway.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, 24)
-            .padding(.bottom, 20)
-
-            // Fields
-            VStack(spacing: 12) {
-                LabeledContent("Agent Name") {
-                    TextField("Agent Name", text: $displayName)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                // Avatar selection
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Avatar")
-                        .font(.headline)
-                    
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 8), count: 8), spacing: 8) {
-                        ForEach(builtInAvatars, id: \.self) { symbol in
-                            let avatarKey = "sf:\(symbol)"
-                            Button {
-                                selectedAvatar = avatarKey
-                            } label: {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(selectedAvatar == avatarKey ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
-                                        .frame(width: 40, height: 40)
-                                    Image(systemName: symbol)
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(selectedAvatar == avatarKey ? Color.accentColor : Color.secondary)
-                                }
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(selectedAvatar == avatarKey ? Color.accentColor : Color.clear, lineWidth: 2)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    if selectedAvatar.hasPrefix("sf:") {
+                        Image(systemName: String(selectedAvatar.dropFirst(3)))
+                            .font(.system(size: 28))
+                            .foregroundStyle(.accentColor)
                     }
                 }
 
-                Divider()
+                Text("Set Up Your Agent")
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-                LabeledContent("Connection Name") {
-                    TextField("Connection Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                }
-                LabeledContent("Host") {
-                    TextField("Host", text: $host)
-                        .textFieldStyle(.roundedBorder)
-                        .textContentType(.URL)
-                }
-                LabeledContent("Port") {
-                    TextField("Port", text: $port)
-                        .textFieldStyle(.roundedBorder)
-                }
-                Toggle("Use TLS (wss://)", isOn: $useTLS)
-
-                Divider()
-
-                LabeledContent("Token") {
-                    SecureField("Gateway Token (optional)", text: $token)
-                        .textFieldStyle(.roundedBorder)
-                        .textContentType(.password)
-                }
+                Text("Give your agent a name, pick an avatar, and connect to your gateway.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            // Fields
+            ScrollView {
+                VStack(spacing: 16) {
+                    LabeledContent("Name") {
+                        TextField("Agent Name", text: $displayName)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    // Avatar grid
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Avatar")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 6), count: 8), spacing: 6) {
+                            ForEach(builtInAvatars, id: \.self) { symbol in
+                                let key = "sf:\(symbol)"
+                                Button {
+                                    selectedAvatar = key
+                                } label: {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(selectedAvatar == key ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
+                                            .frame(width: 40, height: 40)
+                                        Image(systemName: symbol)
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(selectedAvatar == key ? Color.accentColor : Color.secondary)
+                                    }
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(selectedAvatar == key ? Color.accentColor : Color.clear, lineWidth: 2)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // Connection
+                    LabeledContent("Host") {
+                        TextField("Host", text: $host)
+                            .textFieldStyle(.roundedBorder)
+                            .textContentType(.URL)
+                    }
+                    LabeledContent("Port") {
+                        TextField("Port", text: $port)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 120)
+                    }
+                    Toggle("Use TLS (wss://)", isOn: $useTLS)
+
+                    LabeledContent("Token") {
+                        SecureField("Gateway Token (optional)", text: $token)
+                            .textFieldStyle(.roundedBorder)
+                            .textContentType(.password)
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+
+            Spacer(minLength: 8)
 
             // Error
             if let error = errorMessage {
@@ -139,7 +147,7 @@ struct ConnectionSetupView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .frame(width: 440, height: 640)
+        .frame(width: 460, height: 600)
     }
 
     private func connect() async {
@@ -152,9 +160,10 @@ struct ConnectionSetupView: View {
             return
         }
 
+        let name = displayName.isEmpty ? "My Agent" : displayName
         let profile = ConnectionProfile(
-            name: name.isEmpty ? "Default" : name,
-            displayName: displayName.isEmpty ? "My Agent" : displayName,
+            name: name,
+            displayName: name,
             host: host,
             port: portNumber,
             useTLS: useTLS,
