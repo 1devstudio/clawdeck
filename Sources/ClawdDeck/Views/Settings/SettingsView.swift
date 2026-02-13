@@ -4,8 +4,12 @@ import SwiftUI
 struct SettingsView: View {
     @State private var selectedTab: SettingsTab = .connections
 
+    /// Shared app view model — injected from the environment.
+    var appViewModel: AppViewModel?
+
     enum SettingsTab: String, CaseIterable {
         case connections = "Connections"
+        case gateway = "Gateway"
         case appearance = "Appearance"
         case shortcuts = "Shortcuts"
     }
@@ -17,6 +21,12 @@ struct SettingsView: View {
                     Label("Connections", systemImage: "network")
                 }
                 .tag(SettingsTab.connections)
+
+            GatewaySettingsView(connectionManager: appViewModel?.connectionManager)
+                .tabItem {
+                    Label("Gateway", systemImage: "gearshape.2")
+                }
+                .tag(SettingsTab.gateway)
 
             AppearanceSettingsView()
                 .tabItem {
@@ -30,7 +40,7 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.shortcuts)
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 700, height: 550)
     }
 }
 

@@ -223,6 +223,33 @@ actor GatewayClient {
         let _ = try await send(method: GatewayMethod.sessionsPatch, params: params)
     }
 
+    /// Fetch the current gateway config.
+    func configGet() async throws -> ConfigGetResult {
+        let response = try await send(method: GatewayMethod.configGet)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(ConfigGetResult.self)
+    }
+
+    /// Fetch the config schema with UI hints.
+    func configSchema() async throws -> ConfigSchemaResult {
+        let response = try await send(method: GatewayMethod.configSchema)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(ConfigSchemaResult.self)
+    }
+
+    /// Patch the gateway config (merge partial update).
+    func configPatch(raw: String, baseHash: String, sessionKey: String? = nil, note: String? = nil) async throws {
+        let params = ConfigPatchParams(raw: raw, baseHash: baseHash, sessionKey: sessionKey, note: note)
+        let response = try await send(method: GatewayMethod.configPatch, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Config patch failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+    }
+
     // MARK: - Private: Handshake
 
     private func performHandshake() async throws {

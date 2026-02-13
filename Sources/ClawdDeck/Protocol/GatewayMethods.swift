@@ -356,6 +356,53 @@ struct PresencePayload: Codable, Sendable {
     let status: String?  // "online", "offline"
 }
 
+// MARK: - Config types
+
+/// Result of config.get.
+struct ConfigGetResult: Codable, Sendable {
+    let path: String?
+    let exists: Bool
+    let raw: String?
+    let hash: String?
+    let valid: Bool?
+    let issues: [String]?
+    let warnings: [String]?
+}
+
+/// Parameters for config.patch.
+struct ConfigPatchParams: Codable, Sendable {
+    let raw: String
+    let baseHash: String
+    let sessionKey: String?
+    let note: String?
+    let restartDelayMs: Int?
+
+    init(raw: String, baseHash: String, sessionKey: String? = nil, note: String? = nil, restartDelayMs: Int? = 2000) {
+        self.raw = raw
+        self.baseHash = baseHash
+        self.sessionKey = sessionKey
+        self.note = note
+        self.restartDelayMs = restartDelayMs
+    }
+}
+
+/// Result of config.schema — we only care about the uiHints for labels.
+struct ConfigSchemaResult: Codable, Sendable {
+    let schema: AnyCodable?
+    let uiHints: [String: UIHintEntry]?
+    let version: String?
+
+    struct UIHintEntry: Codable, Sendable {
+        let label: String?
+        let help: String?
+        let group: String?
+        let order: Int?
+        let sensitive: Bool?
+        let placeholder: String?
+        let advanced: Bool?
+    }
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.

@@ -58,7 +58,7 @@ struct ClawdDeckApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(appViewModel: appViewModel)
         }
     }
 }

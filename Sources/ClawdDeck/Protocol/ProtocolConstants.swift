@@ -30,6 +30,9 @@ enum GatewayMethod {
     static let sessionsDelete = "sessions.delete"
     static let agentsList = "agents.list"
     static let agentIdentity = "agent.identity"
+    static let configGet = "config.get"
+    static let configSchema = "config.schema"
+    static let configPatch = "config.patch"
 }
 
 /// Gateway event names.
