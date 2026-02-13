@@ -3,7 +3,6 @@ import SwiftUI
 /// Main three-column layout for the app.
 struct MainView: View {
     @Bindable var appViewModel: AppViewModel
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         HStack(spacing: 0) {
@@ -22,20 +21,22 @@ struct MainView: View {
 
             Divider()
 
-            // Main content: sidebar + detail
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView(viewModel: appViewModel.sidebarViewModel)
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
-            } detail: {
-                if let sessionKey = appViewModel.selectedSessionKey {
-                    chatArea(sessionKey: sessionKey)
-                } else {
-                    ContentUnavailableView(
-                        "No Session Selected",
-                        systemImage: "bubble.left.and.bubble.right",
-                        description: Text("Select a session from the sidebar or create a new one.")
-                    )
-                }
+            // Sidebar (always visible)
+            SidebarView(viewModel: appViewModel.sidebarViewModel)
+                .frame(minWidth: 220, idealWidth: 260, maxWidth: 350)
+
+            Divider()
+
+            // Detail area
+            if let sessionKey = appViewModel.selectedSessionKey {
+                chatArea(sessionKey: sessionKey)
+            } else {
+                ContentUnavailableView(
+                    "No Session Selected",
+                    systemImage: "bubble.left.and.bubble.right",
+                    description: Text("Select a session from the sidebar or create a new one.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .toolbar {
