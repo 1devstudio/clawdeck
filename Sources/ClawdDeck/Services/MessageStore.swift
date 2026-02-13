@@ -63,19 +63,38 @@ final class MessageStore {
 
         switch event.state {
         case "delta":
+            let newContent = event.message?.content ?? ""
+
             if let existing = streamingMessages[runId] {
-                // Replace with latest cumulative content — the gateway sends
-                // the full accumulated text in each delta, not incremental chunks.
-                existing.content = event.message?.content ?? existing.content
+                // The gateway sends cumulative text within each text segment,
+                // but resets to a short string when a new segment begins
+                // (e.g. after tool calls). We detect this by checking if the
+                // new content is a prefix of what we already have — if not,
+                // a new segment started.
+                let currentSegmentText = String(existing.content.suffix(from: existing.content.index(existing.content.startIndex, offsetBy: existing.segmentOffset)))
+
+                if !newContent.isEmpty && !currentSegmentText.hasPrefix(newContent) && newContent.count < currentSegmentText.count {
+                    // New segment — keep accumulated text + append new
+                    if !existing.content.isEmpty {
+                        existing.content += "\n\n"
+                    }
+                    existing.segmentOffset = existing.content.count
+                    existing.content += newContent
+                } else {
+                    // Same segment growing — replace from segment offset
+                    let prefix = String(existing.content.prefix(existing.segmentOffset))
+                    existing.content = prefix + newContent
+                }
                 streamingContentVersion += 1
             } else {
-                // Create new streaming message
+                // First delta for this run — create streaming message
                 let message = ChatMessage.streamPlaceholder(
                     runId: runId,
                     sessionKey: sessionKey,
                     agentId: event.message?.agentId
                 )
-                message.content = event.message?.content ?? ""
+                message.content = newContent
+                message.segmentOffset = 0
                 streamingMessages[runId] = message
                 messagesBySession[sessionKey, default: []].append(message)
             }
@@ -83,13 +102,20 @@ final class MessageStore {
         case "final":
             if let existing = streamingMessages[runId] {
                 // Finalize the streaming message.
-                // Only replace content if the streaming message is empty —
-                // deltas already provided the text progressively, and the
-                // final may only contain the last text block (post tool-use),
-                // which would overwrite earlier streamed content.
-                if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                   let content = event.message?.content {
-                    existing.content = content
+                if let content = event.message?.content, !content.isEmpty {
+                    let currentSegmentText = String(existing.content.suffix(from: existing.content.index(existing.content.startIndex, offsetBy: existing.segmentOffset)))
+
+                    if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        // No delta content — use final directly
+                        existing.content = content
+                    } else if !currentSegmentText.hasPrefix(content) && content.count < currentSegmentText.count {
+                        // Final is a new segment
+                        existing.content += "\n\n" + content
+                    } else {
+                        // Final replaces current segment (complete version)
+                        let prefix = String(existing.content.prefix(existing.segmentOffset))
+                        existing.content = prefix + content
+                    }
                 }
                 existing.state = .complete
                 streamingMessages.removeValue(forKey: runId)

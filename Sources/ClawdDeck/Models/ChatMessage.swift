@@ -32,6 +32,10 @@ final class ChatMessage: Identifiable {
     var errorMessage: String?
     var model: String?
 
+    /// Tracks where the current streaming segment starts within `content`.
+    /// Used by MessageStore to detect new segments vs cumulative growth.
+    var segmentOffset: Int = 0
+
     /// Whether this message should be displayed in the chat view.
     var isVisible: Bool {
         switch role {
