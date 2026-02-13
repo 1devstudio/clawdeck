@@ -234,7 +234,7 @@ actor GatewayClient {
             role: GatewayProtocol.role,
             scopes: GatewayProtocol.scopes,
             auth: profile.token.map { ConnectParams.AuthInfo(token: $0, password: nil) },
-            device: .init(id: deviceId, publicKey: nil, signature: nil, signedAt: nil, nonce: nil),
+            device: nil,  // Device pairing not yet implemented; token auth is sufficient
             locale: Locale.current.identifier,
             userAgent: "ClawdDeck/\(GatewayProtocol.clientVersion)"
         )
