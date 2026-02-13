@@ -192,8 +192,9 @@ final class AppViewModel {
             if let session = sessions.first(where: { $0.key == sessionKey }) {
                 session.label = label
             }
+            print("[AppViewModel] Renamed session \(sessionKey) to '\(label)'")
         } catch {
-            // Handle error
+            print("[AppViewModel] ❌ Failed to rename session: \(error)")
         }
     }
 

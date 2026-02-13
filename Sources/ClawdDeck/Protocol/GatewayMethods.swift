@@ -184,6 +184,16 @@ struct SessionsListResult: Codable, Sendable {
 /// Parameters for sessions.patch.
 struct SessionsPatchParams: Codable, Sendable {
     let key: String
+    let patch: SessionPatchFields
+
+    init(key: String, label: String? = nil, model: String? = nil) {
+        self.key = key
+        self.patch = SessionPatchFields(label: label, model: model)
+    }
+}
+
+/// Patchable fields for a session.
+struct SessionPatchFields: Codable, Sendable {
     let label: String?
     let model: String?
 }
