@@ -52,7 +52,25 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .navigationTitle(activeAgentName)
         .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    if let profileId = appViewModel.connectionManager.activeProfile?.id {
+                        appViewModel.editingAgentProfileId = profileId
+                    } else {
+                        appViewModel.editingAgentProfileId = nil
+                    }
+                    appViewModel.showAgentSettings = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Edit Agent Settings")
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 connectionStatusView
 
@@ -64,9 +82,16 @@ struct MainView: View {
                 .help("Toggle Inspector")
             }
         }
-        .sheet(isPresented: $appViewModel.showAgentSettings) {
+        .sheet(isPresented: $appViewModel.showAgentSettings, onDismiss: {
+            appViewModel.editingAgentProfileId = nil
+        }) {
             AgentSettingsSheet(appViewModel: appViewModel)
         }
+    }
+
+    /// Display name of the currently active agent (connection profile).
+    private var activeAgentName: String {
+        appViewModel.connectionManager.activeProfile?.displayName ?? "Clawd Deck"
     }
 
     // MARK: - Chat area with optional inspector

@@ -73,7 +73,7 @@ struct ChatView: View {
                 }
             )
         }
-        .navigationTitle(viewModel.session?.displayTitle ?? "Chat")
+        // Title is set at the MainView level (agent name)
         .task {
             if viewModel.messages.isEmpty {
                 await viewModel.loadHistory()
