@@ -86,23 +86,18 @@ final class AppViewModel {
 
     /// Load agents and sessions after connecting.
     func loadInitialData() async {
-        guard let client = connectionManager.activeClient else { return }
-
-        // Check for snapshot data from handshake
-        if let hello = await client.helloResult, let snapshot = hello.snapshot {
-            if let agentSummaries = snapshot.agents {
-                agents = agentSummaries.map { Agent(from: $0) }
-            }
-            if let sessionSummaries = snapshot.sessions {
-                sessions = sessionSummaries.map { Session.from(summary: $0) }
-            }
+        guard connectionManager.activeClient != nil else {
+            print("[AppViewModel] No active client, skipping data load")
+            return
         }
 
-        // Fetch fresh data
+        // Fetch fresh data from gateway (skip snapshot — it's complex to decode)
+        print("[AppViewModel] Loading initial data...")
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.refreshAgents() }
             group.addTask { await self.refreshSessions() }
         }
+        print("[AppViewModel] Loaded \(agents.count) agents, \(sessions.count) sessions")
     }
 
     /// Refresh the agent list from the gateway.
@@ -110,9 +105,10 @@ final class AppViewModel {
         guard let client = connectionManager.activeClient else { return }
         do {
             let result = try await client.listAgents()
+            print("[AppViewModel] agents.list returned \(result.agents.count) agents (default: \(result.defaultId ?? "none"))")
             agents = result.agents.map { Agent(from: $0) }
         } catch {
-            // Silently fail — agents from snapshot are still available
+            print("[AppViewModel] Failed to list agents: \(error)")
         }
     }
 
@@ -121,9 +117,12 @@ final class AppViewModel {
         guard let client = connectionManager.activeClient else { return }
         do {
             let result = try await client.listSessions()
-            sessions = result.sessions.map { Session.from(summary: $0) }
+            print("[AppViewModel] sessions.list returned \(result.sessions.count) sessions")
+            sessions = result.sessions
+                .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
+                .map { Session.from(summary: $0) }
         } catch {
-            // Silently fail
+            print("[AppViewModel] Failed to list sessions: \(error)")
         }
     }
 
@@ -244,22 +243,4 @@ final class AppViewModel {
         }
     }
 }
-
-// MARK: - Session factory
-
-extension Session {
-    static func from(summary: SessionSummary) -> Session {
-        let isoFormatter = ISO8601DateFormatter()
-        return Session(
-            key: summary.key,
-            label: summary.label,
-            derivedTitle: summary.derivedTitle,
-            model: summary.model,
-            agentId: summary.agentId,
-            lastMessage: summary.lastMessage,
-            lastMessageAt: summary.lastMessageAt.flatMap { isoFormatter.date(from: $0) },
-            createdAt: summary.createdAt.flatMap { isoFormatter.date(from: $0) } ?? Date(),
-            updatedAt: summary.updatedAt.flatMap { isoFormatter.date(from: $0) } ?? Date()
-        )
-    }
-}
+// Session.from(summary:) is defined in Session.swift

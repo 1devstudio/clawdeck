@@ -5,7 +5,11 @@ enum GatewayProtocol {
     static let version = 3
     static let clientName = "clawdbot-macos"
     static let clientVersion = "0.1.0"
-    static let platform = "macOS"
+    static let clientPlatform = "macos"
+    static let clientMode = "ui"
+    static let clientDisplayName = "Clawd Deck"
+    static let role = "operator"
+    static let scopes = ["operator.read", "operator.write"]
 
     /// Default reconnect parameters.
     enum Reconnect {
