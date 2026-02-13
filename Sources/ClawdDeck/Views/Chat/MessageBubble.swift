@@ -1,5 +1,6 @@
 import SwiftUI
 import MarkdownUI
+import HighlightSwift
 
 /// Renders a single chat message with role-appropriate styling.
 struct MessageBubble: View {
@@ -36,6 +37,19 @@ struct MessageBubble: View {
                         Markdown(message.content)
                             .markdownTextStyle {
                                 FontSize(14)
+                            }
+                            .markdownTextStyle(\.code) {
+                                FontFamilyVariant(.monospaced)
+                                FontSize(.em(0.88))
+                                ForegroundColor(.purple)
+                                BackgroundColor(.purple.opacity(0.12))
+                            }
+                            .markdownBlockStyle(\.codeBlock) { configuration in
+                                HighlightedCodeBlock(
+                                    code: configuration.content,
+                                    language: configuration.language
+                                )
+                                .markdownMargin(top: .em(0.4), bottom: .em(0.4))
                             }
                     } else {
                         Text(message.content)
