@@ -112,13 +112,6 @@ struct EventFrame: Codable, Sendable {
     let payload: AnyCodable?
 }
 
-/// Error shape in response frames.
-struct ErrorShape: Codable, Sendable {
-    let code: String?
-    let message: String?
-    let details: AnyCodable?
-}
-
 // MARK: - Frame decoder
 
 /// Decodes raw JSON data into a typed GatewayFrame.

@@ -171,7 +171,7 @@ actor GatewayClient {
         let params = ChatSendParams(sessionKey: sessionKey, message: message)
         let response = try await send(method: GatewayMethod.chatSend, params: params)
         guard response.ok, let payload = response.payload else {
-            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil))
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }
         return try payload.decode(ChatSendResult.self)
     }
@@ -181,7 +181,7 @@ actor GatewayClient {
         let params = ChatHistoryParams(sessionKey: sessionKey, limit: limit)
         let response = try await send(method: GatewayMethod.chatHistory, params: params)
         guard response.ok, let payload = response.payload else {
-            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil))
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }
         return try payload.decode(ChatHistoryResult.self)
     }
@@ -197,7 +197,7 @@ actor GatewayClient {
         let params = SessionsListParams(limit: limit, includeDerivedTitles: true, includeLastMessage: true)
         let response = try await send(method: GatewayMethod.sessionsList, params: params)
         guard response.ok, let payload = response.payload else {
-            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil))
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }
         return try payload.decode(SessionsListResult.self)
     }
@@ -206,7 +206,7 @@ actor GatewayClient {
     func listAgents() async throws -> AgentsListResult {
         let response = try await send(method: GatewayMethod.agentsList)
         guard response.ok, let payload = response.payload else {
-            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil))
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }
         return try payload.decode(AgentsListResult.self)
     }
@@ -247,11 +247,15 @@ actor GatewayClient {
             client: .init(
                 id: GatewayProtocol.clientName,
                 version: GatewayProtocol.clientVersion,
-                platform: GatewayProtocol.platform,
-                mode: "ui"
+                platform: GatewayProtocol.clientPlatform,
+                mode: GatewayProtocol.clientMode
             ),
-            auth: profile.token.map { ConnectParams.AuthInfo(token: $0) },
-            device: nil
+            role: GatewayProtocol.role,
+            scopes: GatewayProtocol.scopes,
+            auth: profile.token.map { ConnectParams.AuthInfo(token: $0, password: nil) },
+            device: nil,
+            locale: nil,
+            userAgent: nil
         )
 
         let requestId = UUID().uuidString

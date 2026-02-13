@@ -45,11 +45,6 @@ struct InspectorView: View {
                     }
                 }
 
-                LabeledContent("Created") {
-                    Text(session.createdAt, style: .date)
-                    Text(session.createdAt, style: .time)
-                }
-
                 LabeledContent("Updated") {
                     Text(session.updatedAt, style: .date)
                     Text(session.updatedAt, style: .time)

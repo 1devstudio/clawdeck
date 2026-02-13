@@ -99,7 +99,7 @@ final class MessageStore {
         case "error":
             if let existing = streamingMessages[runId] {
                 existing.state = .error
-                existing.errorMessage = event.error?.message ?? "Unknown error"
+                existing.errorMessage = event.errorMessage ?? "Unknown error"
                 streamingMessages.removeValue(forKey: runId)
             }
 
