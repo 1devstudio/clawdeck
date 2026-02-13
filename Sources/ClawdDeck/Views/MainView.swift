@@ -3,6 +3,10 @@ import SwiftUI
 /// Main three-column layout for the app.
 struct MainView: View {
     @Bindable var appViewModel: AppViewModel
+    @State private var sidebarWidth: CGFloat = 260
+
+    private let sidebarMinWidth: CGFloat = 200
+    private let sidebarMaxWidth: CGFloat = 400
 
     var body: some View {
         HStack(spacing: 0) {
@@ -21,11 +25,20 @@ struct MainView: View {
 
             Divider()
 
-            // Sidebar (always visible)
+            // Sidebar (always visible, resizable)
             SidebarView(viewModel: appViewModel.sidebarViewModel)
-                .frame(minWidth: 220, idealWidth: 260, maxWidth: 350)
+                .frame(width: sidebarWidth)
 
-            Divider()
+            // Draggable resize handle
+            ResizeHandle()
+                .gesture(
+                    DragGesture(coordinateSpace: .global)
+                        .onChanged { value in
+                            // The rail is 60pt + 1pt divider, so offset from leading edge
+                            let newWidth = value.location.x - 61
+                            sidebarWidth = min(max(newWidth, sidebarMinWidth), sidebarMaxWidth)
+                        }
+                )
 
             // Detail area
             if let sessionKey = appViewModel.selectedSessionKey {
@@ -98,5 +111,32 @@ struct MainView: View {
         case .connecting, .reconnecting: return .orange
         case .disconnected: return .red
         }
+    }
+}
+
+// MARK: - Resize Handle
+
+/// Thin draggable divider between the sidebar and detail area.
+private struct ResizeHandle: View {
+    @State private var isHovering = false
+
+    var body: some View {
+        Rectangle()
+            .fill(isHovering ? Color.accentColor.opacity(0.4) : Color.clear)
+            .frame(width: 5)
+            .overlay(
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor))
+                    .frame(width: 1)
+            )
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovering = hovering
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
     }
 }
