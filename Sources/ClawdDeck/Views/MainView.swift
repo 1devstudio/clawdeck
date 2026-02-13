@@ -7,7 +7,7 @@ struct MainView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(viewModel: SidebarViewModel(appViewModel: appViewModel))
+            SidebarView(viewModel: appViewModel.sidebarViewModel)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
         } detail: {
             if let sessionKey = appViewModel.selectedSessionKey {
@@ -44,6 +44,7 @@ struct MainView: View {
                 appViewModel: appViewModel
             ))
             .frame(maxWidth: .infinity)
+            .id(sessionKey) // Stabilize: only recreate ChatView when session actually changes
 
             if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
                 Divider()

@@ -10,6 +10,11 @@ final class AppViewModel {
     let connectionManager = ConnectionManager()
     let messageStore = MessageStore()
 
+    // MARK: - Child View Models (created once, shared)
+
+    /// Sidebar view model — owned here so it survives re-renders.
+    lazy var sidebarViewModel: SidebarViewModel = SidebarViewModel(appViewModel: self)
+
     // MARK: - State
 
     /// All known agents.
@@ -231,12 +236,16 @@ final class AppViewModel {
             print("[AppViewModel] chat event: state=\(chatEvent.state) runId=\(chatEvent.runId) sessionKey=\(chatEvent.sessionKey) content=\(chatEvent.message?.content?.prefix(80) ?? "nil")")
             messageStore.handleChatEvent(chatEvent)
 
-            // Update session's last message
+            // Update session's last message preview (but don't change updatedAt
+            // to avoid re-sorting the sidebar and disrupting the user's selection).
             if chatEvent.state == "final", let content = chatEvent.message?.content {
                 if let session = sessions.first(where: { $0.key == chatEvent.sessionKey }) {
                     session.lastMessage = String(content.prefix(100))
                     session.lastMessageAt = Date()
-                    session.updatedAt = Date()
+                    // Note: updatedAt is intentionally NOT updated here.
+                    // Session order refreshes on next full sessions.list call,
+                    // not on every streaming event. This prevents the sidebar
+                    // from re-sorting under the user and stealing selection.
                 }
             }
         } catch {
