@@ -4,29 +4,35 @@ import Foundation
 
 /// Parameters for the connect request (step 3 of handshake).
 struct ConnectParams: Codable, Sendable {
-    let protocol_: Int
+    let minProtocol: Int
+    let maxProtocol: Int
     let client: ClientInfo
+    let role: String
+    let scopes: [String]
     let auth: AuthInfo?
     let device: DeviceInfo?
-
-    enum CodingKeys: String, CodingKey {
-        case protocol_ = "protocol"
-        case client, auth, device
-    }
+    let locale: String?
+    let userAgent: String?
 
     struct ClientInfo: Codable, Sendable {
-        let name: String
-        let version: String
-        let platform: String
+        let id: String       // "clawdbot-macos"
+        let version: String  // "0.1.0"
+        let platform: String // "macos"
+        let mode: String     // "ui"
+        let displayName: String?
     }
 
     struct AuthInfo: Codable, Sendable {
-        let token: String
+        let token: String?
+        let password: String?
     }
 
     struct DeviceInfo: Codable, Sendable {
         let id: String
-        let name: String
+        let publicKey: String?
+        let signature: String?
+        let signedAt: Int?
+        let nonce: String?
     }
 }
 
@@ -37,21 +43,39 @@ struct ConnectChallenge: Codable, Sendable {
 
 /// Payload of the hello-ok response (step 4 of handshake).
 struct HelloOk: Codable, Sendable {
-    let protocolVersion: Int?
-    let sessionId: String?
-    let features: [String]?
-    let snapshot: SnapshotPayload?
+    let type: String                // "hello-ok"
+    let `protocol`: Int             // 3
+    let server: ServerInfo
+    let features: FeaturesInfo
+    let snapshot: AnyCodable?
+    let canvasHostUrl: String?
+    let auth: AuthResponse?
+    let policy: PolicyInfo
 
-    enum CodingKeys: String, CodingKey {
-        case protocolVersion = "protocol"
-        case sessionId, features, snapshot
+    struct ServerInfo: Codable, Sendable {
+        let version: String
+        let commit: String?
+        let host: String?
+        let connId: String
     }
-}
 
-/// Initial state snapshot delivered with hello-ok.
-struct SnapshotPayload: Codable, Sendable {
-    let agents: [AgentSummary]?
-    let sessions: [SessionSummary]?
+    struct FeaturesInfo: Codable, Sendable {
+        let methods: [String]
+        let events: [String]
+    }
+
+    struct AuthResponse: Codable, Sendable {
+        let deviceToken: String
+        let role: String
+        let scopes: [String]
+        let issuedAtMs: Int?
+    }
+
+    struct PolicyInfo: Codable, Sendable {
+        let maxPayload: Int
+        let maxBufferedBytes: Int
+        let tickIntervalMs: Int
+    }
 }
 
 // MARK: - Agent types

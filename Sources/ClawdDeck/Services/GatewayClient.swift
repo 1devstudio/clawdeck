@@ -222,14 +222,21 @@ actor GatewayClient {
 
         // Step 3: Send connect request
         let connectParams = ConnectParams(
-            protocol_: GatewayProtocol.version,
+            minProtocol: GatewayProtocol.version,
+            maxProtocol: GatewayProtocol.version,
             client: .init(
-                name: GatewayProtocol.clientName,
+                id: GatewayProtocol.clientId,
                 version: GatewayProtocol.clientVersion,
-                platform: GatewayProtocol.platform
+                platform: GatewayProtocol.clientPlatform,
+                mode: GatewayProtocol.clientMode,
+                displayName: GatewayProtocol.clientDisplayName
             ),
-            auth: profile.token.map { ConnectParams.AuthInfo(token: $0) },
-            device: .init(id: deviceId, name: deviceName)
+            role: GatewayProtocol.role,
+            scopes: GatewayProtocol.scopes,
+            auth: profile.token.map { ConnectParams.AuthInfo(token: $0, password: nil) },
+            device: .init(id: deviceId, publicKey: nil, signature: nil, signedAt: nil, nonce: nil),
+            locale: Locale.current.identifier,
+            userAgent: "ClawdDeck/\(GatewayProtocol.clientVersion)"
         )
 
         let requestId = UUID().uuidString

@@ -6,6 +6,7 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     var name: String
     var host: String
     var port: Int
+    var path: String
     var useTLS: Bool
     var token: String?
     var isDefault: Bool
@@ -13,20 +14,24 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     /// WebSocket URL for this profile.
     var webSocketURL: URL? {
         let scheme = useTLS ? "wss" : "ws"
-        return URL(string: "\(scheme)://\(host):\(port)")
+        let portSuffix = (useTLS && port == 443) || (!useTLS && port == 80) ? "" : ":\(port)"
+        let pathComponent = path.isEmpty ? "" : path
+        return URL(string: "\(scheme)://\(host)\(portSuffix)\(pathComponent)")
     }
 
     /// Display string for the connection.
     var displayAddress: String {
-        "\(host):\(port)"
+        let portSuffix = (useTLS && port == 443) || (!useTLS && port == 80) ? "" : ":\(port)"
+        return "\(host)\(portSuffix)\(path)"
     }
 
     init(
         id: String = UUID().uuidString,
         name: String = "Default",
-        host: String = "localhost",
-        port: Int = 18789,
-        useTLS: Bool = false,
+        host: String = "vps-0a60f62f.vps.ovh.net",
+        port: Int = 443,
+        path: String = "/ws",
+        useTLS: Bool = true,
         token: String? = nil,
         isDefault: Bool = true
     ) {
@@ -34,13 +39,20 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
         self.name = name
         self.host = host
         self.port = port
+        self.path = path
         self.useTLS = useTLS
         self.token = token
         self.isDefault = isDefault
     }
 
     /// Default local development profile.
-    static let localhost = ConnectionProfile()
+    static let localhost = ConnectionProfile(
+        name: "Local",
+        host: "localhost",
+        port: 18789,
+        path: "",
+        useTLS: false
+    )
 }
 
 // MARK: - Persistence

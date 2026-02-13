@@ -7,8 +7,8 @@ struct ConnectionSetupView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = "Default"
-    @State private var host = "localhost"
-    @State private var port = "18789"
+    @State private var host = "vps-0a60f62f.vps.ovh.net"
+    @State private var port = "443"
     @State private var token = ""
     @State private var useTLS = false
     @State private var isConnecting = false
