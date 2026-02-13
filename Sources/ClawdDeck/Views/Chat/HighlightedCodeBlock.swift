@@ -78,7 +78,7 @@ struct HighlightedCodeBlock: View {
     private func performHighlight() async {
         do {
             let colors: HighlightColors = colorScheme == .dark
-                ? .dark(.githubDark)
+                ? .dark(.github)
                 : .light(.github)
 
             let result: HighlightResult

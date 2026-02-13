@@ -13,7 +13,7 @@ final class AppViewModel {
     // MARK: - Child View Models (created once, shared)
 
     /// Sidebar view model — owned here so it survives re-renders.
-    lazy var sidebarViewModel: SidebarViewModel = SidebarViewModel(appViewModel: self)
+    private(set) var sidebarViewModel: SidebarViewModel!
 
     // MARK: - State
 
@@ -45,6 +45,8 @@ final class AppViewModel {
     // MARK: - Init
 
     init() {
+        sidebarViewModel = SidebarViewModel(appViewModel: self)
+
         // Wire up event handling
         connectionManager.onEvent = { [weak self] event in
             Task { @MainActor in
