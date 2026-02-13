@@ -88,6 +88,8 @@ struct MessageBubble: View {
         case .user: return "You"
         case .assistant: return message.agentId ?? "Assistant"
         case .system: return "System"
+        case .toolCall: return "Tool Call"
+        case .toolResult: return "Tool Result"
         }
     }
 
@@ -99,6 +101,8 @@ struct MessageBubble: View {
             return AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
         case .system:
             return AnyShapeStyle(Color.yellow.opacity(0.08))
+        case .toolCall, .toolResult:
+            return AnyShapeStyle(Color.gray.opacity(0.08))
         }
     }
 }

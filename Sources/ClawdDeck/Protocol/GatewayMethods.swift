@@ -265,9 +265,24 @@ struct ChatEventPayload: Codable, Sendable {
 }
 
 /// A single content block within a chat event message.
-struct ContentBlock: Codable, Sendable {
+///
+/// Uses lenient decoding: if `type` is missing the block decodes as
+/// `type: "unknown"` so one malformed block doesn't destroy the entire array.
+struct ContentBlock: Sendable, Encodable {
     let type: String
     let text: String?
+}
+
+extension ContentBlock: Decodable {
+    enum CodingKeys: String, CodingKey {
+        case type, text
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = (try? container.decode(String.self, forKey: .type)) ?? "unknown"
+        text = try? container.decodeIfPresent(String.self, forKey: .text)
+    }
 }
 
 /// The message portion of a chat event.
@@ -300,13 +315,26 @@ extension ChatEventMessage: Codable {
         role = try container.decodeIfPresent(String.self, forKey: .role)
         agentId = try container.decodeIfPresent(String.self, forKey: .agentId)
 
-        // content can be either a plain string or an array of content blocks
-        if let blocks = try? container.decodeIfPresent([ContentBlock].self, forKey: .content) {
-            contentBlocks = blocks
-        } else if let plainText = try? container.decodeIfPresent(String.self, forKey: .content) {
-            contentBlocks = plainText.isEmpty ? nil : [ContentBlock(type: "text", text: plainText)]
-        } else {
-            contentBlocks = nil
+        // content can be either a plain string or an array of content blocks.
+        // Use do/catch instead of try? so decode errors surface in logs.
+        do {
+            if let blocks = try container.decodeIfPresent([ContentBlock].self, forKey: .content) {
+                contentBlocks = blocks
+            } else {
+                contentBlocks = nil
+            }
+        } catch {
+            // Not an array — try plain string before giving up
+            do {
+                if let plainText = try container.decodeIfPresent(String.self, forKey: .content) {
+                    contentBlocks = plainText.isEmpty ? nil : [ContentBlock(type: "text", text: plainText)]
+                } else {
+                    contentBlocks = nil
+                }
+            } catch {
+                print("[ChatEventMessage] ⚠️ Failed to decode content as [ContentBlock] or String: \(error)")
+                contentBlocks = nil
+            }
         }
     }
 
