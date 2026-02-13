@@ -9,7 +9,7 @@ enum GatewayProtocol {
     static let clientMode = "ui"
     static let clientDisplayName = "Clawd Deck"
     static let role = "operator"
-    static let scopes = ["operator.read", "operator.write"]
+    static let scopes = ["operator.read", "operator.write", "operator.admin"]
 
     /// Default reconnect parameters.
     enum Reconnect {
