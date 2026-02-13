@@ -142,21 +142,30 @@ final class AppViewModel {
     func loadHistory(for sessionKey: String) async {
         guard let client = connectionManager.activeClient else { return }
         do {
-            let result = try await client.chatHistory(sessionKey: sessionKey)
-            let messages = result.messages.map { msg -> ChatMessage in
-                ChatMessage(
-                    id: msg.id ?? UUID().uuidString,
-                    role: MessageRole(rawValue: msg.role) ?? .system,
-                    content: msg.content,
-                    timestamp: ISO8601DateFormatter().date(from: msg.timestamp ?? "") ?? Date(),
-                    sessionKey: sessionKey,
-                    state: .complete,
-                    agentId: msg.agentId
-                )
+            let response = try await client.send(
+                method: GatewayMethod.chatHistory,
+                params: ChatHistoryParams(sessionKey: sessionKey, limit: 100)
+            )
+            guard response.ok, let payload = response.payload else {
+                print("[AppViewModel] chat.history failed: \(response.error?.message ?? "unknown")")
+                return
             }
+
+            // Decode payload as raw dictionary to handle complex content field
+            let payloadData = try JSONSerialization.data(withJSONObject: payload.value as Any)
+            let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+            let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
+
+            print("[AppViewModel] chat.history returned \(rawMessages.count) raw messages for \(sessionKey)")
+
+            let messages = rawMessages.enumerated().compactMap { index, raw in
+                ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
+            }.filter { $0.isVisible }
+
+            print("[AppViewModel] \(messages.count) visible messages after filtering")
             messageStore.setMessages(messages, for: sessionKey)
         } catch {
-            // Failed to load history
+            print("[AppViewModel] Failed to load history: \(error)")
         }
     }
 
