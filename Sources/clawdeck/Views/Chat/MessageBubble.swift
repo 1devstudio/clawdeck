@@ -122,9 +122,6 @@ struct MessageBubble: View {
                             .padding(.trailing, 6)
                         }
                     }
-                    .onHover { hovering in
-                        isHovered = hovering
-                    }
                 }
 
                 // Error message
@@ -149,6 +146,9 @@ struct MessageBubble: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .onHover { hovering in
+                isHovered = hovering
             }
 
             if message.role != .user {
