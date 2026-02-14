@@ -447,7 +447,7 @@ struct ModelPicker: View {
         for model in suggestions {
             grouped[model.provider, default: []].append(model)
         }
-        return grouped.sorted { $0.key < $1.key }
+        return grouped.sorted { $0.key < $1.key }.map { (provider: $0.key, models: $0.value) }
     }
 
     var body: some View {
@@ -563,7 +563,7 @@ struct ModelPicker: View {
                 }
 
                 if suggestions.isEmpty {
-                    Text("No models match "\(searchText)"")
+                    Text("No models match \"\(searchText)\"")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(8)
@@ -571,7 +571,8 @@ struct ModelPicker: View {
             }
             .padding(.vertical, 4)
         }
-        .frame(width: 300, maxHeight: 250)
+        .frame(width: 300)
+        .frame(maxHeight: 250)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
