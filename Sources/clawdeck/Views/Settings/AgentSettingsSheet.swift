@@ -115,7 +115,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Display Name", systemImage: "person.crop.circle")
                     .frame(width: 130, alignment: .leading)
-                TextField("Agent Name", text: $viewModel.agentDisplayName)
+                TextField("", text: $viewModel.agentDisplayName, prompt: Text("Agent Name"))
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
@@ -123,7 +123,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Emoji", systemImage: "face.smiling")
                     .frame(width: 130, alignment: .leading)
-                TextField("🤖", text: $viewModel.agentEmoji)
+                TextField("", text: $viewModel.agentEmoji, prompt: Text("🤖"))
                     .textFieldStyle(.roundedBorder)
                     .help("Emoji avatar for the agent")
             }
@@ -198,7 +198,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Display Name", systemImage: "network")
                     .frame(width: 130, alignment: .leading)
-                TextField("Gateway Name", text: $viewModel.gatewayDisplayName)
+                TextField("", text: $viewModel.gatewayDisplayName, prompt: Text("Gateway Name"))
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
@@ -206,7 +206,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Host", systemImage: "server.rack")
                     .frame(width: 130, alignment: .leading)
-                TextField("host.example.com", text: $viewModel.gatewayHost)
+                TextField("", text: $viewModel.gatewayHost, prompt: Text("host.example.com"))
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
@@ -214,20 +214,23 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Port", systemImage: "number")
                     .frame(width: 130, alignment: .leading)
-                TextField("443", text: $viewModel.gatewayPort)
+                TextField("", text: $viewModel.gatewayPort, prompt: Text("443"))
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 80)
 
                 Spacer()
 
-                Toggle("Use TLS", isOn: $viewModel.gatewayUseTLS)
+                Text("TLS")
+                    .font(.body)
+                Toggle("", isOn: $viewModel.gatewayUseTLS)
+                    .labelsHidden()
             }
             .padding(.vertical, 2)
 
             HStack {
                 Label("Token", systemImage: "key")
                     .frame(width: 130, alignment: .leading)
-                SecureField("Access Token", text: $viewModel.gatewayToken)
+                SecureField("", text: $viewModel.gatewayToken, prompt: Text("Access Token"))
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
@@ -239,7 +242,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Primary Model", systemImage: "brain")
                     .frame(width: 130, alignment: .leading)
-                TextField("anthropic/claude-3-sonnet", text: $viewModel.primaryModel)
+                TextField("", text: $viewModel.primaryModel, prompt: Text("anthropic/claude-3-sonnet"))
                     .textFieldStyle(.roundedBorder)
                     .help("Default model for new conversations")
             }
