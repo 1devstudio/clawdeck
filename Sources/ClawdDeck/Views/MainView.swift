@@ -89,10 +89,10 @@ struct MainView: View {
                 .padding(.vertical, 5)
                 .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-                .frame(width: 300)
+                .frame(width: 500)
             }
 
-            // Right-aligned controls
+            // Right-aligned controls — plain style, no button chrome
             ToolbarItemGroup(placement: .primaryAction) {
                 HStack(spacing: 6) {
                     Circle()
@@ -107,14 +107,20 @@ struct MainView: View {
                     appViewModel.isInspectorVisible.toggle()
                 } label: {
                     Image(systemName: "sidebar.right")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.borderless)
                 .help("Toggle Inspector (⌘⇧I)")
 
                 Button {
                     appViewModel.showAgentSettings = true
                 } label: {
                     Image(systemName: "gearshape")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.borderless)
                 .help("Settings")
             }
         }
