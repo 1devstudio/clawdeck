@@ -11,6 +11,33 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
+                        // "Load earlier messages" button
+                        if viewModel.hasMoreMessages {
+                            Button {
+                                // Remember the topmost visible message so we can
+                                // scroll back to it after more messages appear.
+                                let anchorId = viewModel.messages.first?.id
+                                viewModel.loadMoreMessages()
+                                if let anchorId {
+                                    // Scroll to keep the user's position stable
+                                    DispatchQueue.main.async {
+                                        proxy.scrollTo(anchorId, anchor: .top)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.up.circle")
+                                    Text("Load earlier messages")
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                            .id("load-more-button")
+                        }
+
                         ForEach(viewModel.messages) { message in
                             MessageBubble(
                                 message: message,

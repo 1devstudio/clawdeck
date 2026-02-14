@@ -201,7 +201,7 @@ final class AppViewModel {
         do {
             let response = try await client.send(
                 method: GatewayMethod.chatHistory,
-                params: ChatHistoryParams(sessionKey: sessionKey, limit: 100)
+                params: ChatHistoryParams(sessionKey: sessionKey, limit: 1000)
             )
 
             // After the await, check if this load is still relevant.

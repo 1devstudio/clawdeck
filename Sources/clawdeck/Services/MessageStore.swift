@@ -4,8 +4,18 @@ import Foundation
 @Observable
 @MainActor
 final class MessageStore {
-    /// Messages indexed by session key.
-    private var messagesBySession: [String: [ChatMessage]] = [:]
+    /// All messages indexed by session key (full history from gateway).
+    private var allMessagesBySession: [String: [ChatMessage]] = [:]
+
+    /// Number of messages currently visible per session (pagination window).
+    /// Grows as the user scrolls up to load more.
+    private var visibleCountBySession: [String: Int] = [:]
+
+    /// Default number of messages to show initially.
+    static let initialPageSize = 50
+
+    /// Number of additional messages to load when scrolling up.
+    static let pageSize = 50
 
     /// Active streaming messages by runId.
     private var streamingMessages: [String: ChatMessage] = [:]
@@ -15,43 +25,70 @@ final class MessageStore {
 
     // MARK: - Read
 
-    /// Get all messages for a session, ordered by timestamp.
+    /// Get the currently visible messages for a session (paginated tail).
     func messages(for sessionKey: String) -> [ChatMessage] {
-        messagesBySession[sessionKey] ?? []
+        guard let all = allMessagesBySession[sessionKey] else { return [] }
+        let visibleCount = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+        let startIndex = max(0, all.count - visibleCount)
+        return Array(all[startIndex...])
     }
 
     /// Check if a session has any messages loaded.
     func hasMessages(for sessionKey: String) -> Bool {
-        !(messagesBySession[sessionKey]?.isEmpty ?? true)
+        !(allMessagesBySession[sessionKey]?.isEmpty ?? true)
+    }
+
+    /// Whether there are older messages that can be loaded for this session.
+    func hasMoreMessages(for sessionKey: String) -> Bool {
+        guard let all = allMessagesBySession[sessionKey] else { return false }
+        let visibleCount = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+        return visibleCount < all.count
+    }
+
+    /// Load the next page of older messages for a session.
+    /// Returns the number of newly revealed messages.
+    @discardableResult
+    func loadMoreMessages(for sessionKey: String) -> Int {
+        guard let all = allMessagesBySession[sessionKey] else { return 0 }
+        let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+        let newVisible = min(currentVisible + Self.pageSize, all.count)
+        let revealed = newVisible - currentVisible
+        visibleCountBySession[sessionKey] = newVisible
+        return revealed
     }
 
     // MARK: - Write
 
     /// Add a message to a session.
     func addMessage(_ message: ChatMessage) {
-        messagesBySession[message.sessionKey, default: []].append(message)
+        allMessagesBySession[message.sessionKey, default: []].append(message)
+        // Expand the visible window so new messages are always visible.
+        let currentVisible = visibleCountBySession[message.sessionKey] ?? Self.initialPageSize
+        visibleCountBySession[message.sessionKey] = currentVisible + 1
     }
 
-    /// Add multiple messages (e.g., from history).
+    /// Set all messages for a session (e.g., from history).
+    /// Shows the most recent `initialPageSize` messages.
     func setMessages(_ messages: [ChatMessage], for sessionKey: String) {
-        messagesBySession[sessionKey] = messages
+        allMessagesBySession[sessionKey] = messages
+        visibleCountBySession[sessionKey] = min(Self.initialPageSize, messages.count)
     }
 
     /// Mark a user message as sent.
     func markSent(messageId: String, sessionKey: String) {
-        guard let messages = messagesBySession[sessionKey],
+        guard let messages = allMessagesBySession[sessionKey],
               let index = messages.firstIndex(where: { $0.id == messageId })
         else { return }
-        messagesBySession[sessionKey]?[index].state = .sent
+        allMessagesBySession[sessionKey]?[index].state = .sent
     }
 
     /// Mark a user message as failed.
     func markError(messageId: String, sessionKey: String, error: String) {
-        guard let messages = messagesBySession[sessionKey],
+        guard let messages = allMessagesBySession[sessionKey],
               let index = messages.firstIndex(where: { $0.id == messageId })
         else { return }
-        messagesBySession[sessionKey]?[index].state = .error
-        messagesBySession[sessionKey]?[index].errorMessage = error
+        allMessagesBySession[sessionKey]?[index].state = .error
+        allMessagesBySession[sessionKey]?[index].errorMessage = error
     }
 
     // MARK: - Streaming
@@ -96,7 +133,10 @@ final class MessageStore {
                 message.content = newContent
                 message.segmentOffset = 0
                 streamingMessages[runId] = message
-                messagesBySession[sessionKey, default: []].append(message)
+                allMessagesBySession[sessionKey, default: []].append(message)
+                // Expand visible window so streaming message is visible
+                let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+                visibleCountBySession[sessionKey] = currentVisible + 1
             }
 
         case "final":
@@ -129,7 +169,10 @@ final class MessageStore {
                     agentId: event.message?.agentId,
                     runId: runId
                 )
-                messagesBySession[sessionKey, default: []].append(message)
+                allMessagesBySession[sessionKey, default: []].append(message)
+                // Expand visible window
+                let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+                visibleCountBySession[sessionKey] = currentVisible + 1
             }
 
         case "error":
@@ -153,13 +196,15 @@ final class MessageStore {
 
     /// Remove all messages for a session.
     func clearSession(_ sessionKey: String) {
-        messagesBySession.removeValue(forKey: sessionKey)
+        allMessagesBySession.removeValue(forKey: sessionKey)
+        visibleCountBySession.removeValue(forKey: sessionKey)
         streamingMessages = streamingMessages.filter { $0.value.sessionKey != sessionKey }
     }
 
     /// Remove all messages.
     func clearAll() {
-        messagesBySession.removeAll()
+        allMessagesBySession.removeAll()
+        visibleCountBySession.removeAll()
         streamingMessages.removeAll()
     }
 }

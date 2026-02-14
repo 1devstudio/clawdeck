@@ -82,6 +82,16 @@ final class ChatViewModel {
         appViewModel.messageStore.isStreaming(sessionKey: sessionKey)
     }
 
+    /// Whether there are older messages available to load.
+    var hasMoreMessages: Bool {
+        appViewModel.messageStore.hasMoreMessages(for: sessionKey)
+    }
+
+    /// Load the next page of older messages.
+    func loadMoreMessages() {
+        appViewModel.messageStore.loadMoreMessages(for: sessionKey)
+    }
+
     /// The session object.
     var session: Session? {
         appViewModel.sessions.first { $0.key == sessionKey }
