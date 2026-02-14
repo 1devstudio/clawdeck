@@ -33,8 +33,10 @@ struct MessageComposer: View {
                 // Attach button
                 Button(action: pickFile) {
                     Image(systemName: "paperclip")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 18))
+                        .foregroundStyle(.primary.opacity(0.6))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Attach image (⌘⇧A)")
