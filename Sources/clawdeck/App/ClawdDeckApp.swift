@@ -25,7 +25,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static func configureWindowTitleBar(_ window: NSWindow) {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.isMovableByWindowBackground = true
         // Extend content into the title bar area
         window.styleMask.insert(.fullSizeContentView)
         // Match the toolbar/title bar background to the agent rail
