@@ -189,15 +189,25 @@ final class AppViewModel {
         selectedSessionKey = sessionKey
 
         // Already have messages — nothing to load.
-        guard !messageStore.hasMessages(for: sessionKey) else { return }
+        guard !messageStore.hasMessages(for: sessionKey) else {
+            print("[AppViewModel] selectSession(\(sessionKey)): already has messages, skipping")
+            return
+        }
 
         // Already loading this exact session — don't cancel and restart.
-        guard historyLoadingKey != sessionKey else { return }
+        guard historyLoadingKey != sessionKey else {
+            print("[AppViewModel] selectSession(\(sessionKey)): already loading, skipping")
+            return
+        }
 
         // Cancel any in-flight load for a *different* session.
+        if let previousKey = historyLoadingKey {
+            print("[AppViewModel] selectSession(\(sessionKey)): cancelling load for \(previousKey)")
+        }
         historyLoadTask?.cancel()
         historyLoadingKey = sessionKey
 
+        print("[AppViewModel] selectSession(\(sessionKey)): starting history load")
         let task = Task { await loadHistory(for: sessionKey) }
         historyLoadTask = task
         await task.value
@@ -247,14 +257,13 @@ final class AppViewModel {
             messageStore.setMessages(messages, for: sessionKey)
         } catch is CancellationError {
             // Expected when the user switches sessions before the load completes.
-            // GatewayClient.send() now throws CancellationError via
-            // withTaskCancellationHandler when the parent task is cancelled.
+            print("[AppViewModel] History load cancelled (task cancellation) for \(sessionKey)")
         } catch GatewayClientError.cancelled {
             // Thrown when the WebSocket disconnects and all pending requests
             // are flushed (e.g. reconnection). Not a user-initiated cancel.
             print("[AppViewModel] History load interrupted (connection lost) for \(sessionKey)")
         } catch {
-            print("[AppViewModel] Failed to load history: \(error)")
+            print("[AppViewModel] ❌ Failed to load history for \(sessionKey): \(type(of: error)) — \(error.localizedDescription)")
         }
     }
 
