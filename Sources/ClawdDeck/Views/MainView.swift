@@ -53,7 +53,6 @@ struct MainView: View {
                 )
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
-        .ignoresSafeArea(.all, edges: .top)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 TopBarView(
