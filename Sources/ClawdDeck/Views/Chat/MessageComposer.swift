@@ -29,10 +29,10 @@ struct MessageComposer: View {
                 )
             }
 
-            HStack(alignment: .bottom, spacing: 10) {
-                // Attach button — circular outline like iMessage "+"
+            HStack(alignment: .center, spacing: 10) {
+                // Attach button
                 Button(action: pickFile) {
-                    Image(systemName: "plus")
+                    Image(systemName: "paperclip")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
@@ -55,10 +55,8 @@ struct MessageComposer: View {
                     onPasteImage: onPasteImage
                 )
                 .font(.body)
-                .frame(minHeight: 32, maxHeight: 120)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: 32)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 4)
                 .background(
                     Capsule()
                         .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
@@ -74,7 +72,7 @@ struct MessageComposer: View {
                 )
                 .focused($isFocused)
 
-                // Abort button (visible during streaming) or send button (when there's content)
+                // Abort button (visible during streaming)
                 if isStreaming {
                     Button(action: onAbort) {
                         Image(systemName: "stop.circle.fill")
@@ -84,21 +82,10 @@ struct MessageComposer: View {
                     .buttonStyle(.plain)
                     .help("Stop generation (Esc)")
                     .keyboardShortcut(.escape, modifiers: [])
-                } else if canSend {
-                    Button(action: onSend) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(.blue)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Send message (↩)")
-                    .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .animation(.easeInOut(duration: 0.15), value: canSend)
-            .animation(.easeInOut(duration: 0.15), value: isStreaming)
         }
         .onDrop(of: [.image, .fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
