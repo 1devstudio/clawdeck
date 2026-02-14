@@ -218,23 +218,48 @@ final class AppViewModel {
         }
     }
 
-    /// Load chat history for a session.
+    /// Maximum number of messages to request in chat.history.
+    /// The gateway has a per-connection send buffer limit (~1.5 MB). Large sessions
+    /// with many tool calls can exceed this, causing the connection to drop.
+    /// Start with a moderate limit; on connection-lost errors, retry with fewer.
+    private static let historyLimits = [200, 100, 50, 25]
+
+    /// Load chat history for a session, retrying with smaller limits if the
+    /// response is too large for the gateway's send buffer.
     func loadHistory(for sessionKey: String) async {
         guard let client = connectionManager.activeClient else { return }
         guard !Task.isCancelled else { return }
+
+        for limit in Self.historyLimits {
+            guard !Task.isCancelled else { return }
+            let success = await loadHistoryAttempt(for: sessionKey, limit: limit)
+            if success { return }
+
+            // If we got here, the load failed (likely connection dropped).
+            // Wait for reconnection before retrying with a smaller limit.
+            print("[AppViewModel] History load failed with limit=\(limit), retrying with smaller limit...")
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s for reconnect
+        }
+        print("[AppViewModel] ❌ All history load attempts failed for \(sessionKey)")
+    }
+
+    /// Single attempt to load history with a specific limit. Returns true on success.
+    private func loadHistoryAttempt(for sessionKey: String, limit: Int) async -> Bool {
+        guard let client = connectionManager.activeClient else { return false }
+        guard !Task.isCancelled else { return false }
         do {
             let response = try await client.send(
                 method: GatewayMethod.chatHistory,
-                params: ChatHistoryParams(sessionKey: sessionKey, limit: 1000)
+                params: ChatHistoryParams(sessionKey: sessionKey, limit: limit)
             )
 
             // After the await, check if this load is still relevant.
             // The user may have switched sessions while we waited.
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
 
             guard response.ok, let payload = response.payload else {
                 print("[AppViewModel] chat.history failed: \(response.error?.message ?? "unknown")")
-                return
+                return false
             }
 
             // Decode payload as raw dictionary to handle complex content field
@@ -242,7 +267,7 @@ final class AppViewModel {
             let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
             let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
 
-            print("[AppViewModel] chat.history returned \(rawMessages.count) raw messages for \(sessionKey)")
+            print("[AppViewModel] chat.history returned \(rawMessages.count) raw messages for \(sessionKey) (limit=\(limit))")
 
             let allMessages = rawMessages.enumerated().compactMap { index, raw in
                 ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
@@ -255,15 +280,19 @@ final class AppViewModel {
 
             print("[AppViewModel] \(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages")
             messageStore.setMessages(messages, for: sessionKey)
+            return true
         } catch is CancellationError {
             // Expected when the user switches sessions before the load completes.
             print("[AppViewModel] History load cancelled (task cancellation) for \(sessionKey)")
+            return false
         } catch GatewayClientError.cancelled {
             // Thrown when the WebSocket disconnects and all pending requests
             // are flushed (e.g. reconnection). Not a user-initiated cancel.
-            print("[AppViewModel] History load interrupted (connection lost) for \(sessionKey)")
+            print("[AppViewModel] History load interrupted (connection lost, limit=\(limit)) for \(sessionKey)")
+            return false
         } catch {
             print("[AppViewModel] ❌ Failed to load history for \(sessionKey): \(type(of: error)) — \(error.localizedDescription)")
+            return false
         }
     }
 
