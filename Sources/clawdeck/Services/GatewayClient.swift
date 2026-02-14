@@ -105,6 +105,10 @@ actor GatewayClient {
         shouldReconnect = true
 
         let task = urlSession.webSocketTask(with: url)
+        // Default maximumMessageSize is 1 MB — far too small for large
+        // chat.history responses (sessions with many tool calls can produce
+        // multi-megabyte payloads). Raise to 50 MB.
+        task.maximumMessageSize = 50 * 1024 * 1024
         self.webSocketTask = task
         task.resume()
 
