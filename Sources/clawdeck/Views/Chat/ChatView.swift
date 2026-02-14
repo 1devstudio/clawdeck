@@ -8,8 +8,12 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Message list
-            ScrollViewReader { proxy in
+            // Message list with pattern background
+            ZStack {
+                // Pattern background — behind scroll content
+                ChatPatternBackground()
+
+                ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         // "Load earlier messages" button
@@ -66,9 +70,6 @@ struct ChatView: View {
                     .padding(.vertical, 12)
                 }
                 .scrollContentBackground(.hidden)
-                .background {
-                    ChatPatternBackground()
-                }
                 .onAppear {
                     scrollProxy = proxy
                     // Scroll to bottom when the view first appears (session switch).
@@ -93,7 +94,8 @@ struct ChatView: View {
                         }
                     }
                 }
-            }
+            } // ScrollViewReader
+            } // ZStack
 
             // Error banner
             if let error = viewModel.errorMessage {
