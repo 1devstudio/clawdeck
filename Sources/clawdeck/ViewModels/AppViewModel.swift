@@ -233,11 +233,12 @@ final class AppViewModel {
             messageStore.setMessages(messages, for: sessionKey)
         } catch is CancellationError {
             // Expected when the user switches sessions before the load completes.
-            print("[AppViewModel] History load cancelled (CancellationError) for \(sessionKey)")
+            // GatewayClient.send() now throws CancellationError via
+            // withTaskCancellationHandler when the parent task is cancelled.
         } catch GatewayClientError.cancelled {
-            // Also expected — GatewayClient throws its own cancelled error
-            // when the WebSocket disconnects or pending requests are flushed.
-            print("[AppViewModel] History load cancelled (GatewayClient) for \(sessionKey)")
+            // Thrown when the WebSocket disconnects and all pending requests
+            // are flushed (e.g. reconnection). Not a user-initiated cancel.
+            print("[AppViewModel] History load interrupted (connection lost) for \(sessionKey)")
         } catch {
             print("[AppViewModel] Failed to load history: \(error)")
         }

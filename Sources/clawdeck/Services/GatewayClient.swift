@@ -140,6 +140,11 @@ actor GatewayClient {
     // MARK: - Send request
 
     /// Send a request and await the response.
+    ///
+    /// Supports cooperative cancellation: if the calling `Task` is cancelled
+    /// while waiting for the gateway response, the pending continuation is
+    /// immediately resumed with `CancellationError` and removed from the
+    /// in-flight dictionary so it doesn't leak.
     func send(method: String, params: (any Encodable)? = nil) async throws -> ResponseFrame {
         guard isHandshakeComplete else {
             throw GatewayClientError.notConnected
@@ -159,8 +164,30 @@ actor GatewayClient {
         let frame = RequestFrame(id: requestId, method: method, params: anyCodableParams)
         try await sendFrame(frame)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            pendingRequests[requestId] = continuation
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                // If the task was already cancelled before we got here,
+                // resume immediately instead of parking the continuation.
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else {
+                    pendingRequests[requestId] = continuation
+                }
+            }
+        } onCancel: {
+            // Called on an arbitrary thread when the parent Task is cancelled.
+            // We need to hop onto the actor to safely mutate pendingRequests.
+            Task { [weak self] in
+                await self?.cancelPendingRequest(id: requestId)
+            }
+        }
+    }
+
+    /// Cancel a single pending request by its ID.
+    /// Called from the cancellation handler when the calling task is cancelled.
+    private func cancelPendingRequest(id: String) {
+        if let continuation = pendingRequests.removeValue(forKey: id) {
+            continuation.resume(throwing: CancellationError())
         }
     }
 
