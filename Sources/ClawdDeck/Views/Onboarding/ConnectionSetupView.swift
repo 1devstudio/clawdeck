@@ -148,6 +148,7 @@ struct ConnectionSetupView: View {
             .padding(.bottom, 20)
         }
         .frame(width: 460, height: 600)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func connect() async {
