@@ -238,9 +238,7 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Primary Model", systemImage: "brain")
                     .frame(width: 130, alignment: .leading)
-                TextField("", text: $viewModel.primaryModel, prompt: Text("anthropic/claude-3-sonnet"))
-                    .textFieldStyle(.roundedBorder)
-                    .help("Default model for new conversations")
+                ModelPicker(selectedModel: $viewModel.primaryModel)
             }
             .padding(.vertical, 2)
         }
@@ -392,5 +390,98 @@ struct IconPickerGrid: View {
                 .help(icon)
             }
         }
+    }
+}
+
+// MARK: - Model Picker
+
+/// A combobox-style model picker: dropdown of well-known models + editable text field for custom values.
+struct ModelPicker: View {
+    @Binding var selectedModel: String
+
+    /// Well-known models grouped by provider.
+    private static let modelGroups: [(provider: String, models: [(id: String, label: String)])] = [
+        ("Anthropic", [
+            ("anthropic/claude-opus-4-6", "Claude Opus 4.6"),
+            ("anthropic/claude-sonnet-4-20250514", "Claude Sonnet 4"),
+            ("anthropic/claude-3-5-haiku-latest", "Claude 3.5 Haiku"),
+        ]),
+        ("OpenAI", [
+            ("openai/gpt-5.2", "GPT-5.2"),
+            ("openai/o3", "o3"),
+            ("openai/o4-mini", "o4-mini"),
+        ]),
+        ("Google", [
+            ("google/gemini-3-pro-preview", "Gemini 3 Pro"),
+            ("google/gemini-2.5-flash-preview-05-20", "Gemini 2.5 Flash"),
+        ]),
+        ("OpenRouter", [
+            ("openrouter/anthropic/claude-sonnet-4-5", "Claude Sonnet 4.5"),
+            ("openrouter/anthropic/claude-opus-4", "Claude Opus 4"),
+            ("openrouter/google/gemini-2.5-pro-preview", "Gemini 2.5 Pro"),
+        ]),
+        ("Other", [
+            ("xai/grok-3", "Grok 3"),
+            ("mistral/mistral-large-latest", "Mistral Large"),
+            ("ollama/llama3.3", "Llama 3.3 (Ollama)"),
+        ]),
+    ]
+
+    /// Whether the custom text field is shown.
+    @State private var isCustom: Bool = false
+
+    /// Flat list of all known model IDs for matching.
+    private var allKnownIds: [String] {
+        Self.modelGroups.flatMap { $0.models.map(\.id) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("", selection: pickerBinding) {
+                ForEach(Self.modelGroups, id: \.provider) { group in
+                    Section(group.provider) {
+                        ForEach(group.models, id: \.id) { model in
+                            Text(model.label)
+                                .tag(model.id)
+                        }
+                    }
+                }
+                Divider()
+                Text("Custom…")
+                    .tag("__custom__")
+            }
+            .labelsHidden()
+
+            if isCustom {
+                TextField("", text: $selectedModel, prompt: Text("provider/model-name"))
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+        }
+    }
+
+    /// Binding that bridges the Picker selection to our state,
+    /// switching to custom mode when needed.
+    private var pickerBinding: Binding<String> {
+        Binding<String>(
+            get: {
+                if isCustom { return "__custom__" }
+                if allKnownIds.contains(selectedModel) { return selectedModel }
+                // Current value isn't in the list — show as custom
+                if !selectedModel.isEmpty {
+                    DispatchQueue.main.async { isCustom = true }
+                    return "__custom__"
+                }
+                return selectedModel
+            },
+            set: { newValue in
+                if newValue == "__custom__" {
+                    isCustom = true
+                } else {
+                    isCustom = false
+                    selectedModel = newValue
+                }
+            }
+        )
     }
 }
