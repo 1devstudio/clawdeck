@@ -8,12 +8,8 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Message list with pattern background
-            ZStack {
-                // Pattern background — behind scroll content
-                ChatPatternBackground()
-
-                ScrollViewReader { proxy in
+            // Message list
+            ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         // "Load earlier messages" button
@@ -70,6 +66,11 @@ struct ChatView: View {
                     .padding(.vertical, 12)
                 }
                 .scrollContentBackground(.hidden)
+                .background {
+                    // Disable NSScrollView opaque background + show pattern
+                    ScrollViewBackgroundDisabler()
+                    ChatPatternBackground()
+                }
                 .onAppear {
                     scrollProxy = proxy
                     // Scroll to bottom when the view first appears (session switch).
@@ -94,8 +95,7 @@ struct ChatView: View {
                         }
                     }
                 }
-            } // ScrollViewReader
-            } // ZStack
+            }
 
             // Error banner
             if let error = viewModel.errorMessage {
@@ -153,6 +153,37 @@ struct ChatView: View {
             withAnimation(.easeOut(duration: 0.2)) { scroll() }
         } else {
             scroll()
+        }
+    }
+}
+
+// MARK: - NSScrollView Background Disabler
+
+/// Walks up the NSView hierarchy to find the enclosing NSScrollView
+/// and sets `drawsBackground = false` so SwiftUI backgrounds show through.
+struct ScrollViewBackgroundDisabler: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            disableScrollViewBackground(from: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            disableScrollViewBackground(from: nsView)
+        }
+    }
+
+    private func disableScrollViewBackground(from view: NSView) {
+        var current: NSView? = view
+        while let v = current {
+            if let scrollView = v as? NSScrollView {
+                scrollView.drawsBackground = false
+                return
+            }
+            current = v.superview
         }
     }
 }
