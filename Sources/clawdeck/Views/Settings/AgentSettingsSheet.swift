@@ -24,10 +24,19 @@ struct AgentSettingsSheet: View {
             .padding(.top, 16)
             .padding(.bottom, 4)
 
-            Form {
-                if viewModel.isLoading {
-                    loadingSection
-                } else {
+            if viewModel.isLoading {
+                Spacer()
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading settings…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                Form {
                     agentIdentitySection
                     iconSection
                     gatewayConnectionSection
@@ -41,8 +50,8 @@ struct AgentSettingsSheet: View {
                         successSection(successMessage)
                     }
                 }
+                .formStyle(.grouped)
             }
-            .formStyle(.grouped)
 
             Divider()
 
@@ -96,19 +105,6 @@ struct AgentSettingsSheet: View {
     }
 
     // MARK: - Sections
-
-    private var loadingSection: some View {
-        Section {
-            HStack {
-                ProgressView()
-                    .scaleEffect(0.8)
-                Text("Loading settings...")
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.vertical, 8)
-        }
-    }
 
     private var agentIdentitySection: some View {
         Section("Agent Identity") {
