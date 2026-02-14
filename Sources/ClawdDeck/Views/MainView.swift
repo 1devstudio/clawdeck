@@ -77,8 +77,8 @@ struct MainView: View {
                     .focusEffectDisabled()
             }
 
-            // Right-aligned controls — plain style, no button chrome
-            ToolbarItemGroup(placement: .primaryAction) {
+            // Right-aligned controls — separate items, no shared background
+            ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(connectionStatusColor)
@@ -87,7 +87,9 @@ struct MainView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+            }
 
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     appViewModel.isInspectorVisible.toggle()
                 } label: {
@@ -97,7 +99,9 @@ struct MainView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Toggle Inspector (⌘⇧I)")
+            }
 
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     appViewModel.showAgentSettings = true
                 } label: {
