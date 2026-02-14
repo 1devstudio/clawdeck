@@ -241,10 +241,14 @@ struct ComposerTextEditor: NSViewRepresentable {
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.textColor = NSColor.labelColor
         textView.backgroundColor = .clear
-        textView.textContainerInset = NSSize(width: 0, height: 2)
-        textView.isVerticallyResizable = true
+        textView.isVerticallyResizable = false
         textView.isHorizontallyResizable = false
         textView.textContainer?.widthTracksTextView = true
+
+        // Vertically center single line: compute inset from frame height vs line height
+        let lineHeight = (textView.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)).boundingRectForFont.height
+        let verticalInset = max(0, (32 - lineHeight) / 2)
+        textView.textContainerInset = NSSize(width: 0, height: verticalInset)
 
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
