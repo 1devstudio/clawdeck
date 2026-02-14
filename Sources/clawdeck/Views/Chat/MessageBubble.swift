@@ -93,8 +93,10 @@ struct MessageBubble: View {
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
                         .padding(.bottom, 10)
-                        .background(bubbleBackground)
-                        .cornerRadius(12)
+                        .background {
+                            bubbleBackground
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay {
                             if message.state == .error {
                                 RoundedRectangle(cornerRadius: 12)
@@ -105,6 +107,8 @@ struct MessageBubble: View {
                             } else if isSearchMatch {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                            } else {
+                                bubbleBorder
                             }
                         }
 
@@ -272,17 +276,45 @@ struct MessageBubble: View {
         }
     }
 
-    private var bubbleBackground: some ShapeStyle {
+    /// Frosted-glass bubble background with a role-appropriate tint.
+    @ViewBuilder
+    private var bubbleBackground: some View {
         switch message.role {
         case .user:
-            return AnyShapeStyle(themeColor.opacity(0.12))
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(themeColor.opacity(0.12))
+            }
         case .assistant:
-            return AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.primary.opacity(0.03))
+            }
         case .system:
-            return AnyShapeStyle(Color.yellow.opacity(0.08))
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.yellow.opacity(0.08))
+            }
         case .toolCall, .toolResult:
-            return AnyShapeStyle(Color.gray.opacity(0.08))
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.06))
+            }
         }
+    }
+
+    /// Subtle border to define bubble edges against any background.
+    private var bubbleBorder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
     }
 }
 

@@ -35,8 +35,19 @@ struct TypingIndicator: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.primary.opacity(0.03))
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
             }
 
             Spacer(minLength: 60)
