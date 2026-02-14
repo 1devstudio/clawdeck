@@ -18,6 +18,7 @@ struct MessageComposer: View {
 
     @FocusState private var isFocused: Bool
     @State private var isDropTargeted = false
+    @State private var editorHeight: CGFloat = 32
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +30,7 @@ struct MessageComposer: View {
                 )
             }
 
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 // Attach button
                 Button(action: pickFile) {
                     Image(systemName: "paperclip")
@@ -46,23 +47,24 @@ struct MessageComposer: View {
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
 
-                // Text field — pill-shaped capsule like iMessage
+                // Text field — pill-shaped like iMessage
                 ComposerTextEditor(
                     text: $text,
+                    contentHeight: $editorHeight,
                     onEnterSend: {
                         if canSend { onSend() }
                     },
                     onPasteImage: onPasteImage
                 )
                 .font(.body)
-                .frame(height: 32)
+                .frame(height: editorHeight)
                 .padding(.horizontal, 12)
                 .background(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
                         .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
                 )
                 .overlay(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
                         .stroke(
                             isDropTargeted
                                 ? Color.accentColor
@@ -70,6 +72,7 @@ struct MessageComposer: View {
                             lineWidth: isDropTargeted ? 2 : 1
                         )
                 )
+                .animation(.easeOut(duration: 0.15), value: editorHeight)
                 .focused($isFocused)
 
                 // Abort button (visible during streaming)
@@ -221,8 +224,12 @@ struct AttachmentThumbnail: View {
 /// - **Cmd+V** with image on clipboard: calls `onPasteImage`
 struct ComposerTextEditor: NSViewRepresentable {
     @Binding var text: String
+    @Binding var contentHeight: CGFloat
     var onEnterSend: () -> Void
     var onPasteImage: (NSImage) -> Void
+
+    static let minHeight: CGFloat = 32
+    static let maxHeight: CGFloat = 120
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -241,14 +248,10 @@ struct ComposerTextEditor: NSViewRepresentable {
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.textColor = NSColor.labelColor
         textView.backgroundColor = .clear
-        textView.isVerticallyResizable = false
+        textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.textContainer?.widthTracksTextView = true
-
-        // Vertically center single line: compute inset from frame height vs line height
-        let lineHeight = (textView.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)).boundingRectForFont.height
-        let verticalInset = max(0, (32 - lineHeight) / 2)
-        textView.textContainerInset = NSSize(width: 0, height: verticalInset)
+        textView.textContainerInset = NSSize(width: 0, height: 6)
 
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
@@ -256,14 +259,24 @@ struct ComposerTextEditor: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         context.coordinator.textView = textView
+
+        // Observe frame changes to recalculate height
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.frameDidChange(_:)),
+            name: NSView.frameDidChangeNotification,
+            object: textView
+        )
+        textView.postsFrameChangedNotifications = true
+
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         let textView = scrollView.documentView as! NSTextView
-        // Only update if the text actually changed (avoids cursor jumps)
         if textView.string != text {
             textView.string = text
+            context.coordinator.recalcHeight(textView)
         }
     }
 
@@ -278,6 +291,29 @@ struct ComposerTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            recalcHeight(textView)
+        }
+
+        @objc func frameDidChange(_ notification: Notification) {
+            guard let textView = textView else { return }
+            recalcHeight(textView)
+        }
+
+        func recalcHeight(_ textView: NSTextView) {
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else { return }
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let inset = textView.textContainerInset
+            let newHeight = min(
+                max(usedRect.height + inset.height * 2, ComposerTextEditor.minHeight),
+                ComposerTextEditor.maxHeight
+            )
+            DispatchQueue.main.async {
+                if abs(self.parent.contentHeight - newHeight) > 0.5 {
+                    self.parent.contentHeight = newHeight
+                }
+            }
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
