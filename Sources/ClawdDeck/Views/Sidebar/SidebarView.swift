@@ -85,7 +85,9 @@ struct SidebarView: View {
                     }
                 }
             }
-            .listStyle(.sidebar)
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .background(Color(nsColor: .controlBackgroundColor))
         }
         .overlay {
             if viewModel.filteredSessions.isEmpty {
