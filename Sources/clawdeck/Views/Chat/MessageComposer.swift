@@ -36,15 +36,11 @@ struct MessageComposer: View {
                 Button(action: pickFile) {
                     Image(systemName: "paperclip")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
-                        .background(
-                            Circle()
-                                .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
-                        )
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .glassEffect(in: .circle)
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
 
