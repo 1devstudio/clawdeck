@@ -206,11 +206,16 @@ final class AppViewModel {
 
             print("[AppViewModel] chat.history returned \(rawMessages.count) raw messages for \(sessionKey)")
 
-            let messages = rawMessages.enumerated().compactMap { index, raw in
+            let allMessages = rawMessages.enumerated().compactMap { index, raw in
                 ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
             }.filter { $0.isVisible }
 
-            print("[AppViewModel] \(messages.count) visible messages after filtering")
+            // Merge consecutive assistant messages into a single message.
+            // The gateway stores separate messages for each text segment
+            // around tool calls, but the user sees them as one reply.
+            let messages = Self.mergeConsecutiveAssistantMessages(allMessages)
+
+            print("[AppViewModel] \(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages")
             messageStore.setMessages(messages, for: sessionKey)
         } catch {
             print("[AppViewModel] Failed to load history: \(error)")
@@ -335,6 +340,35 @@ final class AppViewModel {
         } catch {
             // Failed to decode presence
         }
+    }
+    // MARK: - Message merging
+
+    /// Merge consecutive assistant messages into single messages.
+    ///
+    /// The gateway transcript stores a separate message for each text segment
+    /// around tool-call / tool-result pairs. When loaded as history these
+    /// appear as multiple small bubbles for what was a single assistant turn.
+    /// This method joins them so the UI shows one cohesive reply that can be
+    /// selected and copied as a whole.
+    static func mergeConsecutiveAssistantMessages(_ messages: [ChatMessage]) -> [ChatMessage] {
+        guard !messages.isEmpty else { return [] }
+
+        var merged: [ChatMessage] = []
+
+        for message in messages {
+            if message.role == .assistant,
+               let last = merged.last,
+               last.role == .assistant {
+                // Append to the previous assistant message
+                let separator = last.content.isEmpty || message.content.isEmpty ? "" : "\n\n"
+                last.content += separator + message.content
+                // Keep the earlier timestamp (start of the reply)
+            } else {
+                merged.append(message)
+            }
+        }
+
+        return merged
     }
 }
 // Session.from(summary:) is defined in Session.swift
