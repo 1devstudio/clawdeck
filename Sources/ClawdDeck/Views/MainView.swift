@@ -62,6 +62,7 @@ struct MainView: View {
                 )
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
             // Search bar — centered via .principal
             ToolbarItem(placement: .principal) {
