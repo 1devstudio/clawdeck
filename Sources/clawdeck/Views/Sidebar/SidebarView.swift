@@ -60,7 +60,7 @@ struct SidebarView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(.quaternary.opacity(0.3))
+            .background(.ultraThinMaterial.opacity(0.5))
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
@@ -82,6 +82,7 @@ struct SidebarView: View {
                                 }
                             )
                             .tag(session.key)
+                            .listRowBackground(Color.clear)
                             .contextMenu {
                                 Button("Rename…") {
                                     viewModel.beginRename(session.key)
@@ -95,8 +96,9 @@ struct SidebarView: View {
                     }
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .alternatingRowBackgrounds(.disabled)
         }
         .overlay {
             if viewModel.filteredSessions.isEmpty {

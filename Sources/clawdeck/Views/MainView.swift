@@ -52,27 +52,17 @@ struct MainView: View {
             // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
                 .background {
-                    ChatPatternBackground()
+                    InnerPanelBackground()
                 }
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 8,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: 8,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
                 )
+                .padding(.trailing, 12)
+                .padding(.bottom, 12)
         }
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+        .background(Color(nsColor: .windowBackgroundColor))
         .tint(appViewModel.customAccentColor)
         .environment(\.themeColor, appViewModel.customAccentColor ?? .accentColor)
         .toolbarBackground(.hidden, for: .windowToolbar)
@@ -188,17 +178,31 @@ struct MainView: View {
             // Sidebar — Liquid Glass panel
             SidebarView(viewModel: appViewModel.sidebarViewModel)
                 .frame(width: sidebarWidth)
-                .glassEffect(in: .rect(cornerRadius: 0))
-
-            // Draggable resize handle
-            ResizeHandle()
-                .gesture(
-                    DragGesture(coordinateSpace: .global)
-                        .onChanged { value in
-                            let newWidth = value.location.x - railWidth - 1
-                            sidebarWidth = min(max(newWidth, sidebarMinWidth), sidebarMaxWidth)
+                .background {
+                    VisualEffectBlur(material: .sidebar)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(alignment: .trailing) {
+                    // Invisible trailing-edge drag handle for resizing
+                    Color.clear
+                        .frame(width: 6)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            if hovering {
+                                NSCursor.resizeLeftRight.push()
+                            } else {
+                                NSCursor.pop()
+                            }
                         }
-                )
+                        .gesture(
+                            DragGesture(coordinateSpace: .global)
+                                .onChanged { value in
+                                    let newWidth = value.location.x - railWidth - 1
+                                    sidebarWidth = min(max(newWidth, sidebarMinWidth), sidebarMaxWidth)
+                                }
+                        )
+                }
+                .padding(12)
 
             // Chat area
             if let sessionKey = appViewModel.selectedSessionKey {
@@ -247,33 +251,5 @@ struct MainView: View {
             description: Text("Select a session from the sidebar or create a new one.")
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Resize Handle
-
-/// Thin draggable divider between the sidebar and detail area.
-private struct ResizeHandle: View {
-    @State private var isHovering = false
-    @Environment(\.themeColor) private var themeColor
-
-    var body: some View {
-        Rectangle()
-            .fill(isHovering ? themeColor.opacity(0.4) : Color.clear)
-            .frame(width: 5)
-            .overlay(
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1)
-            )
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovering = hovering
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
     }
 }
