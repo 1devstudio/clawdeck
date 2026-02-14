@@ -10,6 +10,7 @@ struct HighlightedCodeBlock: View {
     let language: String?
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.messageTextSize) private var messageTextSize
     @State private var highlightResult: AttributedString?
     @State private var detectedLanguage: String?
     @State private var isCopied = false
@@ -51,10 +52,10 @@ struct HighlightedCodeBlock: View {
                 Group {
                     if let highlighted = highlightResult {
                         Text(highlighted)
-                            .font(.system(.callout, design: .monospaced))
+                            .font(.system(size: messageTextSize - 1, design: .monospaced))
                     } else {
                         Text(code)
-                            .font(.system(.callout, design: .monospaced))
+                            .font(.system(size: messageTextSize - 1, design: .monospaced))
                             .foregroundStyle(.primary)
                     }
                 }

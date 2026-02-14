@@ -15,3 +15,16 @@ extension EnvironmentValues {
         set { self[ThemeColorKey.self] = newValue }
     }
 }
+
+// MARK: - Message Text Size Environment Key
+
+private struct MessageTextSizeKey: EnvironmentKey {
+    static let defaultValue: Double = 14
+}
+
+extension EnvironmentValues {
+    var messageTextSize: Double {
+        get { self[MessageTextSizeKey.self] }
+        set { self[MessageTextSizeKey.self] = newValue }
+    }
+}

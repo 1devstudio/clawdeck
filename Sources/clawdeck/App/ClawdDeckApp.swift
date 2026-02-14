@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
+    @AppStorage("messageTextSize") private var messageTextSize: Double = 14
 
     var body: some Scene {
         WindowGroup {
@@ -106,6 +107,7 @@ struct ClawdDeckApp: App {
                         .frame(minWidth: 800, minHeight: 500)
                 }
             }
+            .environment(\.messageTextSize, messageTextSize)
             .task {
                 if appViewModel.hasProfiles {
                     await appViewModel.connectAndLoad()
@@ -140,6 +142,7 @@ struct ClawdDeckApp: App {
 
         Settings {
             SettingsView()
+                .environment(\.messageTextSize, messageTextSize)
         }
     }
 }
