@@ -290,7 +290,7 @@ struct ComposerTextEditor: NSViewRepresentable {
                 return true
             }
             // Intercept Cmd+V to check for image paste
-            if commandSelector == #selector(NSResponder.paste(_:)) {
+            if commandSelector == #selector(NSText.paste(_:)) {
                 if handleImagePaste() {
                     return true
                 }
