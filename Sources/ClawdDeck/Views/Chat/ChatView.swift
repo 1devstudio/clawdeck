@@ -15,7 +15,9 @@ struct ChatView: View {
                         ForEach(viewModel.messages) { message in
                             MessageBubble(
                                 message: message,
-                                agentDisplayName: viewModel.agentDisplayName
+                                agentDisplayName: viewModel.agentDisplayName,
+                                searchQuery: viewModel.searchQuery,
+                                isCurrentMatch: message.id == viewModel.focusedMatchId
                             )
                             .id(message.id)
                         }
@@ -38,6 +40,13 @@ struct ChatView: View {
                 }
                 .onChange(of: viewModel.streamingContentVersion) { _, _ in
                     scrollToBottom(proxy: proxy, animated: false)
+                }
+                .onChange(of: viewModel.focusedMatchId) { _, matchId in
+                    if let matchId {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(matchId, anchor: .center)
+                        }
+                    }
                 }
             }
 

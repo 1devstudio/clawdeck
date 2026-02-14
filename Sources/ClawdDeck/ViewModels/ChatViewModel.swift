@@ -27,6 +27,39 @@ final class ChatViewModel {
     /// Current draft message text.
     var draftText = ""
 
+    /// Search query bound from the top bar.
+    var searchQuery = ""
+
+    /// Index of the currently focused match within `searchMatchIds`.
+    var currentMatchIndex: Int = 0
+
+    /// Message IDs that match the current search query (in display order).
+    var searchMatchIds: [String] {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        return messages
+            .filter { $0.isVisible && $0.content.localizedCaseInsensitiveContains(query) }
+            .map(\.id)
+    }
+
+    /// Navigate to the next search match.
+    func nextMatch() {
+        guard !searchMatchIds.isEmpty else { return }
+        currentMatchIndex = (currentMatchIndex + 1) % searchMatchIds.count
+    }
+
+    /// Navigate to the previous search match.
+    func previousMatch() {
+        guard !searchMatchIds.isEmpty else { return }
+        currentMatchIndex = (currentMatchIndex - 1 + searchMatchIds.count) % searchMatchIds.count
+    }
+
+    /// The message ID of the currently focused match (for scrolling).
+    var focusedMatchId: String? {
+        guard !searchMatchIds.isEmpty, currentMatchIndex < searchMatchIds.count else { return nil }
+        return searchMatchIds[currentMatchIndex]
+    }
+
     /// Pending image attachments to send with the next message.
     var pendingAttachments: [PendingAttachment] = []
 

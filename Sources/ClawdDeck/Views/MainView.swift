@@ -21,6 +21,12 @@ struct MainView: View {
     @State private var sidebarWidth: CGFloat = 260
     @State private var searchText: String = ""
 
+    /// The active chat view model (if a session is selected).
+    private var activeChatVM: ChatViewModel? {
+        guard let key = appViewModel.selectedSessionKey else { return nil }
+        return appViewModel.chatViewModel(for: key)
+    }
+
     private let sidebarMinWidth: CGFloat = 200
     private let sidebarMaxWidth: CGFloat = 400
     private let railWidth: CGFloat = 60
@@ -64,17 +70,65 @@ struct MainView: View {
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
         .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
-            // Search bar — centered via .principal
+            // Search bar — searches messages in the active session
             ToolbarItem(placement: .principal) {
-                TextField("Search sessions…", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .frame(width: 500)
-                    .focusEffectDisabled()
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+
+                    TextField("Search messages…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .onSubmit {
+                            activeChatVM?.nextMatch()
+                        }
+
+                    if let vm = activeChatVM, !searchText.isEmpty {
+                        let count = vm.searchMatchIds.count
+                        if count > 0 {
+                            Text("\(vm.currentMatchIndex + 1)/\(count)")
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(.secondary)
+
+                            Button {
+                                vm.previousMatch()
+                            } label: {
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                vm.nextMatch()
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text("No results")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(width: 500)
+                .focusEffectDisabled()
+                .onChange(of: searchText) { _, newValue in
+                    activeChatVM?.searchQuery = newValue
+                    activeChatVM?.currentMatchIndex = 0
+                }
+                .onChange(of: appViewModel.selectedSessionKey) { _, _ in
+                    searchText = ""
+                    activeChatVM?.searchQuery = ""
+                }
             }
 
             // Right-aligned controls — separate items, no shared background

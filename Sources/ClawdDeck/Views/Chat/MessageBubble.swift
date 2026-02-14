@@ -6,6 +6,8 @@ import HighlightSwift
 struct MessageBubble: View {
     let message: ChatMessage
     var agentDisplayName: String = "Assistant"
+    var searchQuery: String = ""
+    var isCurrentMatch: Bool = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -90,6 +92,12 @@ struct MessageBubble: View {
                         if message.state == .error {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        } else if isCurrentMatch {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.yellow, lineWidth: 2)
+                        } else if isSearchMatch {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
                         }
                     }
                 }
@@ -122,6 +130,13 @@ struct MessageBubble: View {
                 Spacer(minLength: 60)
             }
         }
+    }
+
+    /// Whether this message matches the search query.
+    private var isSearchMatch: Bool {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return false }
+        return message.content.localizedCaseInsensitiveContains(query)
     }
 
     /// Whether the message has real text content (not just the image placeholder).
