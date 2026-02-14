@@ -67,7 +67,7 @@ struct MainView: View {
         .overlay(alignment: .top) {
             // Window drag area (invisible, covers top bar)
             Color.clear
-                .frame(height: 52)
+                .frame(height: 38)
                 .windowDraggable()
         }
         .sheet(isPresented: $appViewModel.showAgentSettings, onDismiss: {
@@ -142,9 +142,9 @@ struct TopBarView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Spacer for traffic light buttons
+            // Spacer for traffic light buttons (close/min/max are ~78px wide)
             Color.clear
-                .frame(width: 70, height: 1)
+                .frame(width: 78, height: 1)
 
             // Search field
             HStack(spacing: 6) {
@@ -206,7 +206,7 @@ struct TopBarView: View {
             .help("Settings")
         }
         .padding(.horizontal, 12)
-        .frame(height: 52)
+        .frame(height: 38)
         .background(.ultraThinMaterial)
     }
 
