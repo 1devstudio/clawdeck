@@ -240,6 +240,8 @@ struct ComposerTextEditor: NSViewRepresentable {
         let textView = scrollView.documentView as! NSTextView
 
         textView.delegate = context.coordinator
+        textView.isSelectable = true
+        textView.isEditable = true
         textView.isRichText = false
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
