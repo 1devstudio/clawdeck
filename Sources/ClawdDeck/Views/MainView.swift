@@ -26,49 +26,51 @@ struct MainView: View {
     private let railWidth: CGFloat = 60
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Top Bar (full width) ──
-            TopBarView(
-                searchText: $searchText,
+        HStack(spacing: 0) {
+            // Agent rail (outer shell)
+            AgentRailView(
+                profiles: appViewModel.connectionManager.profiles,
+                activeProfileId: appViewModel.connectionManager.activeProfile?.id,
                 connectionState: appViewModel.connectionManager.connectionState,
-                isInspectorVisible: $appViewModel.isInspectorVisible,
-                onSettings: { appViewModel.showAgentSettings = true }
+                onSelect: { profile in
+                    Task { await appViewModel.switchAgent(profile) }
+                },
+                onAdd: {
+                    appViewModel.showAgentSettings = true
+                }
             )
 
-            // ── Body: Rail + Inner Panel ──
-            HStack(spacing: 0) {
-                // Agent rail (outer shell)
-                AgentRailView(
-                    profiles: appViewModel.connectionManager.profiles,
-                    activeProfileId: appViewModel.connectionManager.activeProfile?.id,
-                    connectionState: appViewModel.connectionManager.connectionState,
-                    onSelect: { profile in
-                        Task { await appViewModel.switchAgent(profile) }
-                    },
-                    onAdd: {
-                        appViewModel.showAgentSettings = true
-                    }
-                )
-
-                // Inner panel (sidebar + content)
-                innerPanel
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 8,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0
-                        )
+            // Inner panel (sidebar + content)
+            innerPanel
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 8,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 0
                     )
-            }
+                )
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
-        .overlay(alignment: .top) {
-            // Window drag area (invisible, covers top bar)
-            Color.clear
-                .frame(height: 38)
-                .windowDraggable()
+        .ignoresSafeArea(.all, edges: .top)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                TopBarView(
+                    searchText: $searchText,
+                    connectionState: appViewModel.connectionManager.connectionState,
+                    isInspectorVisible: $appViewModel.isInspectorVisible,
+                    onSettings: { appViewModel.showAgentSettings = true }
+                )
+            }
+        }
+        .onAppear {
+            // Configure the window title bar to be transparent
+            DispatchQueue.main.async {
+                if let window = NSApp.windows.first {
+                    AppDelegate.configureWindowTitleBar(window)
+                }
+            }
         }
         .sheet(isPresented: $appViewModel.showAgentSettings, onDismiss: {
             appViewModel.editingAgentProfileId = nil
@@ -142,10 +144,6 @@ struct TopBarView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Spacer for traffic light buttons (close/min/max are ~78px wide)
-            Color.clear
-                .frame(width: 78, height: 1)
-
             // Search field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
@@ -205,9 +203,7 @@ struct TopBarView: View {
             .buttonStyle(.plain)
             .help("Settings")
         }
-        .padding(.horizontal, 12)
-        .frame(height: 38)
-        .background(.ultraThinMaterial)
+        .frame(minWidth: 400)
     }
 
     private var statusColor: Color {
@@ -216,33 +212,6 @@ struct TopBarView: View {
         case .connecting, .reconnecting: return .orange
         case .disconnected: return .red
         }
-    }
-}
-
-// MARK: - Window Draggable modifier
-
-extension View {
-    /// Makes a view act as a window drag area (title bar replacement).
-    func windowDraggable() -> some View {
-        self.overlay(WindowDragView())
-    }
-}
-
-/// An NSView-based drag area for the custom title bar.
-struct WindowDragView: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = WindowDragNSView()
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
-class WindowDragNSView: NSView {
-    override var mouseDownCanMoveWindow: Bool { true }
-
-    override func mouseDown(with event: NSEvent) {
-        window?.performDrag(with: event)
     }
 }
 

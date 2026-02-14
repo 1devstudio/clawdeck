@@ -7,6 +7,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
     }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Make the title bar transparent so content flows under the traffic lights
+        if let window = NSApp.windows.first {
+            configureWindowTitleBar(window)
+        }
+    }
+
+    /// Configure the window for a Slack-style layout where content extends into the title bar.
+    static func configureWindowTitleBar(_ window: NSWindow) {
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        // Extend content into the title bar area
+        window.styleMask.insert(.fullSizeContentView)
+    }
 }
 
 /// Clawd Deck — native macOS desktop app for Clawdbot.
@@ -31,7 +47,8 @@ struct ClawdDeckApp: App {
                 }
             }
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1100, height: 700)
         .commands {
             TextEditingCommands()
