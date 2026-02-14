@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isMovableByWindowBackground = true
         // Extend content into the title bar area
         window.styleMask.insert(.fullSizeContentView)
+        // Match the toolbar/title bar background to the agent rail
+        window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95)
     }
 }
 

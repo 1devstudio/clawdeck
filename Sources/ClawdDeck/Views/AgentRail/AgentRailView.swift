@@ -46,7 +46,7 @@ struct AgentRailView: View {
             .padding(.bottom, 8)
         }
         .frame(width: 60)
-        .background(.ultraThinMaterial)
+        .background(Color.clear)
     }
 }
 

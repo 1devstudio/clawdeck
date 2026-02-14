@@ -40,7 +40,7 @@ struct MainView: View {
                 }
             )
 
-            // Inner panel (sidebar + content)
+            // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
                 .background(Color(nsColor: .controlBackgroundColor))
                 .clipShape(
@@ -50,6 +50,15 @@ struct MainView: View {
                         bottomTrailingRadius: 0,
                         topTrailingRadius: 0
                     )
+                )
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 8,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 0
+                    )
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
                 )
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
