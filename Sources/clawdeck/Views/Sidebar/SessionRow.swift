@@ -7,19 +7,20 @@ struct SessionRow: View {
     @Binding var renameText: String
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
+    @Environment(\.messageTextSize) private var messageTextSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if isRenaming {
                 TextField("Session name", text: $renameText)
                     .textFieldStyle(.plain)
-                    .font(.body)
+                    .font(.system(size: messageTextSize))
                     .fontWeight(.medium)
                     .onSubmit { onCommitRename() }
                     .onExitCommand { onCancelRename() }
             } else {
                 Text(session.displayTitle)
-                    .font(.body)
+                    .font(.system(size: messageTextSize))
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -27,7 +28,7 @@ struct SessionRow: View {
 
             if let lastMessage = session.lastMessage, !lastMessage.isEmpty {
                 Text(lastMessage)
-                    .font(.caption)
+                    .font(.system(size: messageTextSize - 2))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .truncationMode(.tail)
@@ -35,7 +36,7 @@ struct SessionRow: View {
 
             if let date = session.lastMessageAt ?? session.updatedAt as Date? {
                 Text(date, style: .relative)
-                    .font(.caption2)
+                    .font(.system(size: messageTextSize - 3))
                     .foregroundStyle(.tertiary)
             }
         }

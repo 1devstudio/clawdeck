@@ -9,6 +9,7 @@ struct MessageBubble: View {
     var agentDisplayName: String = "Assistant"
     var searchQuery: String = ""
     @Environment(\.themeColor) private var themeColor
+    @Environment(\.messageTextSize) private var messageTextSize
     var isCurrentMatch: Bool = false
 
     @State private var isHovered = false
@@ -26,11 +27,11 @@ struct MessageBubble: View {
                 HStack(spacing: 4) {
                     if message.role == .assistant {
                         Image(systemName: "sparkle")
-                            .font(.caption2)
+                            .font(.system(size: messageTextSize - 3))
                             .foregroundStyle(.purple)
                     }
                     Text(roleLabel)
-                        .font(.caption)
+                        .font(.system(size: messageTextSize - 2))
                         .foregroundStyle(.secondary)
                         .fontWeight(.medium)
 
@@ -68,7 +69,7 @@ struct MessageBubble: View {
                             if message.role == .assistant && message.state != .error {
                                 Markdown(message.content)
                                     .markdownTextStyle {
-                                        FontSize(14)
+                                        FontSize(messageTextSize)
                                     }
                                     .markdownTextStyle(\.code) {
                                         FontFamilyVariant(.monospaced)
@@ -86,7 +87,7 @@ struct MessageBubble: View {
                                     .textSelection(.enabled)
                             } else {
                                 Text(message.content)
-                                    .font(.body)
+                                    .font(.system(size: messageTextSize))
                                     .textSelection(.enabled)
                             }
                         }
@@ -127,13 +128,13 @@ struct MessageBubble: View {
                 // Error message
                 if message.state == .error, let error = message.errorMessage {
                     Text(error)
-                        .font(.caption2)
+                        .font(.system(size: messageTextSize - 3))
                         .foregroundStyle(.red)
                 }
 
                 // Timestamp
                 Text(message.timestamp, style: .time)
-                    .font(.caption2)
+                    .font(.system(size: messageTextSize - 3))
                     .foregroundStyle(.tertiary)
 
                 // Sending indicator
@@ -142,7 +143,7 @@ struct MessageBubble: View {
                         ProgressView()
                             .controlSize(.mini)
                         Text("Sending…")
-                            .font(.caption2)
+                            .font(.system(size: messageTextSize - 3))
                             .foregroundStyle(.secondary)
                     }
                 }

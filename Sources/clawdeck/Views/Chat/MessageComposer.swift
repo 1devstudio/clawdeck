@@ -14,6 +14,7 @@ struct MessageComposer: View {
     var onAbort: () -> Void
     var onAddAttachment: (URL) -> Void
     @Environment(\.themeColor) private var themeColor
+    @Environment(\.messageTextSize) private var messageTextSize
     var onPasteImage: (NSImage) -> Void
     var onRemoveAttachment: (PendingAttachment) -> Void
 
@@ -48,12 +49,13 @@ struct MessageComposer: View {
                 ComposerTextEditor(
                     text: $text,
                     contentHeight: $editorHeight,
+                    fontSize: messageTextSize,
                     onEnterSend: {
                         if canSend { onSend() }
                     },
                     onPasteImage: onPasteImage
                 )
-                .font(.body)
+                .font(.system(size: messageTextSize))
                 .frame(height: editorHeight)
                 .padding(.horizontal, 12)
                 .background(
@@ -222,6 +224,7 @@ struct AttachmentThumbnail: View {
 struct ComposerTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var contentHeight: CGFloat
+    var fontSize: Double = 14
     var onEnterSend: () -> Void
     var onPasteImage: (NSImage) -> Void
 
@@ -244,7 +247,7 @@ struct ComposerTextEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        textView.font = NSFont.systemFont(ofSize: fontSize)
         textView.textColor = NSColor.labelColor
         textView.backgroundColor = .clear
         textView.isVerticallyResizable = true
@@ -275,6 +278,10 @@ struct ComposerTextEditor: NSViewRepresentable {
         let textView = scrollView.documentView as! NSTextView
         if textView.string != text {
             textView.string = text
+            context.coordinator.recalcHeight(textView)
+        }
+        if textView.font?.pointSize != CGFloat(fontSize) {
+            textView.font = NSFont.systemFont(ofSize: fontSize)
             context.coordinator.recalcHeight(textView)
         }
     }
