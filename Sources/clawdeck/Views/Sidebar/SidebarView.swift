@@ -97,7 +97,6 @@ struct SidebarView: View {
             }
             .listStyle(.inset)
             .scrollContentBackground(.hidden)
-            .background(Color(nsColor: .controlBackgroundColor))
         }
         .overlay {
             if viewModel.filteredSessions.isEmpty {

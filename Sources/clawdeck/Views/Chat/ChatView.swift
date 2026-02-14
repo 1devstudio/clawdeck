@@ -12,10 +12,6 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        // Invisible helper — sets tiled pattern on the NSScrollView
-                        ChatPatternBackground()
-                            .frame(width: 0, height: 0)
-
                         // "Load earlier messages" button
                         if viewModel.hasMoreMessages {
                             Button {
@@ -69,7 +65,6 @@ struct ChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-                .scrollContentBackground(.hidden)
                 .onAppear {
                     scrollProxy = proxy
                     // Scroll to bottom when the view first appears (session switch).
