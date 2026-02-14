@@ -29,20 +29,24 @@ struct MessageComposer: View {
                 )
             }
 
-            HStack(alignment: .bottom, spacing: 8) {
-                // Attach button
+            HStack(alignment: .bottom, spacing: 10) {
+                // Attach button — circular outline like iMessage "+"
                 Button(action: pickFile) {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.primary.opacity(0.6))
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
-                        .contentShape(Rectangle())
+                        .background(
+                            Circle()
+                                .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                        )
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
 
-                // Text input — uses a key-intercepting wrapper so Enter sends
+                // Text field — pill-shaped capsule like iMessage
                 ComposerTextEditor(
                     text: $text,
                     onEnterSend: {
@@ -51,37 +55,50 @@ struct MessageComposer: View {
                     onPasteImage: onPasteImage
                 )
                 .font(.body)
-                .frame(minHeight: 36, maxHeight: 120)
+                .frame(minHeight: 32, maxHeight: 120)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .background(
+                    Capsule()
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    Capsule()
                         .stroke(
                             isDropTargeted
                                 ? Color.accentColor
-                                : Color(nsColor: .separatorColor),
+                                : Color(nsColor: .separatorColor).opacity(0.6),
                             lineWidth: isDropTargeted ? 2 : 1
                         )
                 )
                 .focused($isFocused)
 
-                // Abort button (only visible during streaming)
+                // Abort button (visible during streaming) or send button (when there's content)
                 if isStreaming {
                     Button(action: onAbort) {
                         Image(systemName: "stop.circle.fill")
-                            .font(.title2)
+                            .font(.system(size: 26))
                             .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
                     .help("Stop generation (Esc)")
                     .keyboardShortcut(.escape, modifiers: [])
+                } else if canSend {
+                    Button(action: onSend) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Send message (↩)")
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .animation(.easeInOut(duration: 0.15), value: canSend)
+            .animation(.easeInOut(duration: 0.15), value: isStreaming)
         }
         .onDrop(of: [.image, .fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)

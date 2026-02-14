@@ -41,8 +41,6 @@ struct ChatView: View {
                 }
             }
 
-            Divider()
-
             // Error banner
             if let error = viewModel.errorMessage {
                 HStack {
