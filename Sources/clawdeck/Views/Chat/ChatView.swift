@@ -54,11 +54,25 @@ struct ChatView: View {
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
+
+                        // Invisible anchor at the very bottom — always rendered
+                        // even when LazyVStack hasn't materialised the last
+                        // message yet, so scrollTo has a reliable target.
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom-anchor")
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
-                .onAppear { scrollProxy = proxy }
+                .onAppear {
+                    scrollProxy = proxy
+                    // Scroll to bottom when the view first appears (session switch).
+                    // Dispatch async so the LazyVStack has laid out the bottom anchor.
+                    DispatchQueue.main.async {
+                        scrollToBottom(proxy: proxy, animated: false)
+                    }
+                }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     scrollToBottom(proxy: proxy)
                 }
@@ -127,9 +141,7 @@ struct ChatView: View {
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let scroll = {
-            if let lastId = viewModel.messages.last?.id {
-                proxy.scrollTo(lastId, anchor: .bottom)
-            }
+            proxy.scrollTo("bottom-anchor", anchor: .bottom)
         }
         if animated {
             withAnimation(.easeOut(duration: 0.2)) { scroll() }
