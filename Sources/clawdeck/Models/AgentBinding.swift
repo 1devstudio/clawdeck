@@ -10,7 +10,7 @@ struct AgentBinding: Identifiable, Codable, Hashable {
     var railOrder: Int
 
     /// Display name: local override ?? agent identity from gateway ?? agentId.capitalized
-    func displayName(from gatewayManager: GatewayManager?) -> String {
+    @MainActor func displayName(from gatewayManager: GatewayManager?) -> String {
         if let localDisplayName, !localDisplayName.isEmpty {
             return localDisplayName
         }
@@ -28,7 +28,7 @@ struct AgentBinding: Identifiable, Codable, Hashable {
     }
 
     /// Avatar: local override ?? live agent avatar from gateway ?? nil (show initials)
-    func avatarName(from gatewayManager: GatewayManager?) -> String? {
+    @MainActor func avatarName(from gatewayManager: GatewayManager?) -> String? {
         if let localAvatarName, !localAvatarName.isEmpty {
             return localAvatarName
         }
@@ -46,7 +46,7 @@ struct AgentBinding: Identifiable, Codable, Hashable {
     }
 
     /// Initials for display (first 1-2 chars of displayName).
-    func initials(from gatewayManager: GatewayManager?) -> String {
+    @MainActor func initials(from gatewayManager: GatewayManager?) -> String {
         let name = displayName(from: gatewayManager)
         let parts = name.split(separator: " ")
         if parts.count >= 2 {

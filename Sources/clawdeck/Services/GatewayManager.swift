@@ -232,7 +232,7 @@ final class GatewayManager {
             }
         }
         
-        return available.sorted { $0.gateway.displayName < $1.gateway.displayName }
+        return available.sorted(by: { $0.0.displayName < $1.0.displayName })
     }
 
     // MARK: - Convenience Methods
