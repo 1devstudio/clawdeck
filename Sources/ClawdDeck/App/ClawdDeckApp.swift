@@ -35,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let toolbar = window.toolbar {
             toolbar.displayMode = .iconOnly
             // Walk the toolbar items and remove background separators
-            if #available(macOS 14.0, *) {
+            if #available(macOS 15.0, *) {
                 toolbar.allowsDisplayModeCustomization = false
             }
         }
