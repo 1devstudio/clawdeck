@@ -101,17 +101,6 @@ struct MainView: View {
                 .help("Toggle Inspector (⌘⇧I)")
             }
 
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    appViewModel.showAgentSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Settings")
-            }
         }
         .onAppear {
             // Configure the window title bar to be transparent
