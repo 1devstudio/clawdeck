@@ -383,16 +383,22 @@ enum MarkdownParser {
         ]
 
         var i = 0
-        var lastBlockWasCode = false
+        /// Whether we've already appended at least one block.
+        var hasContent = false
+
+        /// Append a single newline separator between blocks.
+        func blockSeparator() {
+            if hasContent {
+                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
+            }
+        }
 
         while i < lines.count {
             let line = lines[i]
 
             // Fenced code block
             if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                if result.length > 0 && !lastBlockWasCode {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
 
                 let language = String(line.trimmingCharacters(in: .whitespaces).dropFirst(3)).trimmingCharacters(in: .whitespaces)
                 var codeLines: [String] = []
@@ -420,52 +426,38 @@ enum MarkdownParser {
                     code: code,
                     language: lang
                 ))
-
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                lastBlockWasCode = true
+                hasContent = true
                 continue
             }
 
-            // Blank line — paragraph break
+            // Blank line — skip (spacing handled by paragraphSpacing)
             if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
                 i += 1
-                lastBlockWasCode = false
                 continue
             }
 
             // Heading
             if let (level, text) = parseHeading(line) {
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
                 result.append(styledHeading(text, level: level, colorScheme: colorScheme))
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
+                hasContent = true
                 i += 1
-                lastBlockWasCode = false
                 continue
             }
 
             // Horizontal rule
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.count >= 3 && (trimmed.allSatisfy({ $0 == "-" }) || trimmed.allSatisfy({ $0 == "*" }) || trimmed.allSatisfy({ $0 == "_" })) {
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
                 result.append(styledHorizontalRule(colorScheme: colorScheme))
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
+                hasContent = true
                 i += 1
-                lastBlockWasCode = false
                 continue
             }
 
             // Block quote
             if trimmed.hasPrefix("> ") || trimmed == ">" {
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
                 var quoteLines: [String] = []
                 while i < lines.count {
                     let ql = lines[i].trimmingCharacters(in: .whitespaces)
@@ -479,8 +471,7 @@ enum MarkdownParser {
                     i += 1
                 }
                 result.append(styledBlockQuote(quoteLines.joined(separator: "\n"), colorScheme: colorScheme))
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                lastBlockWasCode = false
+                hasContent = true
                 continue
             }
 
@@ -498,9 +489,7 @@ enum MarkdownParser {
                         break
                     }
                 }
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
                 for (itemIndex, (indent, itemText)) in listItems.enumerated() {
                     let bullet = indent > 0 ? "◦ " : "• "
                     let prefix = String(repeating: "    ", count: indent) + bullet
@@ -511,8 +500,7 @@ enum MarkdownParser {
                     }
                     result.append(line)
                 }
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                lastBlockWasCode = false
+                hasContent = true
                 continue
             }
 
@@ -530,9 +518,7 @@ enum MarkdownParser {
                         break
                     }
                 }
-                if result.length > 0 {
-                    result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                }
+                blockSeparator()
                 for (itemIndex, (indent, number, itemText)) in listItems.enumerated() {
                     let prefix = String(repeating: "    ", count: indent) + "\(number). "
                     let line = NSMutableAttributedString(string: prefix, attributes: defaultAttrs)
@@ -542,8 +528,7 @@ enum MarkdownParser {
                     }
                     result.append(line)
                 }
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-                lastBlockWasCode = false
+                hasContent = true
                 continue
             }
 
@@ -563,18 +548,10 @@ enum MarkdownParser {
                 i += 1
             }
 
-            if result.length > 0 {
-                result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-            }
+            blockSeparator()
             let paraText = paraLines.joined(separator: " ")
             result.append(parseInlineFormatting(paraText, baseAttrs: defaultAttrs))
-            result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
-            lastBlockWasCode = false
-        }
-
-        // Trim trailing newlines
-        while result.length > 0 && result.string.hasSuffix("\n") {
-            result.deleteCharacters(in: NSRange(location: result.length - 1, length: 1))
+            hasContent = true
         }
 
         return result
@@ -834,7 +811,8 @@ enum MarkdownParser {
 
     static func defaultParagraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = 3
+        style.lineSpacing = 2
+        style.paragraphSpacing = 6   // Space after each paragraph block
         return style
     }
 
