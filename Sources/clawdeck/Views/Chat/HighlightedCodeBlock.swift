@@ -11,6 +11,7 @@ struct HighlightedCodeBlock: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.codeHighlightTheme) private var codeHighlightTheme
     @State private var highlightResult: AttributedString?
     @State private var detectedLanguage: String?
     @State private var isCopied = false
@@ -69,7 +70,7 @@ struct HighlightedCodeBlock: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 0.5)
         )
-        .task(id: code + (language ?? "")) {
+        .task(id: code + (language ?? "") + codeHighlightTheme.rawValue + "\(colorScheme)") {
             await performHighlight()
         }
     }
@@ -79,8 +80,8 @@ struct HighlightedCodeBlock: View {
     private func performHighlight() async {
         do {
             let colors: HighlightColors = colorScheme == .dark
-                ? .dark(.github)
-                : .light(.github)
+                ? .dark(codeHighlightTheme)
+                : .light(codeHighlightTheme)
 
             let result: HighlightResult
             if let lang = language, !lang.isEmpty {

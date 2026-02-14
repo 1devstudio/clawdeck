@@ -10,6 +10,8 @@ struct MessageBubble: View {
     var searchQuery: String = ""
     @Environment(\.themeColor) private var themeColor
     @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.codeHighlightTheme) private var codeHighlightTheme
     var isCurrentMatch: Bool = false
 
     @State private var isHovered = false
@@ -74,8 +76,8 @@ struct MessageBubble: View {
                                     .markdownTextStyle(\.code) {
                                         FontFamilyVariant(.monospaced)
                                         FontSize(.em(0.88))
-                                        ForegroundColor(.purple)
-                                        BackgroundColor(.purple.opacity(0.12))
+                                        ForegroundColor(inlineCodeColor)
+                                        BackgroundColor(inlineCodeColor.opacity(0.12))
                                     }
                                     .markdownBlockStyle(\.codeBlock) { configuration in
                                         HighlightedCodeBlock(
@@ -270,6 +272,10 @@ struct MessageBubble: View {
         case .toolCall: return "Tool Call"
         case .toolResult: return "Tool Result"
         }
+    }
+
+    private var inlineCodeColor: Color {
+        codeHighlightTheme.keywordColor(for: colorScheme)
     }
 
     /// Liquid Glass style per message role.

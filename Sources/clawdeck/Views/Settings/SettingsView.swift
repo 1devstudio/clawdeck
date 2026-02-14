@@ -1,4 +1,5 @@
 import SwiftUI
+import HighlightSwift
 
 /// Application preferences window.
 struct SettingsView: View {
@@ -31,6 +32,22 @@ struct SettingsView: View {
 
 struct AppearanceSettingsView: View {
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
+    @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
+    @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
+
+    private var appearanceMode: Binding<AppearanceMode> {
+        Binding(
+            get: { AppearanceMode(rawValue: appearanceModeRaw) ?? .system },
+            set: { appearanceModeRaw = $0.rawValue }
+        )
+    }
+
+    private var codeHighlightTheme: Binding<HighlightTheme> {
+        Binding(
+            get: { HighlightTheme(rawValue: codeHighlightThemeRaw) ?? .github },
+            set: { codeHighlightThemeRaw = $0.rawValue }
+        )
+    }
 
     var body: some View {
         Form {
@@ -41,8 +58,17 @@ struct AppearanceSettingsView: View {
             }
 
             Section("Theme") {
-                Text("Follow system appearance")
-                    .foregroundStyle(.secondary)
+                Picker("Appearance", selection: appearanceMode) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+
+                Picker("Code Highlight", selection: codeHighlightTheme) {
+                    ForEach(HighlightTheme.allCases) { theme in
+                        Text(theme.rawValue).tag(theme)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
