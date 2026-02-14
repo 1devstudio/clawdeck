@@ -82,9 +82,10 @@ struct MessageBubble: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
                     .background(bubbleBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .cornerRadius(12)
                     .overlay {
                         if message.state == .error {
                             RoundedRectangle(cornerRadius: 12)
