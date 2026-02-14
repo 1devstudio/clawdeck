@@ -70,6 +70,19 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Inner Panel Background Environment Key
+
+private struct InnerPanelBackgroundConfigKey: EnvironmentKey {
+    static let defaultValue: InnerPanelBackgroundConfig = .default
+}
+
+extension EnvironmentValues {
+    var innerPanelBackground: InnerPanelBackgroundConfig {
+        get { self[InnerPanelBackgroundConfigKey.self] }
+        set { self[InnerPanelBackgroundConfigKey.self] = newValue }
+    }
+}
+
 // MARK: - Highlight Theme Keyword Color
 
 extension HighlightTheme {
@@ -94,7 +107,7 @@ extension HighlightTheme {
     }
 }
 
-private extension Color {
+extension Color {
     init(hex: String) {
         let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         let expanded: String
