@@ -52,6 +52,7 @@ struct AgentSettingsSheet: View {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(viewModel.restartPhase != .none)
 
                 Spacer()
 
@@ -67,18 +68,28 @@ struct AgentSettingsSheet: View {
                         if saved {
                             // Apply accent color to the app immediately
                             appViewModel.applyAccentColor(viewModel.agentAccentColor)
+                            
+                            // Brief pause so the user sees the "done" state
+                            if viewModel.restartPhase == .done {
+                                try? await Task.sleep(nanoseconds: 600_000_000)
+                            }
                             dismiss()
                         }
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-                .disabled(viewModel.isSaving)
+                .disabled(viewModel.isSaving || viewModel.restartPhase != .none)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
         .frame(width: 500, height: 620)
+        .overlay {
+            if viewModel.restartPhase != .none && viewModel.restartPhase != .done {
+                GatewayRestartOverlay(phase: viewModel.restartPhase)
+            }
+        }
         .task {
             await viewModel.loadConfig()
         }
@@ -256,6 +267,82 @@ struct AgentSettingsSheet: View {
             } icon: {
                 Image(systemName: "checkmark.circle")
                     .foregroundStyle(.green)
+            }
+        }
+    }
+}
+
+// MARK: - Gateway Restart Overlay
+
+/// Full-sheet overlay shown while the gateway restarts after a config change.
+struct GatewayRestartOverlay: View {
+    let phase: AgentSettingsViewModel.RestartPhase
+
+    private var statusText: String {
+        switch phase {
+        case .applyingConfig: return "Applying configuration…"
+        case .waitingForRestart: return "Gateway is restarting…"
+        case .reconnecting: return "Reconnecting…"
+        case .done, .none: return ""
+        }
+    }
+
+    private var detailText: String {
+        switch phase {
+        case .applyingConfig: return "Sending changes to the gateway"
+        case .waitingForRestart: return "Waiting for the gateway to come back online"
+        case .reconnecting: return "Re-establishing connection"
+        case .done, .none: return ""
+        }
+    }
+
+    /// Progress value (0–1) for the determinate indicator.
+    private var progress: Double {
+        switch phase {
+        case .none: return 0
+        case .applyingConfig: return 0.2
+        case .waitingForRestart: return 0.5
+        case .reconnecting: return 0.8
+        case .done: return 1.0
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            // Dimmed background
+            Rectangle()
+                .fill(.ultraThinMaterial)
+
+            VStack(spacing: 16) {
+                // Animated icon
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(phase == .waitingForRestart ? 360 : 0))
+                    .animation(
+                        phase == .waitingForRestart
+                            ? .linear(duration: 2).repeatForever(autoreverses: false)
+                            : .default,
+                        value: phase
+                    )
+
+                Text(statusText)
+                    .font(.headline)
+
+                Text(detailText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 200)
+                    .animation(.easeInOut(duration: 0.5), value: progress)
+            }
+            .padding(32)
+            .background {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.background)
+                    .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
             }
         }
     }

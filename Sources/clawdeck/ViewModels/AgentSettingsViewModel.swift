@@ -14,6 +14,16 @@ final class AgentSettingsViewModel {
     /// Saving state.
     var isSaving = false
     
+    /// Gateway restart/reconnect progress after a config patch.
+    enum RestartPhase: Equatable {
+        case none
+        case applyingConfig
+        case waitingForRestart
+        case reconnecting
+        case done
+    }
+    var restartPhase: RestartPhase = .none
+    
     /// Error message to display.
     var errorMessage: String?
     
@@ -210,17 +220,26 @@ final class AgentSettingsViewModel {
         successMessage = nil
         
         do {
-            // Save gateway config changes
-            try await saveGatewayConfig()
+            let needsRestart = hasGatewayConfigChanges
             
-            // Save local profile changes
+            // Save gateway config changes (triggers restart if changed)
+            if needsRestart {
+                try await saveGatewayConfig()
+            }
+            
+            // Save local profile changes (no restart)
             await saveGatewayProfile()
+            
+            if needsRestart {
+                restartPhase = .done
+            }
             
             successMessage = "Settings saved successfully"
             isSaving = false
             return true
         } catch {
             errorMessage = "Failed to save settings: \(error.localizedDescription)"
+            restartPhase = .none
             isSaving = false
             return false
         }
@@ -274,6 +293,9 @@ final class AgentSettingsViewModel {
             throw AgentSettingsError.jsonSerializationFailed
         }
 
+        // Phase 1: Applying config
+        restartPhase = .applyingConfig
+
         // Send the patch (gateway merges it with existing config).
         // The gateway will restart after applying, dropping our WebSocket.
         try await client.configPatch(
@@ -282,10 +304,13 @@ final class AgentSettingsViewModel {
             note: "Agent settings updated via ClawDeck"
         )
 
-        // Give the gateway time to restart (restartDelayMs defaults to 2000ms,
-        // plus startup time). Then trigger a fresh reconnect.
+        // Phase 2: Waiting for gateway restart
+        restartPhase = .waitingForRestart
         print("[AgentSettings] Config patch applied, waiting for gateway restart...")
-        try? await Task.sleep(nanoseconds: 4_000_000_000)
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+
+        // Phase 3: Reconnecting
+        restartPhase = .reconnecting
 
         // Force reconnect if not already reconnected
         if let appVM = appViewModel,
@@ -406,9 +431,18 @@ final class AgentSettingsViewModel {
 
     /// Check if settings have unsaved changes.
     var hasUnsavedChanges: Bool {
+        hasGatewayConfigChanges || hasLocalOnlyChanges
+    }
+
+    /// Whether any gateway config fields changed (triggers restart).
+    var hasGatewayConfigChanges: Bool {
         agentDisplayName != originalAgentName ||
         agentEmoji != originalAgentEmoji ||
-        primaryModel != originalPrimaryModel ||
+        primaryModel != originalPrimaryModel
+    }
+
+    /// Whether only local/profile fields changed (no restart needed).
+    var hasLocalOnlyChanges: Bool {
         gatewayDisplayName != originalGatewayDisplayName ||
         gatewayHost != originalGatewayHost ||
         gatewayPort != originalGatewayPort ||
