@@ -33,6 +33,7 @@ enum GatewayMethod {
     static let configGet = "config.get"
     static let configSchema = "config.schema"
     static let configPatch = "config.patch"
+    static let modelsList = "models.list"
 }
 
 /// Gateway event names.

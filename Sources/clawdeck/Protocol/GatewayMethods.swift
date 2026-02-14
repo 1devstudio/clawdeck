@@ -418,6 +418,23 @@ struct ConfigSchemaResult: Codable, Sendable {
     }
 }
 
+// MARK: - Models
+
+/// A single model entry returned by models.list.
+struct GatewayModel: Codable, Sendable, Identifiable {
+    let id: String
+    let name: String
+    let provider: String
+    let contextWindow: Int?
+    let reasoning: Bool?
+    let input: [String]?
+}
+
+/// Result of models.list.
+struct ModelsListResult: Codable, Sendable {
+    let models: [GatewayModel]
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.

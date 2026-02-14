@@ -272,6 +272,15 @@ actor GatewayClient {
         return try payload.decode(ConfigSchemaResult.self)
     }
 
+    /// Fetch the list of available models from the gateway.
+    func modelsList() async throws -> ModelsListResult {
+        let response = try await send(method: GatewayMethod.modelsList)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(ModelsListResult.self)
+    }
+
     /// Patch the gateway config (merge partial update).
     func configPatch(raw: String, baseHash: String, sessionKey: String? = nil, note: String? = nil) async throws {
         let params = ConfigPatchParams(raw: raw, baseHash: baseHash, sessionKey: sessionKey, note: note)

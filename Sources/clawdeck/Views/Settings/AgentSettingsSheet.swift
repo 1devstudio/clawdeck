@@ -238,7 +238,10 @@ struct AgentSettingsSheet: View {
             HStack {
                 Label("Primary Model", systemImage: "brain")
                     .frame(width: 130, alignment: .leading)
-                ModelPicker(selectedModel: $viewModel.primaryModel)
+                ModelPicker(
+                    selectedModel: $viewModel.primaryModel,
+                    client: appViewModel.activeClient
+                )
             }
             .padding(.vertical, 2)
         }
@@ -395,79 +398,79 @@ struct IconPickerGrid: View {
 
 // MARK: - Model Picker
 
-/// A combobox-style model picker: dropdown of well-known models + editable text field for custom values.
+/// Dynamic model picker that fetches available models from the gateway via `models.list`.
+/// Groups models by provider in a searchable dropdown with a "Custom…" fallback.
 struct ModelPicker: View {
     @Binding var selectedModel: String
+    let client: GatewayClient?
 
-    /// Well-known models grouped by provider.
-    private static let modelGroups: [(provider: String, models: [(id: String, label: String)])] = [
-        ("Anthropic", [
-            ("anthropic/claude-opus-4-6", "Claude Opus 4.6"),
-            ("anthropic/claude-sonnet-4-20250514", "Claude Sonnet 4"),
-            ("anthropic/claude-3-5-haiku-latest", "Claude 3.5 Haiku"),
-        ]),
-        ("OpenAI", [
-            ("openai/gpt-5.2", "GPT-5.2"),
-            ("openai/o3", "o3"),
-            ("openai/o4-mini", "o4-mini"),
-        ]),
-        ("Google", [
-            ("google/gemini-3-pro-preview", "Gemini 3 Pro"),
-            ("google/gemini-2.5-flash-preview-05-20", "Gemini 2.5 Flash"),
-        ]),
-        ("OpenRouter", [
-            ("openrouter/anthropic/claude-sonnet-4-5", "Claude Sonnet 4.5"),
-            ("openrouter/anthropic/claude-opus-4", "Claude Opus 4"),
-            ("openrouter/google/gemini-2.5-pro-preview", "Gemini 2.5 Pro"),
-        ]),
-        ("Other", [
-            ("xai/grok-3", "Grok 3"),
-            ("mistral/mistral-large-latest", "Mistral Large"),
-            ("ollama/llama3.3", "Llama 3.3 (Ollama)"),
-        ]),
-    ]
+    /// Models fetched from the gateway, grouped by provider.
+    @State private var providerGroups: [(provider: String, models: [GatewayModel])] = []
+    @State private var isLoading = true
+    @State private var isCustom = false
+    @State private var searchText = ""
 
-    /// Whether the custom text field is shown.
-    @State private var isCustom: Bool = false
-
-    /// Flat list of all known model IDs for matching.
-    private var allKnownIds: [String] {
-        Self.modelGroups.flatMap { $0.models.map(\.id) }
+    /// All fetched model qualified IDs (provider/id) for matching.
+    private var allQualifiedIds: Set<String> {
+        Set(providerGroups.flatMap { group in
+            group.models.map { "\(group.provider)/\($0.id)" }
+        })
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("", selection: pickerBinding) {
-                ForEach(Self.modelGroups, id: \.provider) { group in
-                    Section(group.provider) {
-                        ForEach(group.models, id: \.id) { model in
-                            Text(model.label)
-                                .tag(model.id)
-                        }
-                    }
+            if isLoading {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading models…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                Divider()
-                Text("Custom…")
-                    .tag("__custom__")
-            }
-            .labelsHidden()
-
-            if isCustom {
+            } else if providerGroups.isEmpty {
+                // Fallback to plain text field if gateway returned nothing
                 TextField("", text: $selectedModel, prompt: Text("provider/model-name"))
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12, design: .monospaced))
+            } else {
+                Picker("", selection: pickerBinding) {
+                    ForEach(filteredGroups, id: \.provider) { group in
+                        Section(group.provider.capitalized) {
+                            ForEach(group.models) { model in
+                                Text(model.name)
+                                    .tag("\(group.provider)/\(model.id)")
+                            }
+                        }
+                    }
+                    Divider()
+                    Text("Custom…")
+                        .tag("__custom__")
+                }
+                .labelsHidden()
+
+                if isCustom {
+                    TextField("", text: $selectedModel, prompt: Text("provider/model-name"))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12, design: .monospaced))
+                }
             }
+        }
+        .task {
+            await loadModels()
         }
     }
 
-    /// Binding that bridges the Picker selection to our state,
-    /// switching to custom mode when needed.
+    /// Filtered groups — only show providers that have models.
+    private var filteredGroups: [(provider: String, models: [GatewayModel])] {
+        providerGroups.filter { !$0.models.isEmpty }
+    }
+
+    /// Binding that bridges the Picker selection to our state.
     private var pickerBinding: Binding<String> {
         Binding<String>(
             get: {
                 if isCustom { return "__custom__" }
-                if allKnownIds.contains(selectedModel) { return selectedModel }
-                // Current value isn't in the list — show as custom
+                if allQualifiedIds.contains(selectedModel) { return selectedModel }
                 if !selectedModel.isEmpty {
                     DispatchQueue.main.async { isCustom = true }
                     return "__custom__"
@@ -483,5 +486,31 @@ struct ModelPicker: View {
                 }
             }
         )
+    }
+
+    /// Fetch models from the gateway and group by provider.
+    private func loadModels() async {
+        guard let client else {
+            isLoading = false
+            return
+        }
+
+        do {
+            let result = try await client.modelsList()
+            // Group by provider, sorted alphabetically
+            var grouped: [String: [GatewayModel]] = [:]
+            for model in result.models {
+                grouped[model.provider, default: []].append(model)
+            }
+            // Sort models within each provider by name
+            providerGroups = grouped
+                .sorted { $0.key < $1.key }
+                .map { (provider: $0.key, models: $0.value.sorted { $0.name < $1.name }) }
+        } catch {
+            print("[ModelPicker] Failed to load models: \(error)")
+            // Leave empty — will show text field fallback
+        }
+
+        isLoading = false
     }
 }
