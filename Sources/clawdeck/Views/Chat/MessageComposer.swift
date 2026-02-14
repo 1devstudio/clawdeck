@@ -246,10 +246,13 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NonDraggableTextView()
-        textView.autoresizingMask = [.width]
+        // Use the factory for proper text-system wiring, then swap in our subclass
+        let scrollView = NSTextView.scrollableTextView()
+        let originalTV = scrollView.documentView as! NSTextView
+        let textContainer = originalTV.textContainer!
 
-        let scrollView = NSScrollView()
+        let textView = NonDraggableTextView(frame: originalTV.frame, textContainer: textContainer)
+        textView.autoresizingMask = originalTV.autoresizingMask
         scrollView.documentView = textView
 
         textView.delegate = context.coordinator
