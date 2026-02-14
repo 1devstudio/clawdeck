@@ -475,6 +475,26 @@ enum MarkdownParser {
                 continue
             }
 
+            // Table — line contains | and next line is a separator row (|---|---|)
+            if trimmed.contains("|"), i + 1 < lines.count,
+               isTableSeparator(lines[i + 1]) {
+                blockSeparator()
+                var tableLines: [String] = [line]
+                i += 1
+                while i < lines.count {
+                    let tl = lines[i].trimmingCharacters(in: .whitespaces)
+                    if tl.contains("|") {
+                        tableLines.append(lines[i])
+                        i += 1
+                    } else {
+                        break
+                    }
+                }
+                result.append(styledTable(tableLines, colorScheme: colorScheme))
+                hasContent = true
+                continue
+            }
+
             // Unordered list item
             if let (indent, text) = parseUnorderedListItem(line) {
                 var listItems: [(Int, String)] = [(indent, text)]
@@ -770,6 +790,101 @@ enum MarkdownParser {
         return NSAttributedString(string: "─────────────────────────────────", attributes: attrs)
     }
 
+    // MARK: - Table rendering
+
+    /// Check if a line is a markdown table separator row (e.g. `|---|---|`).
+    static func isTableSeparator(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.contains("|") && trimmed.contains("-") else { return false }
+        let stripped = trimmed.replacingOccurrences(of: "|", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: ":", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        return stripped.isEmpty
+    }
+
+    /// Parse table rows into cells.
+    private static func parseTableRow(_ line: String) -> [String] {
+        var row = line.trimmingCharacters(in: .whitespaces)
+        if row.hasPrefix("|") { row = String(row.dropFirst()) }
+        if row.hasSuffix("|") { row = String(row.dropLast()) }
+        return row.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Render a markdown table as a formatted attributed string.
+    static func styledTable(_ lines: [String], colorScheme: ColorScheme) -> NSAttributedString {
+        guard lines.count >= 2 else { return NSAttributedString() }
+
+        let result = NSMutableAttributedString()
+        let bodyFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let boldFont = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
+
+        // Parse header and data rows (skip separator)
+        let headerCells = parseTableRow(lines[0])
+        let dataRows = lines.dropFirst(2).map { parseTableRow($0) } // skip separator at [1]
+        let colCount = headerCells.count
+
+        // Calculate column widths based on content
+        var colWidths = headerCells.map { $0.count }
+        for row in dataRows {
+            for (ci, cell) in row.enumerated() where ci < colCount {
+                colWidths[ci] = max(colWidths[ci], cell.count)
+            }
+        }
+        // Cap column widths at a reasonable size
+        colWidths = colWidths.map { min($0, 30) }
+
+        let tableParaStyle = NSMutableParagraphStyle()
+        tableParaStyle.lineSpacing = 2
+
+        let headerAttrs: [NSAttributedString.Key: Any] = [
+            .font: boldFont,
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: tableParaStyle
+        ]
+        let cellAttrs: [NSAttributedString.Key: Any] = [
+            .font: bodyFont,
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: tableParaStyle
+        ]
+        let separatorAttrs: [NSAttributedString.Key: Any] = [
+            .font: monoFont,
+            .foregroundColor: NSColor.tertiaryLabelColor,
+            .paragraphStyle: tableParaStyle
+        ]
+
+        // Render a row of cells padded to column widths
+        func renderRow(_ cells: [String], attrs: [NSAttributedString.Key: Any]) -> NSAttributedString {
+            let row = NSMutableAttributedString()
+            for (ci, width) in colWidths.enumerated() {
+                let cell = ci < cells.count ? cells[ci] : ""
+                let padded = cell.padding(toLength: width, withPad: " ", startingAt: 0)
+                if ci > 0 {
+                    row.append(NSAttributedString(string: "  │  ", attributes: separatorAttrs))
+                }
+                row.append(NSAttributedString(string: padded, attributes: attrs))
+            }
+            return row
+        }
+
+        // Header
+        result.append(renderRow(headerCells, attrs: headerAttrs))
+
+        // Separator line
+        let sepLine = colWidths.map { String(repeating: "─", count: $0) }.joined(separator: "──┼──")
+        result.append(NSAttributedString(string: "\n", attributes: cellAttrs))
+        result.append(NSAttributedString(string: sepLine, attributes: separatorAttrs))
+
+        // Data rows
+        for row in dataRows {
+            result.append(NSAttributedString(string: "\n", attributes: cellAttrs))
+            result.append(renderRow(row, attrs: cellAttrs))
+        }
+
+        return result
+    }
+
     // MARK: - Line parsing helpers
 
     static func parseHeading(_ line: String) -> (Int, String)? {
@@ -812,7 +927,7 @@ enum MarkdownParser {
     static func defaultParagraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 4
-        style.paragraphSpacing = 6   // Space after each paragraph block
+        style.paragraphSpacing = 10  // Space after each paragraph block
         return style
     }
 
