@@ -5,6 +5,7 @@ import MarkdownUI
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
     @State private var scrollProxy: ScrollViewProxy?
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,6 +65,9 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                }
+                .background {
+                    ChatPatternBackground(tintColor: themeColor)
                 }
                 .onAppear {
                     scrollProxy = proxy
