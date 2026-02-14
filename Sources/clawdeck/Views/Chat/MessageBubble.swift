@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Renders a single chat message with role-appropriate styling.
 struct MessageBubble: View {
@@ -6,6 +7,10 @@ struct MessageBubble: View {
     var agentDisplayName: String = "Assistant"
     var searchQuery: String = ""
     var isCurrentMatch: Bool = false
+
+    @State private var isHovered = false
+    @State private var copiedText = false
+    @State private var copiedMarkdown = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -55,32 +60,49 @@ struct MessageBubble: View {
 
                 // Message content (hidden for image-only messages)
                 if hasTextContent {
-                    Group {
-                        if message.role == .assistant && message.state != .error {
-                            MarkdownTextView(markdown: message.content)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Text(message.content)
-                                .font(.body)
-                                .textSelection(.enabled)
+                    ZStack(alignment: .topTrailing) {
+                        Group {
+                            if message.role == .assistant && message.state != .error {
+                                MarkdownTextView(markdown: message.content)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                Text(message.content)
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
+                        .background(bubbleBackground)
+                        .cornerRadius(12)
+                        .overlay {
+                            if message.state == .error {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            } else if isCurrentMatch {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.yellow, lineWidth: 2)
+                            } else if isSearchMatch {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                            }
+                        }
+
+                        // Copy buttons — shown on hover for assistant messages
+                        if isHovered && message.role == .assistant && message.state != .streaming {
+                            MessageCopyButtons(
+                                copiedText: $copiedText,
+                                copiedMarkdown: $copiedMarkdown,
+                                onCopyText: { copyRenderedText() },
+                                onCopyMarkdown: { copyAsMarkdown() }
+                            )
+                            .padding(.top, 6)
+                            .padding(.trailing, 6)
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
-                    .background(bubbleBackground)
-                    .cornerRadius(12)
-                    .overlay {
-                        if message.state == .error {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                        } else if isCurrentMatch {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.yellow, lineWidth: 2)
-                        } else if isSearchMatch {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
-                        }
+                    .onHover { hovering in
+                        isHovered = hovering
                     }
                 }
 
@@ -112,6 +134,99 @@ struct MessageBubble: View {
                 Spacer(minLength: 60)
             }
         }
+    }
+
+    // MARK: - Copy actions
+
+    private func copyRenderedText() {
+        // Convert markdown to plain text (strip formatting markers)
+        let plainText = markdownToPlainText(message.content)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(plainText, forType: .string)
+        copiedText = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copiedText = false
+        }
+    }
+
+    private func copyAsMarkdown() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+        copiedMarkdown = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copiedMarkdown = false
+        }
+    }
+
+    /// Strip markdown syntax to produce clean plain text.
+    private func markdownToPlainText(_ markdown: String) -> String {
+        var text = markdown
+
+        // Remove fenced code block markers (keep the code)
+        text = text.replacingOccurrences(
+            of: "```[a-zA-Z]*\\n",
+            with: "",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(of: "```", with: "")
+
+        // Remove heading markers
+        text = text.replacingOccurrences(
+            of: "(?m)^#{1,6}\\s+",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Bold/italic: ***text*** → text, **text** → text, *text* → text
+        text = text.replacingOccurrences(
+            of: "\\*{1,3}(.+?)\\*{1,3}",
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // Strikethrough: ~~text~~ → text
+        text = text.replacingOccurrences(
+            of: "~~(.+?)~~",
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // Inline code: `code` → code
+        text = text.replacingOccurrences(
+            of: "`(.+?)`",
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // Links: [text](url) → text
+        text = text.replacingOccurrences(
+            of: "\\[(.+?)\\]\\(.+?\\)",
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // Block quotes: > text → text
+        text = text.replacingOccurrences(
+            of: "(?m)^>\\s?",
+            with: "",
+            options: .regularExpression
+        )
+
+        // List markers: - item, * item, + item → item
+        text = text.replacingOccurrences(
+            of: "(?m)^(\\s*)[-*+]\\s+",
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // Horizontal rules
+        text = text.replacingOccurrences(
+            of: "(?m)^[-*_]{3,}$",
+            with: "────────────",
+            options: .regularExpression
+        )
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Whether this message matches the search query.
@@ -150,5 +265,61 @@ struct MessageBubble: View {
         case .toolCall, .toolResult:
             return AnyShapeStyle(Color.gray.opacity(0.08))
         }
+    }
+}
+
+// MARK: - Copy Buttons Overlay
+
+/// Two small buttons for copying message content: plain text and markdown.
+struct MessageCopyButtons: View {
+    @Binding var copiedText: Bool
+    @Binding var copiedMarkdown: Bool
+    var onCopyText: () -> Void
+    var onCopyMarkdown: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            // Copy as plain text
+            Button(action: onCopyText) {
+                Group {
+                    if copiedText {
+                        Image(systemName: "checkmark")
+                    } else {
+                        Image(systemName: "doc.on.doc")
+                    }
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(copiedText ? .green : .secondary)
+                .frame(width: 26, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("Copy as plain text")
+
+            // Copy as markdown
+            Button(action: onCopyMarkdown) {
+                Group {
+                    if copiedMarkdown {
+                        Image(systemName: "checkmark")
+                    } else {
+                        Text("MD")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    }
+                }
+                .foregroundStyle(copiedMarkdown ? .green : .secondary)
+                .frame(width: 26, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("Copy as Markdown")
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
     }
 }
