@@ -185,9 +185,10 @@ struct MainView: View {
 
     private var innerPanel: some View {
         HStack(spacing: 0) {
-            // Sidebar
+            // Sidebar — Liquid Glass panel
             SidebarView(viewModel: appViewModel.sidebarViewModel)
                 .frame(width: sidebarWidth)
+                .glassEffect(in: .rect(cornerRadius: 0))
 
             // Draggable resize handle
             ResizeHandle()
