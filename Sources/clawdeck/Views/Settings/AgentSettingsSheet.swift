@@ -530,7 +530,7 @@ struct ModelPicker: View {
             // Results
             if suggestions.isEmpty {
                 VStack(spacing: 4) {
-                    Text("No models match "\(searchText)"")
+                    Text("No models match \"\(searchText)\"")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
