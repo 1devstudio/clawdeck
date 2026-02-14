@@ -63,13 +63,59 @@ struct MainView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
         .toolbar {
-            ToolbarItem(placement: .automatic) {
-                TopBarView(
-                    searchText: $searchText,
-                    connectionState: appViewModel.connectionManager.connectionState,
-                    isInspectorVisible: $appViewModel.isInspectorVisible,
-                    onSettings: { appViewModel.showAgentSettings = true }
-                )
+            // Search bar — centered via .principal
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12))
+
+                    TextField("Search sessions…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(width: 300)
+            }
+
+            // Right-aligned controls
+            ToolbarItemGroup(placement: .primaryAction) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(connectionStatusColor)
+                        .frame(width: 7, height: 7)
+                    Text(appViewModel.connectionManager.connectionState.rawValue.capitalized)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    appViewModel.isInspectorVisible.toggle()
+                } label: {
+                    Image(systemName: "sidebar.right")
+                }
+                .help("Toggle Inspector (⌘⇧I)")
+
+                Button {
+                    appViewModel.showAgentSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .help("Settings")
             }
         }
         .onAppear {
@@ -131,6 +177,14 @@ struct MainView: View {
         }
     }
 
+    private var connectionStatusColor: Color {
+        switch appViewModel.connectionManager.connectionState {
+        case .connected: return .green
+        case .connecting, .reconnecting: return .orange
+        case .disconnected: return .red
+        }
+    }
+
     private var emptyState: some View {
         ContentUnavailableView(
             "No Session Selected",
@@ -138,92 +192,6 @@ struct MainView: View {
             description: Text("Select a session from the sidebar or create a new one.")
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Top Bar
-
-/// Full-width top bar with search, connection status, and window controls.
-struct TopBarView: View {
-    @Binding var searchText: String
-    let connectionState: ConnectionState
-    @Binding var isInspectorVisible: Bool
-    let onSettings: () -> Void
-
-    var body: some View {
-        ZStack {
-            // Search field (truly centered)
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.tertiary)
-                    .font(.system(size: 12))
-
-                TextField("Search sessions…", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.tertiary)
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .frame(maxWidth: 400)
-
-            // Right-aligned controls
-            HStack {
-                Spacer()
-                HStack(spacing: 14) {
-                    // Connection status
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 7, height: 7)
-                        Text(connectionState.rawValue.capitalized)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Inspector toggle
-                    Button {
-                        isInspectorVisible.toggle()
-                    } label: {
-                        Image(systemName: "sidebar.right")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Toggle Inspector (⌘⇧I)")
-
-                    // Settings
-                    Button(action: onSettings) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Settings")
-                }
-            }
-        }
-        .frame(minWidth: 400)
-    }
-
-    private var statusColor: Color {
-        switch connectionState {
-        case .connected: return .green
-        case .connecting, .reconnecting: return .orange
-        case .disconnected: return .red
-        }
     }
 }
 
