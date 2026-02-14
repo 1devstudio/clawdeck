@@ -108,9 +108,10 @@ struct MessageBubble: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
                             } else {
-                                bubbleBorder
+                                glassBorder
                             }
                         }
+                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
 
                         // Copy buttons — shown on hover for assistant messages
                         if isHovered && message.role == .assistant && message.state != .streaming {
@@ -276,45 +277,82 @@ struct MessageBubble: View {
         }
     }
 
-    /// Frosted-glass bubble background with a role-appropriate tint.
+    /// Glass bubble background — frosted material + tint + top-light gradient.
     @ViewBuilder
     private var bubbleBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 12)
+
         switch message.role {
         case .user:
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(themeColor.opacity(0.12))
+                shape.fill(.regularMaterial)
+                shape.fill(themeColor.opacity(0.10))
+                // Top-light refraction gradient
+                shape.fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
         case .assistant:
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.thinMaterial)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.primary.opacity(0.06))
+                shape.fill(.regularMaterial)
+                shape.fill(Color.primary.opacity(0.04))
+                shape.fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
         case .system:
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.yellow.opacity(0.08))
+                shape.fill(.regularMaterial)
+                shape.fill(Color.yellow.opacity(0.08))
+                shape.fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
         case .toolCall, .toolResult:
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.06))
+                shape.fill(.regularMaterial)
+                shape.fill(Color.gray.opacity(0.06))
+                shape.fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.10), Color.white.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
         }
     }
 
-    /// Subtle border to define bubble edges against any background.
-    private var bubbleBorder: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+    /// Glass edge — bright highlight on top, subtle shadow on bottom.
+    private var glassBorder: some View {
+        ZStack {
+            // Specular highlight on top edge
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.35),
+                            Color.white.opacity(0.08),
+                            Color.black.opacity(0.08)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+        }
     }
 }
 
