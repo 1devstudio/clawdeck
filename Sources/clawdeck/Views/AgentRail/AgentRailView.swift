@@ -7,7 +7,10 @@ struct AgentRailView: View {
     let activeBindingId: String?
     let gatewayManager: GatewayManager
     let onSelect: (AgentBinding) -> Void
-    let onAdd: () -> Void
+    let onAddBinding: (AgentBinding) -> Void
+    let onConnectNewGateway: () -> Void
+
+    @State private var showAddPopover = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -35,7 +38,9 @@ struct AgentRailView: View {
                 .padding(.horizontal, 8)
 
             // Add agent button
-            Button(action: onAdd) {
+            Button {
+                showAddPopover = true
+            } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.gray.opacity(0.15))
@@ -47,8 +52,18 @@ struct AgentRailView: View {
             }
             .buttonStyle(.plain)
             .help("Add Agent")
-            .popover(isPresented: .constant(false)) {  // TODO: Implement add agent popover
-                AddAgentPopover(gatewayManager: gatewayManager)
+            .popover(isPresented: $showAddPopover) {
+                AddAgentPopover(
+                    gatewayManager: gatewayManager,
+                    onAddBinding: { binding in
+                        showAddPopover = false
+                        onAddBinding(binding)
+                    },
+                    onConnectNewGateway: {
+                        showAddPopover = false
+                        onConnectNewGateway()
+                    }
+                )
             }
             .padding(.bottom, 8)
         }
@@ -185,7 +200,8 @@ struct AgentContextMenu: View {
 /// Popover for adding new agent bindings.
 struct AddAgentPopover: View {
     let gatewayManager: GatewayManager
-    @Environment(\.dismiss) private var dismiss
+    let onAddBinding: (AgentBinding) -> Void
+    let onConnectNewGateway: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -201,25 +217,38 @@ struct AddAgentPopover: View {
                     Text("All agents from connected gateways are already in the sidebar.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
                 }
+                .frame(maxWidth: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(availableAgents.indices, id: \.self) { index in
                             let (gateway, agent) = availableAgents[index]
                             Button {
-                                addAgent(gateway: gateway, agent: agent)
+                                let binding = AgentBinding(
+                                    gatewayId: gateway.id,
+                                    agentId: agent.id,
+                                    localDisplayName: agent.name,
+                                    railOrder: gatewayManager.sortedAgentBindings.count + 1
+                                )
+                                gatewayManager.addAgentBinding(binding)
+                                onAddBinding(binding)
                             } label: {
                                 HStack {
-                                    VStack(alignment: .leading) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(agent.name ?? agent.id.capitalized)
                                             .font(.body)
-                                        Text(gateway.displayAddress)
+                                        Text(gateway.displayName)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()
+                                    Image(systemName: "plus.circle")
+                                        .foregroundStyle(.secondary)
                                 }
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 4)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -231,23 +260,17 @@ struct AddAgentPopover: View {
 
             Divider()
 
-            Button("Connect New Gateway…") {
-                // TODO: Open gateway connection sheet
-                dismiss()
+            Button {
+                onConnectNewGateway()
+            } label: {
+                HStack {
+                    Image(systemName: "server.rack")
+                    Text("Connect New Gateway…")
+                }
             }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .frame(width: 280)
-    }
-
-    private func addAgent(gateway: GatewayProfile, agent: AgentSummary) {
-        let binding = AgentBinding(
-            gatewayId: gateway.id,
-            agentId: agent.id,
-            localDisplayName: agent.name,
-            railOrder: gatewayManager.sortedAgentBindings.count + 1
-        )
-        gatewayManager.addAgentBinding(binding)
-        dismiss()
     }
 }

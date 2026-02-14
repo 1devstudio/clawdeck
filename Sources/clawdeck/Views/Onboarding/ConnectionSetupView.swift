@@ -1,14 +1,15 @@
 import SwiftUI
 
-/// First-run gateway connection wizard shown when no gateways are configured.
+/// Gateway connection wizard — used for first-run onboarding and "Connect New Gateway" sheet.
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
 
     @State private var gatewayName = ""
-    @State private var host = "vps-0a60f62f.vps.ovh.net"
-    @State private var port = "443"
+    @State private var host = ""
+    @State private var port = "18789"
     @State private var token = ""
-    @State private var useTLS = true
+    @State private var useTLS = false
     @State private var isConnecting = false
     @State private var errorMessage: String?
 
@@ -79,19 +80,27 @@ struct ConnectionSetupView: View {
 
             // Actions
             HStack {
-                Button("Skip") {
+                Button("Cancel") {
                     appViewModel.showConnectionSetup = false
+                    appViewModel.showGatewayConnectionSheet = false
+                    dismiss()
                 }
-                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
 
                 Spacer()
+
+                if isConnecting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.trailing, 8)
+                }
 
                 Button("Connect") {
                     Task { await connect() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(host.isEmpty || port.isEmpty || isConnecting)
-                .keyboardShortcut(.return, modifiers: .command)
+                .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
@@ -145,7 +154,12 @@ struct ConnectionSetupView: View {
                 // Connect to all gateways and load data
                 await appViewModel.connectAndLoad()
                 
+                // Switch to the newly added agent
+                await appViewModel.switchAgent(binding)
+                
                 appViewModel.showConnectionSetup = false
+                appViewModel.showGatewayConnectionSheet = false
+                dismiss()
             } else if let firstAgent = agentsResult.agents.first {
                 // Fallback to first agent
                 let binding = AgentBinding(
@@ -157,7 +171,11 @@ struct ConnectionSetupView: View {
                 appViewModel.gatewayManager.addAgentBinding(binding)
                 
                 await appViewModel.connectAndLoad()
+                await appViewModel.switchAgent(binding)
+                
                 appViewModel.showConnectionSetup = false
+                appViewModel.showGatewayConnectionSheet = false
+                dismiss()
             } else {
                 errorMessage = "No agents found on this gateway"
             }

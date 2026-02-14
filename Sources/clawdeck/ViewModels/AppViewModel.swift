@@ -45,7 +45,10 @@ final class AppViewModel {
     /// All known agents from all connected gateways.
     var agents: [Agent] = []
 
-    /// All known sessions (filtered to the active binding's gateway+agentId).
+    /// All sessions from the active gateway (unfiltered cache).
+    private var allGatewaySessions: [Session] = []
+
+    /// Sessions visible in the sidebar (filtered to the active agent).
     var sessions: [Session] = []
 
     /// Currently selected session key.
@@ -59,6 +62,9 @@ final class AppViewModel {
 
     /// Whether the agent settings sheet is shown.
     var showAgentSettings = false
+
+    /// Whether the "connect new gateway" sheet is shown (from + popover).
+    var showGatewayConnectionSheet = false
 
     /// Profile ID being edited (nil = adding new, non-nil = editing).
     var editingAgentProfileId: String?
@@ -115,11 +121,12 @@ final class AppViewModel {
         let previousGatewayId = activeBinding?.gatewayId
         activeBinding = binding
         
-        // If switching to a different gateway, we need to reload sessions
-        // If same gateway, just filter existing sessions
         if previousGatewayId != binding.gatewayId {
+            // Different gateway — reload sessions from the new gateway
+            allGatewaySessions.removeAll()
             await refreshSessions()
         } else {
+            // Same gateway — just filter the cached sessions (instant)
             filterSessionsToActiveAgent()
         }
     }
@@ -129,6 +136,7 @@ final class AppViewModel {
         gatewayManager.disconnectAll()
         activeBinding = nil
         agents.removeAll()
+        allGatewaySessions.removeAll()
         sessions.removeAll()
         selectedSessionKey = nil
         messageStore.clearAll()
@@ -162,6 +170,7 @@ final class AppViewModel {
     func refreshSessions() async {
         guard let binding = activeBinding,
               let client = gatewayManager.client(for: binding.gatewayId) else {
+            allGatewaySessions.removeAll()
             sessions.removeAll()
             return
         }
@@ -172,10 +181,10 @@ final class AppViewModel {
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
-                sessions.map { ($0.key, $0.createdAt) }
+                allGatewaySessions.map { ($0.key, $0.createdAt) }
             )
 
-            let allSessions = result.sessions
+            allGatewaySessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
                 .map { summary in
                     let session = Session.from(summary: summary)
@@ -187,23 +196,27 @@ final class AppViewModel {
                 }
             
             // Filter to the active agent
-            sessions = allSessions.filter { session in
-                session.agentId == binding.agentId
-            }
+            filterSessionsToActiveAgent()
         } catch {
             print("[AppViewModel] Failed to list sessions: \(error)")
         }
     }
 
-    /// Filter existing sessions to the active agent (for same-gateway switches).
+    /// Filter cached sessions to the active agent (for same-gateway switches).
     private func filterSessionsToActiveAgent() {
         guard let binding = activeBinding else {
             sessions.removeAll()
             return
         }
         
-        sessions = sessions.filter { session in
+        sessions = allGatewaySessions.filter { session in
             session.agentId == binding.agentId
+        }
+        
+        // Clear selection if the selected session doesn't belong to this agent
+        if let selectedKey = selectedSessionKey,
+           !sessions.contains(where: { $0.key == selectedKey }) {
+            selectedSessionKey = nil
         }
     }
 

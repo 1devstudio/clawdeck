@@ -41,8 +41,11 @@ struct MainView: View {
                 onSelect: { binding in
                     Task { await appViewModel.switchAgent(binding) }
                 },
-                onAdd: {
-                    appViewModel.showAgentSettings = true
+                onAddBinding: { binding in
+                    Task { await appViewModel.switchAgent(binding) }
+                },
+                onConnectNewGateway: {
+                    appViewModel.showGatewayConnectionSheet = true
                 }
             )
 
@@ -168,6 +171,9 @@ struct MainView: View {
             appViewModel.editingAgentProfileId = nil
         }) {
             AgentSettingsSheet(appViewModel: appViewModel)
+        }
+        .sheet(isPresented: $appViewModel.showGatewayConnectionSheet) {
+            ConnectionSetupView(appViewModel: appViewModel)
         }
     }
 
