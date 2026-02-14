@@ -235,13 +235,16 @@ struct AgentSettingsSheet: View {
 
     private var modelSection: some View {
         Section("Model Configuration") {
-            HStack {
+            HStack(alignment: .top) {
                 Label("Primary Model", systemImage: "brain")
                     .frame(width: 130, alignment: .leading)
+                    .padding(.top, 4)
+                Spacer(minLength: 8)
                 ModelPicker(
                     selectedModel: $viewModel.primaryModel,
                     client: appViewModel.activeClient
                 )
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.vertical, 2)
         }
@@ -396,99 +399,196 @@ struct IconPickerGrid: View {
     }
 }
 
-// MARK: - Model Picker
+// MARK: - Model Picker (Autocomplete)
 
-/// Dynamic model picker that fetches available models from the gateway via `models.list`.
-/// Groups models by provider in a searchable dropdown with a "Custom…" fallback.
+/// A model entry with its qualified ID for display and selection.
+private struct ModelOption: Identifiable {
+    let qualifiedId: String   // "provider/model-id"
+    let displayName: String   // "Claude Opus 4.6"
+    let provider: String      // "anthropic"
+    var id: String { qualifiedId }
+}
+
+/// Autocomplete model picker that fetches from the gateway via `models.list`.
+/// Type to filter by model name or provider/id; click a suggestion to select.
 struct ModelPicker: View {
     @Binding var selectedModel: String
     let client: GatewayClient?
 
-    /// Models fetched from the gateway, grouped by provider.
-    @State private var providerGroups: [(provider: String, models: [GatewayModel])] = []
+    @State private var allModels: [ModelOption] = []
     @State private var isLoading = true
-    @State private var isCustom = false
     @State private var searchText = ""
+    @State private var showSuggestions = false
+    @State private var hoveredId: String?
+    @FocusState private var isFocused: Bool
 
-    /// All fetched model qualified IDs (provider/id) for matching.
-    private var allQualifiedIds: Set<String> {
-        Set(providerGroups.flatMap { group in
-            group.models.map { "\(group.provider)/\($0.id)" }
-        })
+    /// Display text: show the friendly name if we have it, otherwise the raw ID.
+    private var displayName: String? {
+        allModels.first(where: { $0.qualifiedId == selectedModel })?.displayName
+    }
+
+    /// Filtered suggestions based on search text.
+    private var suggestions: [ModelOption] {
+        let query = searchText.lowercased()
+        guard !query.isEmpty else {
+            // Show a reasonable subset when empty (first 30)
+            return Array(allModels.prefix(30))
+        }
+        return allModels.filter { model in
+            model.displayName.lowercased().contains(query) ||
+            model.qualifiedId.lowercased().contains(query) ||
+            model.provider.lowercased().contains(query)
+        }
+    }
+
+    /// Suggestions grouped by provider for display.
+    private var groupedSuggestions: [(provider: String, models: [ModelOption])] {
+        var grouped: [String: [ModelOption]] = [:]
+        for model in suggestions {
+            grouped[model.provider, default: []].append(model)
+        }
+        return grouped.sorted { $0.key < $1.key }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if isLoading {
-                HStack(spacing: 6) {
+        VStack(alignment: .trailing, spacing: 0) {
+            // Text field
+            HStack(spacing: 4) {
+                if isLoading {
                     ProgressView()
-                        .controlSize(.small)
-                    Text("Loading models…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .controlSize(.mini)
                 }
-            } else if providerGroups.isEmpty {
-                // Fallback to plain text field if gateway returned nothing
-                TextField("", text: $selectedModel, prompt: Text("provider/model-name"))
+                TextField("", text: $searchText, prompt: Text("Search models…"))
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12, design: .monospaced))
-            } else {
-                Picker("", selection: pickerBinding) {
-                    ForEach(filteredGroups, id: \.provider) { group in
-                        Section(group.provider.capitalized) {
-                            ForEach(group.models) { model in
-                                Text(model.name)
-                                    .tag("\(group.provider)/\(model.id)")
+                    .focused($isFocused)
+                    .onChange(of: searchText) { _, _ in
+                        showSuggestions = true
+                    }
+                    .onChange(of: isFocused) { _, focused in
+                        if focused {
+                            showSuggestions = true
+                            // Select all text on focus for easy replacement
+                            if searchText == (displayName ?? selectedModel) {
+                                searchText = ""
                             }
                         }
                     }
-                    Divider()
-                    Text("Custom…")
-                        .tag("__custom__")
-                }
-                .labelsHidden()
+                    .onSubmit {
+                        // If there's an exact match in suggestions, use it
+                        if let match = suggestions.first {
+                            selectModel(match)
+                        }
+                        showSuggestions = false
+                    }
 
-                if isCustom {
-                    TextField("", text: $selectedModel, prompt: Text("provider/model-name"))
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 12, design: .monospaced))
+                // Clear / current selection indicator
+                if !selectedModel.isEmpty && !isFocused {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.green)
                 }
+            }
+
+            // Current selection label (shown when not editing)
+            if !isFocused && !selectedModel.isEmpty {
+                Text(selectedModel)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, 2)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showSuggestions && isFocused && !suggestions.isEmpty {
+                suggestionsDropdown
+                    .offset(y: 26)
             }
         }
         .task {
             await loadModels()
+            // Initialize search text to current display name
+            searchText = displayName ?? selectedModel
         }
     }
 
-    /// Filtered groups — only show providers that have models.
-    private var filteredGroups: [(provider: String, models: [GatewayModel])] {
-        providerGroups.filter { !$0.models.isEmpty }
-    }
+    // MARK: - Suggestions Dropdown
 
-    /// Binding that bridges the Picker selection to our state.
-    private var pickerBinding: Binding<String> {
-        Binding<String>(
-            get: {
-                if isCustom { return "__custom__" }
-                if allQualifiedIds.contains(selectedModel) { return selectedModel }
-                if !selectedModel.isEmpty {
-                    DispatchQueue.main.async { isCustom = true }
-                    return "__custom__"
+    private var suggestionsDropdown: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(groupedSuggestions, id: \.provider) { group in
+                    // Provider header
+                    Text(group.provider.capitalized)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 6)
+                        .padding(.bottom, 2)
+
+                    ForEach(group.models) { model in
+                        Button {
+                            selectModel(model)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(model.displayName)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.primary)
+                                    Text(model.qualifiedId)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                Spacer()
+                                if model.qualifiedId == selectedModel {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(hoveredId == model.qualifiedId ? Color.accentColor.opacity(0.1) : Color.clear)
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { isHovered in
+                            hoveredId = isHovered ? model.qualifiedId : nil
+                        }
+                    }
                 }
-                return selectedModel
-            },
-            set: { newValue in
-                if newValue == "__custom__" {
-                    isCustom = true
-                } else {
-                    isCustom = false
-                    selectedModel = newValue
+
+                if suggestions.isEmpty {
+                    Text("No models match "\(searchText)"")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(8)
                 }
             }
-        )
+            .padding(.vertical, 4)
+        }
+        .frame(width: 300, maxHeight: 250)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .zIndex(100)
     }
 
-    /// Fetch models from the gateway and group by provider.
+    // MARK: - Actions
+
+    private func selectModel(_ model: ModelOption) {
+        selectedModel = model.qualifiedId
+        searchText = model.displayName
+        showSuggestions = false
+        isFocused = false
+    }
+
+    // MARK: - Data Loading
+
     private func loadModels() async {
         guard let client else {
             isLoading = false
@@ -497,18 +597,11 @@ struct ModelPicker: View {
 
         do {
             let result = try await client.modelsList()
-            // Group by provider, sorted alphabetically
-            var grouped: [String: [GatewayModel]] = [:]
-            for model in result.models {
-                grouped[model.provider, default: []].append(model)
-            }
-            // Sort models within each provider by name
-            providerGroups = grouped
-                .sorted { $0.key < $1.key }
-                .map { (provider: $0.key, models: $0.value.sorted { $0.name < $1.name }) }
+            allModels = result.models
+                .map { ModelOption(qualifiedId: "\($0.provider)/\($0.id)", displayName: $0.name, provider: $0.provider) }
+                .sorted { $0.displayName < $1.displayName }
         } catch {
             print("[ModelPicker] Failed to load models: \(error)")
-            // Leave empty — will show text field fallback
         }
 
         isLoading = false
