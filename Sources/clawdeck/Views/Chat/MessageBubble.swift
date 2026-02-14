@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import MarkdownUI
+import HighlightSwift
 
 /// Renders a single chat message with role-appropriate styling.
 struct MessageBubble: View {
@@ -63,8 +65,24 @@ struct MessageBubble: View {
                     ZStack(alignment: .topTrailing) {
                         Group {
                             if message.role == .assistant && message.state != .error {
-                                MessageContentView(markdown: message.content)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Markdown(message.content)
+                                    .markdownTextStyle {
+                                        FontSize(14)
+                                    }
+                                    .markdownTextStyle(\.code) {
+                                        FontFamilyVariant(.monospaced)
+                                        FontSize(.em(0.88))
+                                        ForegroundColor(.purple)
+                                        BackgroundColor(.purple.opacity(0.12))
+                                    }
+                                    .markdownBlockStyle(\.codeBlock) { configuration in
+                                        HighlightedCodeBlock(
+                                            code: configuration.content,
+                                            language: configuration.language
+                                        )
+                                        .markdownMargin(top: .em(0.4), bottom: .em(0.4))
+                                    }
+                                    .textSelection(.enabled)
                             } else {
                                 Text(message.content)
                                     .font(.body)
@@ -139,7 +157,6 @@ struct MessageBubble: View {
     // MARK: - Copy actions
 
     private func copyRenderedText() {
-        // Convert markdown to plain text (strip formatting markers)
         let plainText = markdownToPlainText(message.content)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(plainText, forType: .string)
@@ -177,21 +194,21 @@ struct MessageBubble: View {
             options: .regularExpression
         )
 
-        // Bold/italic: ***text*** → text, **text** → text, *text* → text
+        // Bold/italic
         text = text.replacingOccurrences(
             of: "\\*{1,3}(.+?)\\*{1,3}",
             with: "$1",
             options: .regularExpression
         )
 
-        // Strikethrough: ~~text~~ → text
+        // Strikethrough
         text = text.replacingOccurrences(
             of: "~~(.+?)~~",
             with: "$1",
             options: .regularExpression
         )
 
-        // Inline code: `code` → code
+        // Inline code
         text = text.replacingOccurrences(
             of: "`(.+?)`",
             with: "$1",
@@ -205,14 +222,14 @@ struct MessageBubble: View {
             options: .regularExpression
         )
 
-        // Block quotes: > text → text
+        // Block quotes
         text = text.replacingOccurrences(
             of: "(?m)^>\\s?",
             with: "",
             options: .regularExpression
         )
 
-        // List markers: - item, * item, + item → item
+        // List markers
         text = text.replacingOccurrences(
             of: "(?m)^(\\s*)[-*+]\\s+",
             with: "$1",

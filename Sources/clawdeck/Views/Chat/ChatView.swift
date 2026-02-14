@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 
 /// Center column: message list with composer at the bottom.
 struct ChatView: View {
