@@ -68,7 +68,7 @@ struct MainView: View {
                 TextField("Search sessions…", text: $searchText)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
                     .frame(width: 500)
             }
 
