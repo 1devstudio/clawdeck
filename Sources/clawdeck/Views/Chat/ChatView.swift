@@ -65,6 +65,7 @@ struct ChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
+                .scrollContentBackground(.hidden)
                 .background {
                     ChatPatternBackground()
                 }
