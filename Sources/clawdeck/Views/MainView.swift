@@ -51,7 +51,9 @@ struct MainView: View {
 
             // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background {
+                    ChatPatternBackground()
+                }
                 .clipShape(
                     UnevenRoundedRectangle(
                         topLeadingRadius: 8,
