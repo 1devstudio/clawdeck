@@ -250,6 +250,8 @@ struct MainView: View {
             systemImage: "bubble.left.and.bubble.right",
             description: Text("Select a session from the sidebar or create a new one.")
         )
+        .padding(32)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
