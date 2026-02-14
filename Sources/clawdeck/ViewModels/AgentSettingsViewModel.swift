@@ -39,6 +39,9 @@ final class AgentSettingsViewModel {
     
     /// Primary model (from agents.defaults.model.primary).
     var primaryModel: String = ""
+
+    /// Selected SF Symbol icon for the agent rail (from AgentBinding.localAvatarName).
+    var selectedIcon: String?
     
     // MARK: - Gateway Connection (local settings)
     
@@ -162,6 +165,11 @@ final class AgentSettingsViewModel {
         
         if let binding = appViewModel.activeBinding {
             currentBinding = binding
+
+            // Load icon from binding's localAvatarName (stored as "sf:symbolname")
+            if let avatarName = binding.localAvatarName, avatarName.hasPrefix("sf:") {
+                selectedIcon = String(avatarName.dropFirst(3))
+            }
             
             if let profile = appViewModel.gatewayManager.gatewayProfiles.first(where: { $0.id == binding.gatewayId }) {
                 currentProfile = profile
@@ -189,10 +197,12 @@ final class AgentSettingsViewModel {
     // MARK: - Saving
     
     /// Save all changes to both gateway config and local settings.
-    func saveChanges() async {
+    /// Returns `true` on success so the caller can dismiss.
+    @discardableResult
+    func saveChanges() async -> Bool {
         guard let appViewModel else {
             errorMessage = "No app context available"
-            return
+            return false
         }
         
         isSaving = true
@@ -207,21 +217,13 @@ final class AgentSettingsViewModel {
             await saveGatewayProfile()
             
             successMessage = "Settings saved successfully"
-            
-            // Clear success message after delay
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await MainActor.run {
-                    if self.successMessage == "Settings saved successfully" {
-                        self.successMessage = nil
-                    }
-                }
-            }
+            isSaving = false
+            return true
         } catch {
             errorMessage = "Failed to save settings: \(error.localizedDescription)"
+            isSaving = false
+            return false
         }
-        
-        isSaving = false
     }
     
     /// Save gateway configuration changes.
@@ -317,14 +319,21 @@ final class AgentSettingsViewModel {
         appViewModel.gatewayManager.updateGatewayProfile(profile)
         currentProfile = profile
         
-        // Update current binding's local display name if needed
+        // Update current binding
         if var binding = currentBinding {
-            // Check if agent display name should override the gateway default
+            // Display name override
             let gatewayDefaultName = binding.displayName(from: appViewModel.gatewayManager)
             if !agentDisplayName.isEmpty && agentDisplayName != gatewayDefaultName {
                 binding.localDisplayName = agentDisplayName
             } else {
                 binding.localDisplayName = nil
+            }
+
+            // Icon (stored as "sf:symbolname")
+            if let icon = selectedIcon {
+                binding.localAvatarName = "sf:\(icon)"
+            } else {
+                binding.localAvatarName = nil
             }
             
             // Update through the gateway manager

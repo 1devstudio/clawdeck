@@ -3,6 +3,7 @@ import SwiftUI
 /// Gateway connection wizard — used for first-run onboarding and "Connect New Gateway" sheet.
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
+    @Environment(\.themeColor) private var themeColor
     @Environment(\.dismiss) private var dismiss
 
     @State private var gatewayName = ""
@@ -19,7 +20,7 @@ struct ConnectionSetupView: View {
             VStack(spacing: 8) {
                 Image(systemName: "server.rack")
                     .font(.system(size: 48))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(themeColor)
 
                 Text("Connect to Gateway")
                     .font(.title2)

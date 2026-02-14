@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -66,6 +67,9 @@ final class AppViewModel {
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
+    /// Custom accent color set from Agent Settings. Applied app-wide.
+    var customAccentColor: Color?
+
     /// Profile ID being edited (nil = adding new, non-nil = editing).
     var editingAgentProfileId: String?
 
@@ -96,6 +100,9 @@ final class AppViewModel {
                 self?.handleEvent(event, gatewayId: gatewayId)
             }
         }
+
+        // Load persisted accent color
+        loadAccentColor()
 
         // Show setup on first launch
         if !hasProfiles {
@@ -405,6 +412,31 @@ final class AppViewModel {
         sessions.insert(newSession, at: 0)
         selectedSessionKey = sessionKey
         print("[AppViewModel] Created new session: \(sessionKey)")
+    }
+
+    // MARK: - Accent Color
+
+    /// Apply a custom accent color app-wide via NSAppearance.
+    func applyAccentColor(_ color: Color) {
+        customAccentColor = color
+        // Persist to UserDefaults as hex
+        let nsColor = NSColor(color).usingColorSpace(.sRGB) ?? NSColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let hex = String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+        UserDefaults.standard.set(hex, forKey: "com.clawdbot.deck.accentColor")
+    }
+
+    /// Load saved accent color from UserDefaults.
+    func loadAccentColor() {
+        guard let hex = UserDefaults.standard.string(forKey: "com.clawdbot.deck.accentColor"),
+              !hex.isEmpty else { return }
+        let clean = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard clean.count == 6,
+              let r = Int(clean.prefix(2), radix: 16),
+              let g = Int(clean.dropFirst(2).prefix(2), radix: 16),
+              let b = Int(clean.suffix(2), radix: 16) else { return }
+        customAccentColor = Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 
     // MARK: - Event handling

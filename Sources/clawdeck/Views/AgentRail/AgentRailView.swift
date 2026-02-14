@@ -78,12 +78,13 @@ struct AgentRailItem: View {
     let gatewayManager: GatewayManager
     let isActive: Bool
     let isConnected: Bool
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         HStack(spacing: 0) {
             // Active indicator pill on the left edge
             RoundedRectangle(cornerRadius: 2)
-                .fill(isActive ? Color.accentColor : Color.clear)
+                .fill(isActive ? themeColor : Color.clear)
                 .frame(width: 4, height: isActive ? 28 : 0)
                 .animation(.easeInOut(duration: 0.15), value: isActive)
 
@@ -92,7 +93,7 @@ struct AgentRailItem: View {
             // Avatar
             ZStack {
                 RoundedRectangle(cornerRadius: isActive ? 14 : 20)
-                    .fill(isActive ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.15))
+                    .fill(isActive ? themeColor.opacity(0.2) : Color.gray.opacity(0.15))
                     .frame(width: 40, height: 40)
                     .animation(.easeInOut(duration: 0.15), value: isActive)
 
@@ -123,7 +124,7 @@ struct AgentRailItem: View {
                 // SF Symbol
                 Image(systemName: String(avatarName.dropFirst(3)))
                     .font(.system(size: 18))
-                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isActive ? themeColor : Color.secondary)
             } else {
                 // Custom image from app support
                 if let image = loadCustomAvatar(named: avatarName) {
@@ -144,7 +145,7 @@ struct AgentRailItem: View {
     private var initialsView: some View {
         Text(binding.initials(from: gatewayManager))
             .font(.system(size: 16, weight: .semibold, design: .rounded))
-            .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+            .foregroundStyle(isActive ? themeColor : Color.secondary)
     }
 
     /// Load a custom avatar image from the app's avatars directory.

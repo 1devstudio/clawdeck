@@ -8,6 +8,7 @@ struct MessageBubble: View {
     let message: ChatMessage
     var agentDisplayName: String = "Assistant"
     var searchQuery: String = ""
+    @Environment(\.themeColor) private var themeColor
     var isCurrentMatch: Bool = false
 
     @State private var isHovered = false
@@ -274,7 +275,7 @@ struct MessageBubble: View {
     private var bubbleBackground: some ShapeStyle {
         switch message.role {
         case .user:
-            return AnyShapeStyle(Color.accentColor.opacity(0.12))
+            return AnyShapeStyle(themeColor.opacity(0.12))
         case .assistant:
             return AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
         case .system:

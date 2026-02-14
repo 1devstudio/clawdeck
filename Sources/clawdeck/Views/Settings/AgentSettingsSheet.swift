@@ -4,14 +4,14 @@ import SwiftUI
 struct AgentSettingsSheet: View {
     let appViewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var viewModel: AgentSettingsViewModel
-    
+
     init(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel
         self._viewModel = State(initialValue: AgentSettingsViewModel(appViewModel: appViewModel))
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -29,6 +29,7 @@ struct AgentSettingsSheet: View {
                     loadingSection
                 } else {
                     agentIdentitySection
+                    iconSection
                     gatewayConnectionSection
                     modelSection
 
@@ -62,7 +63,12 @@ struct AgentSettingsSheet: View {
 
                 Button("Save") {
                     Task {
-                        await viewModel.saveChanges()
+                        let saved = await viewModel.saveChanges()
+                        if saved {
+                            // Apply accent color to the app immediately
+                            appViewModel.applyAccentColor(viewModel.agentAccentColor)
+                            dismiss()
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -72,14 +78,14 @@ struct AgentSettingsSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .frame(width: 500, height: 550)
+        .frame(width: 500, height: 620)
         .task {
             await viewModel.loadConfig()
         }
     }
-    
+
     // MARK: - Sections
-    
+
     private var loadingSection: some View {
         Section {
             HStack {
@@ -92,7 +98,7 @@ struct AgentSettingsSheet: View {
             .padding(.vertical, 8)
         }
     }
-    
+
     private var agentIdentitySection: some View {
         Section("Agent Identity") {
             HStack {
@@ -102,7 +108,7 @@ struct AgentSettingsSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
-            
+
             HStack {
                 Label("Emoji", systemImage: "face.smiling")
                     .frame(width: 130, alignment: .leading)
@@ -111,7 +117,7 @@ struct AgentSettingsSheet: View {
                     .help("Emoji avatar for the agent")
             }
             .padding(.vertical, 2)
-            
+
             HStack {
                 Label("Accent Color", systemImage: "paintpalette")
                     .frame(width: 130, alignment: .leading)
@@ -122,7 +128,60 @@ struct AgentSettingsSheet: View {
             .padding(.vertical, 2)
         }
     }
-    
+
+    private var iconSection: some View {
+        Section("Rail Icon") {
+            HStack(alignment: .top) {
+                Label("Icon", systemImage: "star.square")
+                    .frame(width: 130, alignment: .leading)
+                    .padding(.top, 4)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    // Current selection preview
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(viewModel.agentAccentColor.opacity(0.2))
+                                .frame(width: 40, height: 40)
+
+                            if let icon = viewModel.selectedIcon {
+                                Image(systemName: icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(viewModel.agentAccentColor)
+                            } else {
+                                Text(String(viewModel.agentDisplayName.prefix(2)).uppercased())
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(viewModel.agentAccentColor)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.selectedIcon ?? "Initials")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            if viewModel.selectedIcon != nil {
+                                Button("Clear") {
+                                    viewModel.selectedIcon = nil
+                                }
+                                .font(.caption)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.red)
+                            }
+                        }
+                    }
+
+                    // Icon grid
+                    IconPickerGrid(
+                        selectedIcon: $viewModel.selectedIcon,
+                        accentColor: viewModel.agentAccentColor
+                    )
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     private var gatewayConnectionSection: some View {
         Section("Gateway Connection") {
             HStack {
@@ -132,7 +191,7 @@ struct AgentSettingsSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
-            
+
             HStack {
                 Label("Host", systemImage: "server.rack")
                     .frame(width: 130, alignment: .leading)
@@ -140,20 +199,20 @@ struct AgentSettingsSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.vertical, 2)
-            
+
             HStack {
                 Label("Port", systemImage: "number")
                     .frame(width: 130, alignment: .leading)
                 TextField("443", text: $viewModel.gatewayPort)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 80)
-                
+
                 Spacer()
-                
+
                 Toggle("Use TLS", isOn: $viewModel.gatewayUseTLS)
             }
             .padding(.vertical, 2)
-            
+
             HStack {
                 Label("Token", systemImage: "key")
                     .frame(width: 130, alignment: .leading)
@@ -163,7 +222,7 @@ struct AgentSettingsSheet: View {
             .padding(.vertical, 2)
         }
     }
-    
+
     private var modelSection: some View {
         Section("Model Configuration") {
             HStack {
@@ -176,7 +235,7 @@ struct AgentSettingsSheet: View {
             .padding(.vertical, 2)
         }
     }
-    
+
     private func errorSection(_ message: String) -> some View {
         Section {
             Label {
@@ -188,7 +247,7 @@ struct AgentSettingsSheet: View {
             }
         }
     }
-    
+
     private func successSection(_ message: String) -> some View {
         Section {
             Label {
@@ -202,4 +261,50 @@ struct AgentSettingsSheet: View {
     }
 }
 
-// Preview requires a live gateway connection, so omitted.
+// MARK: - Icon Picker Grid
+
+/// Compact grid of common SF Symbols for selecting an agent rail icon.
+struct IconPickerGrid: View {
+    @Binding var selectedIcon: String?
+    let accentColor: Color
+
+    /// Curated set of icons suitable for agent avatars.
+    private let icons: [String] = [
+        // Robots & AI
+        "cpu", "brain", "desktopcomputer", "terminal",
+        // Characters
+        "person.fill", "figure.stand", "face.smiling", "theatermasks",
+        // Nature & objects
+        "bolt.fill", "star.fill", "heart.fill", "flame.fill",
+        "leaf.fill", "drop.fill", "moon.fill", "sun.max.fill",
+        // Tech
+        "antenna.radiowaves.left.and.right", "network", "globe", "command",
+        // Animals & fun
+        "hare.fill", "tortoise.fill", "bird.fill", "ant.fill",
+        // Abstract
+        "hexagon.fill", "diamond.fill", "circle.grid.cross.fill", "sparkle",
+    ]
+
+    private let columns = Array(repeating: GridItem(.fixed(32), spacing: 6), count: 8)
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(icons, id: \.self) { icon in
+                Button {
+                    selectedIcon = icon
+                } label: {
+                    Image(systemName: icon)
+                        .font(.system(size: 14))
+                        .frame(width: 28, height: 28)
+                        .foregroundStyle(selectedIcon == icon ? .white : .secondary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(selectedIcon == icon ? accentColor : Color.gray.opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help(icon)
+            }
+        }
+    }
+}

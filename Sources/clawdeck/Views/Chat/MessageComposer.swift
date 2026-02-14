@@ -13,6 +13,7 @@ struct MessageComposer: View {
     var onSend: () -> Void
     var onAbort: () -> Void
     var onAddAttachment: (URL) -> Void
+    @Environment(\.themeColor) private var themeColor
     var onPasteImage: (NSImage) -> Void
     var onRemoveAttachment: (PendingAttachment) -> Void
 
@@ -67,7 +68,7 @@ struct MessageComposer: View {
                     RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
                         .stroke(
                             isDropTargeted
-                                ? Color.accentColor
+                                ? themeColor
                                 : Color(nsColor: .separatorColor).opacity(0.6),
                             lineWidth: isDropTargeted ? 2 : 1
                         )

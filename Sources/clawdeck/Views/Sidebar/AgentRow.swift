@@ -3,13 +3,14 @@ import SwiftUI
 /// A single agent item in the sidebar.
 struct AgentRow: View {
     let agent: Agent
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         HStack(spacing: 10) {
             // Avatar
             ZStack {
                 Circle()
-                    .fill(agent.isOnline ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
+                    .fill(agent.isOnline ? themeColor.opacity(0.15) : Color.gray.opacity(0.1))
                     .frame(width: 32, height: 32)
 
                 if let avatarURL = agent.avatarURL {
@@ -56,6 +57,6 @@ struct AgentRow: View {
     private var agentInitial: some View {
         Text(String(agent.name.prefix(1)).uppercased())
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(agent.isOnline ? Color.accentColor : Color.secondary)
+            .foregroundStyle(agent.isOnline ? themeColor : Color.secondary)
     }
 }

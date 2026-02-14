@@ -71,6 +71,8 @@ struct MainView: View {
                 )
         }
         .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+        .tint(appViewModel.customAccentColor)
+        .environment(\.themeColor, appViewModel.customAccentColor ?? .accentColor)
         .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
             // Search bar — searches messages in the active session
@@ -250,10 +252,11 @@ struct MainView: View {
 /// Thin draggable divider between the sidebar and detail area.
 private struct ResizeHandle: View {
     @State private var isHovering = false
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         Rectangle()
-            .fill(isHovering ? Color.accentColor.opacity(0.4) : Color.clear)
+            .fill(isHovering ? themeColor.opacity(0.4) : Color.clear)
             .frame(width: 5)
             .overlay(
                 Rectangle()
