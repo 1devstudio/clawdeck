@@ -283,7 +283,7 @@ struct ComposerTextEditor: NSViewRepresentable {
         }
     }
 
-    class Coordinator: NSObject, NSTextViewDelegate {
+    @MainActor class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ComposerTextEditor
         weak var textView: NSTextView?
 
