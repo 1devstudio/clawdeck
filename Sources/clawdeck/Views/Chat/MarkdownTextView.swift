@@ -95,12 +95,7 @@ struct MarkdownTextView: NSViewRepresentable {
                 ? NSColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0)
                 : NSColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
             let codeParaStyle = NSMutableParagraphStyle()
-            codeParaStyle.firstLineHeadIndent = MarkdownParser.codeInset
-            codeParaStyle.headIndent = MarkdownParser.codeInset
-            codeParaStyle.tailIndent = -MarkdownParser.codeInset
             codeParaStyle.lineSpacing = 2
-            codeParaStyle.paragraphSpacingBefore = MarkdownParser.codeVerticalPad
-            codeParaStyle.paragraphSpacing = MarkdownParser.codeVerticalPad
 
             for region in textView.codeBlockRegions {
                 guard region.codeRange.location + region.codeRange.length <= textStorage.length else { continue }
@@ -727,49 +722,15 @@ enum MarkdownParser {
 
     // MARK: - Block styles
 
-    /// Horizontal inset for code block content.
-    static let codeInset: CGFloat = 12
-    /// Vertical padding between header/code and edges.
-    static let codeVerticalPad: CGFloat = 6
-
     static func styledCodeBlock(_ code: String, language: String?, colorScheme: ColorScheme) -> NSAttributedString {
-        let result = NSMutableAttributedString()
-
+        // Fallback for code blocks rendered inline (normally handled by HighlightedCodeBlock)
+        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
         let bgColor: NSColor = colorScheme == .dark
             ? NSColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0)
             : NSColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
-        let headerBgColor: NSColor = colorScheme == .dark
-            ? NSColor(red: 0.12, green: 0.13, blue: 0.15, alpha: 1.0)
-            : NSColor(red: 0.93, green: 0.93, blue: 0.95, alpha: 1.0)
 
-        // Language header line — padded with indents
-        let displayLang = (language ?? "Code").capitalized
-        let headerFont = NSFont.systemFont(ofSize: NSFont.systemFontSize - 2, weight: .medium)
-        let headerParaStyle = NSMutableParagraphStyle()
-        headerParaStyle.firstLineHeadIndent = codeInset
-        headerParaStyle.headIndent = codeInset
-        headerParaStyle.tailIndent = -codeInset
-        headerParaStyle.paragraphSpacingBefore = codeVerticalPad
-        headerParaStyle.paragraphSpacing = codeVerticalPad
-
-        let headerAttrs: [NSAttributedString.Key: Any] = [
-            .font: headerFont,
-            .foregroundColor: NSColor.secondaryLabelColor,
-            .backgroundColor: headerBgColor,
-            .paragraphStyle: headerParaStyle
-        ]
-        result.append(NSAttributedString(string: displayLang + "\n", attributes: headerAttrs))
-
-        // Code body — indented with padding
-        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
         let codeParaStyle = NSMutableParagraphStyle()
-        codeParaStyle.firstLineHeadIndent = codeInset
-        codeParaStyle.headIndent = codeInset
-        codeParaStyle.tailIndent = -codeInset
         codeParaStyle.lineSpacing = 2
-        codeParaStyle.paragraphSpacingBefore = codeVerticalPad
-        // Bottom padding: added as spacing after the last line
-        codeParaStyle.paragraphSpacing = codeVerticalPad
 
         let codeAttrs: [NSAttributedString.Key: Any] = [
             .font: monoFont,
@@ -777,9 +738,8 @@ enum MarkdownParser {
             .backgroundColor: bgColor,
             .paragraphStyle: codeParaStyle
         ]
-        result.append(NSAttributedString(string: code, attributes: codeAttrs))
 
-        return result
+        return NSAttributedString(string: code, attributes: codeAttrs)
     }
 
     static func styledHeading(_ text: String, level: Int, colorScheme: ColorScheme) -> NSAttributedString {

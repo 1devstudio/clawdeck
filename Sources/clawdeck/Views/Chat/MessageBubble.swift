@@ -63,7 +63,7 @@ struct MessageBubble: View {
                     ZStack(alignment: .topTrailing) {
                         Group {
                             if message.role == .assistant && message.state != .error {
-                                MarkdownTextView(markdown: message.content)
+                                MessageContentView(markdown: message.content)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 Text(message.content)
