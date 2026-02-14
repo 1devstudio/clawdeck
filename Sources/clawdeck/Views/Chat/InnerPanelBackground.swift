@@ -1,31 +1,52 @@
 import SwiftUI
 import AppKit
 
-/// A full-cover image background for the inner panel.
-///
-/// Loads a bundled image and scales it to fill the available space
-/// (aspect-fill) so it covers the entire panel without distortion.
+/// Renders the inner panel background based on the user's settings.
+/// Reads from the `innerPanelBackground` environment value.
 struct InnerPanelBackground: View {
-    var imageName: String = "bg1"
+    @Environment(\.innerPanelBackground) private var config
+
+    @State private var cachedImage: NSImage?
+    @State private var isLoading = false
 
     var body: some View {
         GeometryReader { geo in
-            if let nsImage = loadImage() {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .clipped()
+            switch config.mode {
+            case .solidColor:
+                Rectangle()
+                    .fill(Color(hex: config.colorHex))
+
+            case .unsplash:
+                if let nsImage = cachedImage {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                } else {
+                    Rectangle()
+                        .fill(Color(hex: config.colorHex))
+                }
             }
+        }
+        .task(id: config.unsplashURL) {
+            await loadUnsplashImage()
         }
     }
 
-    private func loadImage() -> NSImage? {
-        guard let url = Bundle.module.url(forResource: imageName, withExtension: "jpg")
-                ?? Bundle.module.url(forResource: imageName, withExtension: "png") else {
-            print("[InnerPanelBackground] ❌ \(imageName) not found in bundle")
-            return nil
+    private func loadUnsplashImage() async {
+        guard config.mode == .unsplash,
+              let url = URL(string: config.unsplashURL) else {
+            cachedImage = nil
+            return
         }
-        return NSImage(contentsOf: url)
+
+        isLoading = true
+        do {
+            cachedImage = try await BackgroundImageCache.shared.image(for: url)
+        } catch {
+            cachedImage = nil
+        }
+        isLoading = false
     }
 }

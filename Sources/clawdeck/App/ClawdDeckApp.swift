@@ -100,12 +100,26 @@ struct ClawdDeckApp: App {
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
 
+    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.solidColor.rawValue
+    @AppStorage("bgSolidColorHex") private var bgSolidColorHex: String = "#1E1E2E"
+    @AppStorage("bgUnsplashURL") private var bgUnsplashURL: String = ""
+    @AppStorage("bgUnsplashPhotographer") private var bgUnsplashPhotographer: String = ""
+
     private var appearanceMode: AppearanceMode {
         AppearanceMode(rawValue: appearanceModeRaw) ?? .system
     }
 
     private var codeHighlightTheme: HighlightTheme {
         HighlightTheme(rawValue: codeHighlightThemeRaw) ?? .github
+    }
+
+    private var innerPanelBackgroundConfig: InnerPanelBackgroundConfig {
+        InnerPanelBackgroundConfig(
+            mode: InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .solidColor,
+            colorHex: bgSolidColorHex,
+            unsplashURL: bgUnsplashURL,
+            unsplashPhotographer: bgUnsplashPhotographer
+        )
     }
 
     var body: some Scene {
@@ -120,6 +134,7 @@ struct ClawdDeckApp: App {
             }
             .environment(\.messageTextSize, messageTextSize)
             .environment(\.codeHighlightTheme, codeHighlightTheme)
+            .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
             .preferredColorScheme(appearanceMode.colorScheme)
             .task {
                 if appViewModel.hasProfiles {
@@ -157,6 +172,7 @@ struct ClawdDeckApp: App {
             SettingsView()
                 .environment(\.messageTextSize, messageTextSize)
                 .environment(\.codeHighlightTheme, codeHighlightTheme)
+                .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
         }
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import HighlightSwift
 
 /// Application preferences window.
@@ -24,16 +25,24 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.shortcuts)
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 500)
     }
 }
 
-// MARK: - Appearance Settings (placeholder)
+// MARK: - Appearance Settings
 
 struct AppearanceSettingsView: View {
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
+
+    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.solidColor.rawValue
+    @AppStorage("bgSolidColorHex") private var bgSolidColorHex: String = "#1E1E2E"
+    @AppStorage("bgUnsplashURL") private var bgUnsplashURL: String = ""
+    @AppStorage("bgUnsplashPhotographer") private var bgUnsplashPhotographer: String = ""
+
+    @State private var solidColor: Color = .init(hex: "#1E1E2E")
+    @State private var showUnsplashPicker = false
 
     private var appearanceMode: Binding<AppearanceMode> {
         Binding(
@@ -49,8 +58,53 @@ struct AppearanceSettingsView: View {
         )
     }
 
+    private var bgMode: Binding<InnerPanelBackgroundMode> {
+        Binding(
+            get: { InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .solidColor },
+            set: { bgModeRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
         Form {
+            Section("Background") {
+                Picker("Style", selection: bgMode) {
+                    ForEach(InnerPanelBackgroundMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if bgModeRaw == InnerPanelBackgroundMode.solidColor.rawValue {
+                    ColorPicker("Color", selection: $solidColor, supportsOpacity: false)
+                        .onChange(of: solidColor) { _, newColor in
+                            bgSolidColorHex = hexFromColor(newColor)
+                        }
+                } else {
+                    HStack {
+                        if !bgUnsplashURL.isEmpty {
+                            AsyncImage(url: URL(string: bgUnsplashURL)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                ProgressView()
+                            }
+                            .frame(width: 60, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                            Text("by \(bgUnsplashPhotographer)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button("Choose Image…") {
+                            showUnsplashPicker = true
+                        }
+                    }
+                }
+            }
+
             Section("Messages") {
                 Slider(value: $messageTextSize, in: 12...20, step: 1) {
                     Text("Text Size: \(Int(messageTextSize))pt")
@@ -73,10 +127,23 @@ struct AppearanceSettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear {
+            solidColor = Color(hex: bgSolidColorHex)
+        }
+        .sheet(isPresented: $showUnsplashPicker) {
+            UnsplashPickerSheet()
+        }
+    }
+
+    private func hexFromColor(_ color: Color) -> String {
+        let nsColor = NSColor(color).usingColorSpace(.sRGB) ?? NSColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
 
-// MARK: - Shortcut Settings (placeholder)
+// MARK: - Shortcut Settings
 
 struct ShortcutSettingsView: View {
     var body: some View {
