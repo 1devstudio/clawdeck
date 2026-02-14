@@ -74,9 +74,11 @@ struct MessageBubble: View {
                                     )
                                     .markdownMargin(top: .em(0.4), bottom: .em(0.4))
                                 }
+                                .textSelection(.enabled)
                         } else {
                             Text(message.content)
                                 .font(.body)
+                                .textSelection(.enabled)
                         }
                     }
                     .padding(.horizontal, 12)
