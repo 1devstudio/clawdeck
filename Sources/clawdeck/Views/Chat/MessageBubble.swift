@@ -272,7 +272,7 @@ struct MessageBubble: View {
     }
 
     /// Liquid Glass style per message role.
-    private var bubbleGlassStyle: some GlassEffectStyle {
+    private var bubbleGlassStyle: Glass {
         switch message.role {
         case .user:
             return .regular.tint(themeColor)
