@@ -272,12 +272,28 @@ final class AgentSettingsViewModel {
             throw AgentSettingsError.jsonSerializationFailed
         }
 
-        // Send the patch (gateway merges it with existing config)
+        // Send the patch (gateway merges it with existing config).
+        // The gateway will restart after applying, dropping our WebSocket.
         try await client.configPatch(
             raw: patchString,
             baseHash: configHash,
             note: "Agent settings updated via ClawDeck"
         )
+
+        // Give the gateway time to restart (restartDelayMs defaults to 2000ms,
+        // plus startup time). Then trigger a fresh reconnect.
+        print("[AgentSettings] Config patch applied, waiting for gateway restart...")
+        try? await Task.sleep(nanoseconds: 4_000_000_000)
+
+        // Force reconnect if not already reconnected
+        if let appVM = appViewModel,
+           let binding = appVM.activeBinding,
+           !appVM.gatewayManager.isConnected(binding.gatewayId) {
+            print("[AgentSettings] Reconnecting after config patch...")
+            await appVM.gatewayManager.reconnect(gatewayId: binding.gatewayId)
+            // Reload agents/sessions after reconnecting
+            await appVM.loadInitialData()
+        }
     }
     
     /// Save gateway profile changes to local storage.

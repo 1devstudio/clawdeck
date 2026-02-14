@@ -201,6 +201,12 @@ final class GatewayManager {
         }
     }
 
+    /// Reconnect to a specific gateway (disconnect + connect).
+    func reconnect(gatewayId: String) async {
+        disconnectGateway(gatewayId)
+        await connectGateway(gatewayId)
+    }
+
     // MARK: - Agent Loading
 
     /// Load agents for a specific gateway.
