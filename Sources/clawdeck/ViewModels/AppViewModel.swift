@@ -265,7 +265,7 @@ final class AppViewModel {
     /// Load chat history for a session, retrying with smaller limits if the
     /// response is too large for the gateway's send buffer.
     func loadHistory(for sessionKey: String) async {
-        guard let client = activeClient else { return }
+        guard activeClient != nil else { return }
         guard !Task.isCancelled else { return }
 
         for limit in Self.historyLimits {
@@ -274,11 +274,34 @@ final class AppViewModel {
             if success { return }
 
             // If we got here, the load failed (likely connection dropped).
-            // Wait for reconnection before retrying with a smaller limit.
-            print("[AppViewModel] History load failed with limit=\(limit), retrying with smaller limit...")
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s for reconnect
+            // Wait for actual reconnection before retrying with a smaller limit.
+            print("[AppViewModel] History load failed with limit=\(limit), waiting for reconnection...")
+            let reconnected = await waitForReconnection(timeout: 15)
+            guard reconnected else {
+                print("[AppViewModel] ❌ Reconnection timed out for \(sessionKey)")
+                return
+            }
+            print("[AppViewModel] Reconnected, retrying with smaller limit...")
         }
         print("[AppViewModel] ❌ All history load attempts failed for \(sessionKey)")
+    }
+
+    /// Whether the active binding's gateway is connected.
+    private var isActiveGatewayConnected: Bool {
+        guard let binding = activeBinding else { return false }
+        return gatewayManager.isConnected(binding.gatewayId)
+    }
+
+    /// Wait until the connection is re-established or timeout expires.
+    /// Returns true if connected, false if timed out or cancelled.
+    private func waitForReconnection(timeout: Int) async -> Bool {
+        let deadline = Date().addingTimeInterval(TimeInterval(timeout))
+        while Date() < deadline {
+            guard !Task.isCancelled else { return false }
+            if isActiveGatewayConnected { return true }
+            try? await Task.sleep(nanoseconds: 500_000_000) // poll every 0.5s
+        }
+        return isActiveGatewayConnected
     }
 
     /// Single attempt to load history with a specific limit. Returns true on success.
