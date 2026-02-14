@@ -30,6 +30,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.insert(.fullSizeContentView)
         // Match the toolbar/title bar background to the agent rail
         window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95)
+
+        // Remove toolbar container background/border by making items borderless
+        if let toolbar = window.toolbar {
+            toolbar.displayMode = .iconOnly
+            // Walk the toolbar items and remove background separators
+            if #available(macOS 14.0, *) {
+                toolbar.allowsDisplayModeCustomization = false
+            }
+        }
+
+        // Remove the toolbar border line between title bar and content
+        window.titlebarSeparatorStyle = .none
+
+        // Strip the rounded background from toolbar item containers
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            stripToolbarItemBackgrounds(in: window.contentView?.superview)
+        }
+    }
+
+    /// Recursively find and make toolbar item container backgrounds transparent.
+    private static func stripToolbarItemBackgrounds(in view: NSView?) {
+        guard let view = view else { return }
+        let className = String(describing: type(of: view))
+
+        // NSToolbarItemViewer is the container that draws the rounded background
+        if className.contains("ToolbarItemViewer") || className.contains("ToolbarItem") {
+            view.wantsLayer = true
+            view.layer?.backgroundColor = .clear
+            view.layer?.borderWidth = 0
+        }
+
+        for subview in view.subviews {
+            stripToolbarItemBackgrounds(in: subview)
+        }
     }
 }
 
