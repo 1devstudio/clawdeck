@@ -6,7 +6,7 @@ import AppKit
 /// Loads a bundled image and repeats it across the view using
 /// `NSColor(patternImage:)`. The pattern opacity can be adjusted.
 struct ChatPatternBackground: View {
-    var opacity: Double = 0.15
+    var opacity: Double = 0.30
     var imageName: String = "bg1"
 
     var body: some View {
