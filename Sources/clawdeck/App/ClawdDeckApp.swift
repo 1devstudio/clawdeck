@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import HighlightSwift
 
 /// Ensures the SPM executable is treated as a regular GUI app with proper
 /// keyboard event routing, menu bar, and dock presence.
@@ -96,6 +97,16 @@ struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
+    @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
+    @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
+
+    private var appearanceMode: AppearanceMode {
+        AppearanceMode(rawValue: appearanceModeRaw) ?? .system
+    }
+
+    private var codeHighlightTheme: HighlightTheme {
+        HighlightTheme(rawValue: codeHighlightThemeRaw) ?? .github
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -108,6 +119,8 @@ struct ClawdDeckApp: App {
                 }
             }
             .environment(\.messageTextSize, messageTextSize)
+            .environment(\.codeHighlightTheme, codeHighlightTheme)
+            .preferredColorScheme(appearanceMode.colorScheme)
             .task {
                 if appViewModel.hasProfiles {
                     await appViewModel.connectAndLoad()
@@ -143,6 +156,7 @@ struct ClawdDeckApp: App {
         Settings {
             SettingsView()
                 .environment(\.messageTextSize, messageTextSize)
+                .environment(\.codeHighlightTheme, codeHighlightTheme)
         }
     }
 }
