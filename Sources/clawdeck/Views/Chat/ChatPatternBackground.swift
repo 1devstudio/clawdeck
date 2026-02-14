@@ -27,8 +27,8 @@ struct ChatPatternBackground: View {
 
     /// Load the pattern image from the app bundle Resources.
     private func loadPatternImage() -> NSImage? {
-        guard let url = Bundle.main.url(forResource: imageName, withExtension: "jpg")
-                ?? Bundle.main.url(forResource: imageName, withExtension: "png") else {
+        guard let url = Bundle.module.url(forResource: imageName, withExtension: "jpg")
+                ?? Bundle.module.url(forResource: imageName, withExtension: "png") else {
             print("[ChatPatternBackground] Could not find \(imageName) in bundle")
             return nil
         }
