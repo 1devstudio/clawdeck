@@ -275,7 +275,7 @@ struct MessageBubble: View {
     private var bubbleGlassStyle: Glass {
         switch message.role {
         case .user:
-            return .regular.tint(themeColor)
+            return .regular
         case .assistant:
             return .regular
         case .system:
