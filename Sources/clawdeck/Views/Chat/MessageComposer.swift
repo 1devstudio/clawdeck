@@ -217,6 +217,16 @@ struct AttachmentThumbnail: View {
 
 // MARK: - ComposerTextEditor (NSViewRepresentable)
 
+/// NSTextView subclass that refuses to let mouse-down events move the window.
+///
+/// When `isMovableByWindowBackground` is `true` on the window, AppKit asks each
+/// view whether `mouseDownCanMoveWindow`. By default `NSTextView` inherits `true`
+/// from its superclass when the background is clear. This subclass forces `false`
+/// so text selection always works inside the composer, even over the drag region.
+final class NonDraggableTextView: NSTextView {
+    override var mouseDownCanMoveWindow: Bool { false }
+}
+
 /// A `TextEditor` replacement that intercepts Enter key presses and Cmd+V image paste.
 ///
 /// - **Enter**: triggers `onEnterSend` (sends the message)
@@ -236,8 +246,11 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
+        let textView = NonDraggableTextView()
+        textView.autoresizingMask = [.width]
+
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
 
         textView.delegate = context.coordinator
         textView.isSelectable = true
@@ -275,7 +288,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        let textView = scrollView.documentView as! NSTextView
+        let textView = scrollView.documentView as! NonDraggableTextView
         if textView.string != text {
             textView.string = text
             context.coordinator.recalcHeight(textView)
