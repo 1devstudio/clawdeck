@@ -19,6 +19,9 @@ final class AppViewModel {
     /// loss on re-renders.
     private var chatViewModels: [String: ChatViewModel] = [:]
 
+    /// In-flight history load task — cancelled when selecting a different session.
+    private var historyLoadTask: Task<Void, Never>?
+
     /// Get or create a ChatViewModel for a session key.
     func chatViewModel(for sessionKey: String) -> ChatViewModel {
         if let existing = chatViewModels[sessionKey] {
@@ -180,15 +183,21 @@ final class AppViewModel {
     func selectSession(_ sessionKey: String) async {
         selectedSessionKey = sessionKey
 
+        // Cancel any in-flight history load for a previously selected session.
+        historyLoadTask?.cancel()
+
         // Load history if not already loaded
         if !messageStore.hasMessages(for: sessionKey) {
-            await loadHistory(for: sessionKey)
+            let task = Task { await loadHistory(for: sessionKey) }
+            historyLoadTask = task
+            await task.value
         }
     }
 
     /// Load chat history for a session.
     func loadHistory(for sessionKey: String) async {
         guard let client = connectionManager.activeClient else { return }
+        guard !Task.isCancelled else { return }
         do {
             let response = try await client.send(
                 method: GatewayMethod.chatHistory,
@@ -217,6 +226,8 @@ final class AppViewModel {
 
             print("[AppViewModel] \(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages")
             messageStore.setMessages(messages, for: sessionKey)
+        } catch is CancellationError {
+            // Expected when the user switches sessions before the load completes.
         } catch {
             print("[AppViewModel] Failed to load history: \(error)")
         }

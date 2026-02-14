@@ -34,7 +34,7 @@ struct MessageContentView: View {
         Self.parseSegments(from: markdown)
     }
 
-    static func parseSegments(from markdown: String) -> [Segment] {
+    private static func parseSegments(from markdown: String) -> [Segment] {
         var segments: [Segment] = []
         let lines = markdown.components(separatedBy: "\n")
         var i = 0
