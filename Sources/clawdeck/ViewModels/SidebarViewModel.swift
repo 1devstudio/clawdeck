@@ -26,7 +26,8 @@ final class SidebarViewModel {
 
     /// Display name of the active agent.
     var agentDisplayName: String {
-        appViewModel.connectionManager.activeProfile?.displayName ?? "clawdeck"
+        guard let binding = appViewModel.activeBinding else { return "clawdeck" }
+        return binding.displayName(from: appViewModel.gatewayManager)
     }
 
     /// Agents from the app state.
@@ -137,7 +138,7 @@ final class SidebarViewModel {
 
     /// Show the agent settings sheet for the active agent.
     func showAgentSettings() {
-        appViewModel.editingAgentProfileId = appViewModel.connectionManager.activeProfile?.id
+        appViewModel.editingAgentProfileId = appViewModel.activeBinding?.id
         appViewModel.showAgentSettings = true
     }
 }

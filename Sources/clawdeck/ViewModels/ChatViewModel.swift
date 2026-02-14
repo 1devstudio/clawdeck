@@ -104,7 +104,7 @@ final class ChatViewModel {
 
     /// Display name of the active agent (from the connection profile).
     var agentDisplayName: String {
-        appViewModel.connectionManager.activeProfile?.displayName ?? "Assistant"
+        appViewModel.activeBinding?.displayName(from: appViewModel.gatewayManager) ?? "Assistant"
     }
 
     // MARK: - Init
@@ -137,7 +137,7 @@ final class ChatViewModel {
         isSending = true
         errorMessage = nil
 
-        guard let client = appViewModel.connectionManager.activeClient else {
+        guard let client = appViewModel.activeClient else {
             appViewModel.messageStore.markError(
                 messageId: outgoing.id,
                 sessionKey: sessionKey,
@@ -178,7 +178,7 @@ final class ChatViewModel {
 
     /// Abort the current generation.
     func abortGeneration() async {
-        guard let client = appViewModel.connectionManager.activeClient else { return }
+        guard let client = appViewModel.activeClient else { return }
         do {
             try await client.chatAbort(sessionKey: sessionKey)
         } catch {

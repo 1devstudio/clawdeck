@@ -46,7 +46,7 @@ enum GatewayClientError: Error, LocalizedError {
 actor GatewayClient {
     // MARK: - Properties
 
-    private let profile: ConnectionProfile
+    private let profile: GatewayProfile
     private var webSocketTask: URLSessionWebSocketTask?
     private let urlSession: URLSession
 
@@ -71,7 +71,7 @@ actor GatewayClient {
 
     // MARK: - Init
 
-    init(profile: ConnectionProfile) {
+    init(profile: GatewayProfile) {
         self.profile = profile
         self.urlSession = URLSession(configuration: .default)
 

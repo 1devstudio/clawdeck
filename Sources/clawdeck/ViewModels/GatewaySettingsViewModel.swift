@@ -45,20 +45,20 @@ final class GatewaySettingsViewModel {
     /// Validation warnings from the gateway.
     var validationWarnings: [String] = []
 
-    /// Reference to the connection manager for gateway access.
-    private weak var connectionManager: ConnectionManager?
+    /// Reference to the app view model for gateway access.
+    private weak var appViewModel: AppViewModel?
 
     // MARK: - Init
 
-    init(connectionManager: ConnectionManager?) {
-        self.connectionManager = connectionManager
+    init(appViewModel: AppViewModel?) {
+        self.appViewModel = appViewModel
     }
 
     // MARK: - Actions
 
     /// Fetch the current config from the gateway.
     func loadConfig() async {
-        guard let client = connectionManager?.activeClient else {
+        guard let client = appViewModel?.activeClient else {
             errorMessage = "Not connected to gateway"
             return
         }
@@ -91,7 +91,7 @@ final class GatewaySettingsViewModel {
 
     /// Save the edited config back to the gateway via config.patch.
     func saveConfig() async {
-        guard let client = connectionManager?.activeClient else {
+        guard let client = appViewModel?.activeClient else {
             errorMessage = "Not connected to gateway"
             return
         }

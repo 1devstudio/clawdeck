@@ -35,11 +35,11 @@ struct MainView: View {
         HStack(spacing: 0) {
             // Agent rail (outer shell)
             AgentRailView(
-                profiles: appViewModel.connectionManager.profiles,
-                activeProfileId: appViewModel.connectionManager.activeProfile?.id,
-                connectionState: appViewModel.connectionManager.connectionState,
-                onSelect: { profile in
-                    Task { await appViewModel.switchAgent(profile) }
+                bindings: appViewModel.gatewayManager.sortedAgentBindings,
+                activeBindingId: appViewModel.activeBinding?.id,
+                gatewayManager: appViewModel.gatewayManager,
+                onSelect: { binding in
+                    Task { await appViewModel.switchAgent(binding) }
                 },
                 onAdd: {
                     appViewModel.showAgentSettings = true
@@ -137,7 +137,7 @@ struct MainView: View {
                     Circle()
                         .fill(connectionStatusColor)
                         .frame(width: 7, height: 7)
-                    Text(appViewModel.connectionManager.connectionState.rawValue.capitalized)
+                    Text(activeGatewayConnectionState.rawValue.capitalized)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -215,8 +215,14 @@ struct MainView: View {
         }
     }
 
+    /// Connection state for the active binding's gateway.
+    private var activeGatewayConnectionState: ConnectionState {
+        guard let binding = appViewModel.activeBinding else { return .disconnected }
+        return appViewModel.gatewayManager.connectionState(for: binding.gatewayId)
+    }
+    
     private var connectionStatusColor: Color {
-        switch appViewModel.connectionManager.connectionState {
+        switch activeGatewayConnectionState {
         case .connected: return .green
         case .connecting, .reconnecting: return .orange
         case .disconnected: return .red

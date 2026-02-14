@@ -7,7 +7,7 @@ import SwiftUI
 final class AppViewModel {
     // MARK: - Services
 
-    let connectionManager = ConnectionManager()
+    let gatewayManager = GatewayManager()
     let messageStore = MessageStore()
 
     // MARK: - Child View Models (created once, shared)
@@ -39,10 +39,13 @@ final class AppViewModel {
 
     // MARK: - State
 
-    /// All known agents.
+    /// Currently selected agent binding in the rail.
+    var activeBinding: AgentBinding?
+
+    /// All known agents from all connected gateways.
     var agents: [Agent] = []
 
-    /// All known sessions.
+    /// All known sessions (filtered to the active binding's gateway+agentId).
     var sessions: [Session] = []
 
     /// Currently selected session key.
@@ -65,9 +68,15 @@ final class AppViewModel {
         sessions.first { $0.key == selectedSessionKey }
     }
 
-    /// Whether the app has any configured profiles.
+    /// Whether the app has any configured gateway profiles.
     var hasProfiles: Bool {
-        !connectionManager.profiles.isEmpty
+        !gatewayManager.gatewayProfiles.isEmpty
+    }
+
+    /// Shortcut to the client for the active binding's gateway.
+    var activeClient: GatewayClient? {
+        guard let binding = activeBinding else { return nil }
+        return gatewayManager.client(for: binding.gatewayId)
     }
 
     // MARK: - Init
@@ -76,9 +85,9 @@ final class AppViewModel {
         sidebarViewModel = SidebarViewModel(appViewModel: self)
 
         // Wire up event handling
-        connectionManager.onEvent = { [weak self] event in
+        gatewayManager.onEvent = { [weak self] event, gatewayId in
             Task { @MainActor in
-                self?.handleEvent(event)
+                self?.handleEvent(event, gatewayId: gatewayId)
             }
         }
 
@@ -90,27 +99,35 @@ final class AppViewModel {
 
     // MARK: - Connection
 
-    /// Connect using the default profile and load initial data.
+    /// Connect to all gateways and load initial data.
     func connectAndLoad() async {
-        await connectionManager.connectDefault()
-
-        if connectionManager.isConnected {
-            await loadInitialData()
+        await gatewayManager.connectAll()
+        await loadInitialData()
+        
+        // Set active binding to the first one if none is selected
+        if activeBinding == nil, let firstBinding = gatewayManager.sortedAgentBindings.first {
+            await switchAgent(firstBinding)
         }
     }
 
-    /// Connect with a specific profile and load initial data.
-    func connect(with profile: ConnectionProfile) async {
-        await connectionManager.connect(with: profile)
-
-        if connectionManager.isConnected {
-            await loadInitialData()
+    /// Switch to a different agent binding.
+    func switchAgent(_ binding: AgentBinding) async {
+        let previousGatewayId = activeBinding?.gatewayId
+        activeBinding = binding
+        
+        // If switching to a different gateway, we need to reload sessions
+        // If same gateway, just filter existing sessions
+        if previousGatewayId != binding.gatewayId {
+            await refreshSessions()
+        } else {
+            filterSessionsToActiveAgent()
         }
     }
 
-    /// Disconnect from the gateway.
+    /// Disconnect from all gateways.
     func disconnect() {
-        connectionManager.disconnect()
+        gatewayManager.disconnectAll()
+        activeBinding = nil
         agents.removeAll()
         sessions.removeAll()
         selectedSessionKey = nil
@@ -118,56 +135,47 @@ final class AppViewModel {
         chatViewModels.removeAll()
     }
 
-    /// Switch to a different agent (connection profile).
-    func switchAgent(_ profile: ConnectionProfile) async {
-        guard profile.id != connectionManager.activeProfile?.id else { return }
-        disconnect()
-        await connect(with: profile)
-    }
-
     // MARK: - Data loading
 
     /// Load agents and sessions after connecting.
     func loadInitialData() async {
-        guard connectionManager.activeClient != nil else {
-            print("[AppViewModel] No active client, skipping data load")
-            return
-        }
-
-        // Fetch fresh data from gateway (skip snapshot — it's complex to decode)
         print("[AppViewModel] Loading initial data...")
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.refreshAgents() }
-            group.addTask { await self.refreshSessions() }
-        }
+        await refreshAgents()
+        await refreshSessions()
         print("[AppViewModel] Loaded \(agents.count) agents, \(sessions.count) sessions")
     }
 
-    /// Refresh the agent list from the gateway.
+    /// Refresh agents from all connected gateways.
     func refreshAgents() async {
-        guard let client = connectionManager.activeClient else { return }
-        do {
-            let result = try await client.listAgents()
-            print("[AppViewModel] agents.list returned \(result.agents.count) agents (default: \(result.defaultId ?? "none"))")
-            agents = result.agents.map { Agent(from: $0) }
-        } catch {
-            print("[AppViewModel] Failed to list agents: \(error)")
+        var allAgents: [Agent] = []
+        
+        for (gatewayId, agentSummaries) in gatewayManager.agentSummaries {
+            let gatewayAgents = agentSummaries.map { Agent(from: $0) }
+            allAgents.append(contentsOf: gatewayAgents)
         }
+        
+        agents = allAgents
+        print("[AppViewModel] Loaded \(agents.count) agents from \(gatewayManager.agentSummaries.count) gateways")
     }
 
-    /// Refresh the session list from the gateway.
+    /// Refresh sessions from the active binding's gateway.
     func refreshSessions() async {
-        guard let client = connectionManager.activeClient else { return }
+        guard let binding = activeBinding,
+              let client = gatewayManager.client(for: binding.gatewayId) else {
+            sessions.removeAll()
+            return
+        }
+        
         do {
             let result = try await client.listSessions()
-            print("[AppViewModel] sessions.list returned \(result.sessions.count) sessions")
+            print("[AppViewModel] sessions.list returned \(result.sessions.count) sessions for gateway \(binding.gatewayId)")
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
                 sessions.map { ($0.key, $0.createdAt) }
             )
 
-            sessions = result.sessions
+            let allSessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
                 .map { summary in
                     let session = Session.from(summary: summary)
@@ -177,8 +185,25 @@ final class AppViewModel {
                     }
                     return session
                 }
+            
+            // Filter to the active agent
+            sessions = allSessions.filter { session in
+                session.agentId == binding.agentId
+            }
         } catch {
             print("[AppViewModel] Failed to list sessions: \(error)")
+        }
+    }
+
+    /// Filter existing sessions to the active agent (for same-gateway switches).
+    private func filterSessionsToActiveAgent() {
+        guard let binding = activeBinding else {
+            sessions.removeAll()
+            return
+        }
+        
+        sessions = sessions.filter { session in
+            session.agentId == binding.agentId
         }
     }
 
@@ -227,7 +252,7 @@ final class AppViewModel {
     /// Load chat history for a session, retrying with smaller limits if the
     /// response is too large for the gateway's send buffer.
     func loadHistory(for sessionKey: String) async {
-        guard let client = connectionManager.activeClient else { return }
+        guard let client = activeClient else { return }
         guard !Task.isCancelled else { return }
 
         for limit in Self.historyLimits {
@@ -245,7 +270,7 @@ final class AppViewModel {
 
     /// Single attempt to load history with a specific limit. Returns true on success.
     private func loadHistoryAttempt(for sessionKey: String, limit: Int) async -> Bool {
-        guard let client = connectionManager.activeClient else { return false }
+        guard let client = activeClient else { return false }
         guard !Task.isCancelled else { return false }
         do {
             let response = try await client.send(
@@ -298,7 +323,7 @@ final class AppViewModel {
 
     /// Delete a session.
     func deleteSession(_ sessionKey: String) async {
-        guard let client = connectionManager.activeClient else { return }
+        guard let client = activeClient else { return }
         do {
             try await client.deleteSession(key: sessionKey)
             sessions.removeAll { $0.key == sessionKey }
@@ -313,7 +338,7 @@ final class AppViewModel {
 
     /// Rename a session.
     func renameSession(_ sessionKey: String, label: String) async {
-        guard let client = connectionManager.activeClient else { return }
+        guard let client = activeClient else { return }
         do {
             try await client.patchSession(key: sessionKey, label: label)
             if let session = sessions.first(where: { $0.key == sessionKey }) {
@@ -330,13 +355,14 @@ final class AppViewModel {
     /// Create a new session by generating a unique key and selecting it.
     /// The session is created on the gateway implicitly when the first message is sent.
     func createNewSession() async {
-        let defaultAgent = agents.first { $0.isDefault }?.id ?? agents.first?.id ?? "main"
+        guard let binding = activeBinding else { return }
+        
         let shortId = UUID().uuidString.prefix(8).lowercased()
-        let sessionKey = "agent:\(defaultAgent):\(shortId)"
+        let sessionKey = "agent:\(binding.agentId):\(shortId)"
 
         let newSession = Session(
             key: sessionKey,
-            agentId: defaultAgent,
+            agentId: binding.agentId,
             updatedAt: Date(),
             isActive: true
         )
@@ -347,10 +373,10 @@ final class AppViewModel {
 
     // MARK: - Event handling
 
-    private func handleEvent(_ event: EventFrame) {
+    private func handleEvent(_ event: EventFrame, gatewayId: String) {
         switch event.event {
         case GatewayEvent.chat:
-            handleChatEvent(event)
+            handleChatEvent(event, gatewayId: gatewayId)
 
         case GatewayEvent.presence:
             handlePresenceEvent(event)
@@ -368,7 +394,13 @@ final class AppViewModel {
         }
     }
 
-    private func handleChatEvent(_ event: EventFrame) {
+    private func handleChatEvent(_ event: EventFrame, gatewayId: String) {
+        // Only handle events from the active gateway
+        guard let activeBinding = activeBinding,
+              activeBinding.gatewayId == gatewayId else {
+            return
+        }
+        
         guard let payload = event.payload else {
             print("[AppViewModel] chat event has no payload")
             return

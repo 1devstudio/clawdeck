@@ -1,48 +1,30 @@
 import SwiftUI
 
-/// First-run connection wizard shown when no profiles are configured.
+/// First-run gateway connection wizard shown when no gateways are configured.
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
 
-    @State private var displayName = "My Agent"
+    @State private var gatewayName = ""
     @State private var host = "vps-0a60f62f.vps.ovh.net"
     @State private var port = "443"
     @State private var token = ""
-    @State private var useTLS = false
-    @State private var selectedAvatar = "sf:robot"
+    @State private var useTLS = true
     @State private var isConnecting = false
     @State private var errorMessage: String?
-
-    private let builtInAvatars = [
-        "robot", "desktopcomputer", "brain.head.profile", "cpu",
-        "cloud", "server.rack", "antenna.radiowaves.left.and.right",
-        "globe", "bolt.circle", "wand.and.stars", "sparkles",
-        "terminal", "chevron.left.forwardslash.chevron.right",
-        "gearshape", "atom"
-    ]
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                // Live avatar preview
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.accentColor.opacity(0.15))
-                        .frame(width: 64, height: 64)
+                Image(systemName: "server.rack")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.accentColor)
 
-                    if selectedAvatar.hasPrefix("sf:") {
-                        Image(systemName: String(selectedAvatar.dropFirst(3)))
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                }
-
-                Text("Set Up Your Agent")
+                Text("Connect to Gateway")
                     .font(.title2)
                     .fontWeight(.semibold)
 
-                Text("Give your agent a name, pick an avatar, and connect to your gateway.")
+                Text("Enter your Clawdbot gateway details to connect.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -52,66 +34,33 @@ struct ConnectionSetupView: View {
             .padding(.bottom, 16)
 
             // Fields
-            ScrollView {
-                VStack(spacing: 16) {
-                    LabeledContent("Name") {
-                        TextField("Agent Name", text: $displayName)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    // Avatar grid
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Avatar")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 6), count: 8), spacing: 6) {
-                            ForEach(builtInAvatars, id: \.self) { symbol in
-                                let key = "sf:\(symbol)"
-                                Button {
-                                    selectedAvatar = key
-                                } label: {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(selectedAvatar == key ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.1))
-                                            .frame(width: 40, height: 40)
-                                        Image(systemName: symbol)
-                                            .font(.system(size: 16))
-                                            .foregroundStyle(selectedAvatar == key ? Color.accentColor : Color.secondary)
-                                    }
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(selectedAvatar == key ? Color.accentColor : Color.clear, lineWidth: 2)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // Connection
-                    LabeledContent("Host") {
-                        TextField("Host", text: $host)
-                            .textFieldStyle(.roundedBorder)
-                            .textContentType(.URL)
-                    }
-                    LabeledContent("Port") {
-                        TextField("Port", text: $port)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 120)
-                    }
-                    Toggle("Use TLS (wss://)", isOn: $useTLS)
-
-                    LabeledContent("Token") {
-                        SecureField("Gateway Token (optional)", text: $token)
-                            .textFieldStyle(.roundedBorder)
-                            .textContentType(.password)
-                    }
+            VStack(spacing: 16) {
+                LabeledContent("Gateway Name") {
+                    TextField("e.g. Main Gateway", text: $gatewayName)
+                        .textFieldStyle(.roundedBorder)
                 }
-                .padding(.horizontal, 24)
+
+                LabeledContent("Host") {
+                    TextField("Host", text: $host)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.URL)
+                }
+                
+                LabeledContent("Port") {
+                    TextField("Port", text: $port)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 120)
+                }
+                
+                Toggle("Use TLS (wss://)", isOn: $useTLS)
+
+                LabeledContent("Token") {
+                    SecureField("Gateway Token (optional)", text: $token)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.password)
+                }
             }
+            .padding(.horizontal, 24)
 
             Spacer(minLength: 8)
 
@@ -147,7 +96,7 @@ struct ConnectionSetupView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .frame(width: 460, height: 600)
+        .frame(width: 420, height: 400)
     }
 
     private func connect() async {
@@ -160,25 +109,60 @@ struct ConnectionSetupView: View {
             return
         }
 
-        let name = displayName.isEmpty ? "My Agent" : displayName
-        let profile = ConnectionProfile(
-            name: name,
-            displayName: name,
-            host: host,
-            port: portNumber,
-            useTLS: useTLS,
-            token: token.isEmpty ? nil : token,
-            isDefault: true,
-            avatarName: selectedAvatar
-        )
+        do {
+            // Test the connection and get agent list
+            let agentsResult = try await appViewModel.gatewayManager.testConnection(
+                host: host,
+                port: portNumber,
+                path: "/ws",
+                useTLS: useTLS,
+                token: token.isEmpty ? nil : token
+            )
 
-        appViewModel.connectionManager.addProfile(profile)
-        await appViewModel.connect(with: profile)
+            // Connection successful - add the gateway profile
+            let profile = GatewayProfile(
+                displayName: gatewayName.isEmpty ? host : gatewayName,
+                host: host,
+                port: portNumber,
+                path: "/ws",
+                useTLS: useTLS,
+                token: token.isEmpty ? nil : token
+            )
 
-        if appViewModel.connectionManager.isConnected {
-            appViewModel.showConnectionSetup = false
-        } else {
-            errorMessage = appViewModel.connectionManager.lastError ?? "Failed to connect"
+            appViewModel.gatewayManager.addGatewayProfile(profile)
+
+            // Auto-add the default agent as a binding
+            if let defaultAgentId = agentsResult.defaultId,
+               let defaultAgent = agentsResult.agents.first(where: { $0.id == defaultAgentId }) {
+                let binding = AgentBinding(
+                    gatewayId: profile.id,
+                    agentId: defaultAgent.id,
+                    localDisplayName: defaultAgent.name,
+                    railOrder: 1
+                )
+                appViewModel.gatewayManager.addAgentBinding(binding)
+                
+                // Connect to all gateways and load data
+                await appViewModel.connectAndLoad()
+                
+                appViewModel.showConnectionSetup = false
+            } else if let firstAgent = agentsResult.agents.first {
+                // Fallback to first agent
+                let binding = AgentBinding(
+                    gatewayId: profile.id,
+                    agentId: firstAgent.id,
+                    localDisplayName: firstAgent.name,
+                    railOrder: 1
+                )
+                appViewModel.gatewayManager.addAgentBinding(binding)
+                
+                await appViewModel.connectAndLoad()
+                appViewModel.showConnectionSetup = false
+            } else {
+                errorMessage = "No agents found on this gateway"
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
 
         isConnecting = false

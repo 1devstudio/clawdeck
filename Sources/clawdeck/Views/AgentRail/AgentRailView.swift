@@ -3,23 +3,27 @@ import AppKit
 
 /// Narrow vertical rail showing agent avatars, like Slack's workspace switcher.
 struct AgentRailView: View {
-    let profiles: [ConnectionProfile]
-    let activeProfileId: String?
-    let connectionState: ConnectionState
-    let onSelect: (ConnectionProfile) -> Void
+    let bindings: [AgentBinding]
+    let activeBindingId: String?
+    let gatewayManager: GatewayManager
+    let onSelect: (AgentBinding) -> Void
     let onAdd: () -> Void
 
     var body: some View {
         VStack(spacing: 4) {
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 8) {
-                    ForEach(profiles) { profile in
+                    ForEach(bindings) { binding in
                         AgentRailItem(
-                            profile: profile,
-                            isActive: profile.id == activeProfileId,
-                            isConnected: profile.id == activeProfileId && connectionState == .connected
+                            binding: binding,
+                            gatewayManager: gatewayManager,
+                            isActive: binding.id == activeBindingId,
+                            isConnected: gatewayManager.isConnected(binding.gatewayId)
                         )
-                        .onTapGesture { onSelect(profile) }
+                        .onTapGesture { onSelect(binding) }
+                        .contextMenu {
+                            AgentContextMenu(binding: binding, gatewayManager: gatewayManager)
+                        }
                     }
                 }
                 .padding(.vertical, 8)
@@ -43,6 +47,9 @@ struct AgentRailView: View {
             }
             .buttonStyle(.plain)
             .help("Add Agent")
+            .popover(isPresented: .constant(false)) {  // TODO: Implement add agent popover
+                AddAgentPopover(gatewayManager: gatewayManager)
+            }
             .padding(.bottom, 8)
         }
         .frame(width: 60)
@@ -52,7 +59,8 @@ struct AgentRailView: View {
 
 /// A single agent avatar in the rail.
 struct AgentRailItem: View {
-    let profile: ConnectionProfile
+    let binding: AgentBinding
+    let gatewayManager: GatewayManager
     let isActive: Bool
     let isConnected: Bool
 
@@ -90,12 +98,12 @@ struct AgentRailItem: View {
         }
         .frame(width: 60)
         .contentShape(Rectangle())
-        .help(profile.displayName)
+        .help(binding.displayName(from: gatewayManager))
     }
 
     @ViewBuilder
     private var agentAvatar: some View {
-        if let avatarName = profile.avatarName {
+        if let avatarName = binding.avatarName(from: gatewayManager) {
             if avatarName.hasPrefix("sf:") {
                 // SF Symbol
                 Image(systemName: String(avatarName.dropFirst(3)))
@@ -119,7 +127,7 @@ struct AgentRailItem: View {
     }
 
     private var initialsView: some View {
-        Text(profile.initials)
+        Text(binding.initials(from: gatewayManager))
             .font(.system(size: 16, weight: .semibold, design: .rounded))
             .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
     }
@@ -130,5 +138,116 @@ struct AgentRailItem: View {
             .appendingPathComponent("clawdeck/avatars")
         guard let url = avatarDir?.appendingPathComponent(filename) else { return nil }
         return NSImage(contentsOf: url)
+    }
+}
+
+/// Context menu for agent rail items.
+struct AgentContextMenu: View {
+    let binding: AgentBinding
+    let gatewayManager: GatewayManager
+
+    private var gatewayProfile: GatewayProfile? {
+        gatewayManager.gatewayProfiles.first { $0.id == binding.gatewayId }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            // Agent name (label)
+            Text(binding.displayName(from: gatewayManager))
+                .font(.headline)
+
+            // Gateway address (dimmed label)
+            if let gateway = gatewayProfile {
+                Text(gateway.displayAddress)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            Button("Agent Settings…") {
+                // TODO: Open agent settings
+            }
+
+            Button("Gateway Settings…") {
+                // TODO: Open gateway settings
+            }
+
+            Divider()
+
+            Button("Remove from Sidebar") {
+                gatewayManager.removeAgentBinding(binding)
+            }
+        }
+    }
+}
+
+/// Popover for adding new agent bindings.
+struct AddAgentPopover: View {
+    let gatewayManager: GatewayManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Agent")
+                .font(.headline)
+
+            let availableAgents = gatewayManager.getAvailableAgents()
+            
+            if availableAgents.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No available agents")
+                        .foregroundStyle(.secondary)
+                    Text("All agents from connected gateways are already in the sidebar.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(availableAgents.indices, id: \.self) { index in
+                            let (gateway, agent) = availableAgents[index]
+                            Button {
+                                addAgent(gateway: gateway, agent: agent)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(agent.name ?? agent.id.capitalized)
+                                            .font(.body)
+                                        Text(gateway.displayAddress)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+            }
+
+            Divider()
+
+            Button("Connect New Gateway…") {
+                // TODO: Open gateway connection sheet
+                dismiss()
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+    }
+
+    private func addAgent(gateway: GatewayProfile, agent: AgentSummary) {
+        let binding = AgentBinding(
+            gatewayId: gateway.id,
+            agentId: agent.id,
+            localDisplayName: agent.name,
+            railOrder: gatewayManager.sortedAgentBindings.count + 1
+        )
+        gatewayManager.addAgentBinding(binding)
+        dismiss()
     }
 }

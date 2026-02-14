@@ -4,8 +4,8 @@ import SwiftUI
 struct GatewaySettingsView: View {
     @State private var viewModel: GatewaySettingsViewModel
 
-    init(connectionManager: ConnectionManager?) {
-        _viewModel = State(initialValue: GatewaySettingsViewModel(connectionManager: connectionManager))
+    init(appViewModel: AppViewModel?) {
+        _viewModel = State(initialValue: GatewaySettingsViewModel(appViewModel: appViewModel))
     }
 
     var body: some View {
