@@ -157,25 +157,28 @@ final class ChatViewModel {
 
     // MARK: - Attachments
 
-    /// Maximum attachment size in bytes (5 MB — gateway limit).
-    private static let maxAttachmentBytes = 5_000_000
+    /// Maximum attachment size in bytes after encoding.
+    /// Gateway WebSocket maxPayload is 512 KB, and base64 inflates by ~33%.
+    /// So raw image data must be under ~380 KB to fit in the frame with JSON overhead.
+    private static let maxAttachmentBytes = 350_000
+
+    /// Maximum image dimension (width or height) — images are scaled down to fit.
+    private static let maxImageDimension: CGFloat = 1200
 
     /// Add an image from a file URL.
     func addAttachment(from url: URL) {
-        guard let image = NSImage(contentsOf: url),
-              let data = imageData(for: image, url: url) else {
+        guard let image = NSImage(contentsOf: url) else {
             errorMessage = "Could not load image from file"
             return
         }
-        let mimeType = mimeTypeForURL(url)
-        guard data.count <= Self.maxAttachmentBytes else {
-            errorMessage = "Image too large (max 5 MB)"
+        guard let data = compressForUpload(image: image) else {
+            errorMessage = "Could not compress image for upload"
             return
         }
         let attachment = PendingAttachment(
             image: image,
             data: data,
-            mimeType: mimeType,
+            mimeType: "image/jpeg",
             fileName: url.lastPathComponent
         )
         pendingAttachments.append(attachment)
@@ -183,21 +186,15 @@ final class ChatViewModel {
 
     /// Add an image from NSImage (e.g. pasted from clipboard).
     func addAttachment(image: NSImage, fileName: String? = nil) {
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            errorMessage = "Could not process pasted image"
-            return
-        }
-        guard pngData.count <= Self.maxAttachmentBytes else {
-            errorMessage = "Image too large (max 5 MB)"
+        guard let data = compressForUpload(image: image) else {
+            errorMessage = "Could not compress image for upload"
             return
         }
         let attachment = PendingAttachment(
             image: image,
-            data: pngData,
-            mimeType: "image/png",
-            fileName: fileName ?? "pasted-image.png"
+            data: data,
+            mimeType: "image/jpeg",
+            fileName: fileName ?? "pasted-image.jpg"
         )
         pendingAttachments.append(attachment)
     }
@@ -207,32 +204,71 @@ final class ChatViewModel {
         pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
-    /// Get image data from a file, preferring the original format.
-    private func imageData(for image: NSImage, url: URL) -> Data? {
-        // Try reading the raw file data first (preserves JPEG compression, etc.)
-        if let data = try? Data(contentsOf: url), data.count <= Self.maxAttachmentBytes {
-            return data
-        }
-        // Fallback: re-encode as PNG
+    /// Compress and resize an image to fit within the gateway WebSocket payload limit.
+    ///
+    /// Strategy:
+    /// 1. Scale down if larger than maxImageDimension
+    /// 2. Encode as JPEG, starting at quality 0.8
+    /// 3. If still too large, reduce quality progressively
+    private func compressForUpload(image: NSImage) -> Data? {
         guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+              let bitmap = NSBitmapImageRep(data: tiffData) else {
             return nil
         }
-        return pngData
+
+        // Scale down if needed
+        let scaledBitmap = scaleBitmap(bitmap, maxDimension: Self.maxImageDimension)
+
+        // Try JPEG at decreasing quality until it fits
+        let qualities: [Double] = [0.8, 0.6, 0.45, 0.3, 0.2]
+        for quality in qualities {
+            if let data = scaledBitmap.representation(
+                using: .jpeg,
+                properties: [.compressionFactor: quality]
+            ), data.count <= Self.maxAttachmentBytes {
+                return data
+            }
+        }
+
+        // Last resort: scale down more aggressively
+        let smallBitmap = scaleBitmap(bitmap, maxDimension: 600)
+        return smallBitmap.representation(
+            using: .jpeg,
+            properties: [.compressionFactor: 0.3]
+        )
     }
 
-    /// Determine MIME type from file URL.
-    private func mimeTypeForURL(_ url: URL) -> String {
-        let ext = url.pathExtension.lowercased()
-        switch ext {
-        case "jpg", "jpeg": return "image/jpeg"
-        case "png": return "image/png"
-        case "gif": return "image/gif"
-        case "webp": return "image/webp"
-        case "heic": return "image/heic"
-        case "svg": return "image/svg+xml"
-        default: return "image/png"
-        }
+    /// Scale a bitmap so its longest side is at most `maxDimension`.
+    private func scaleBitmap(_ bitmap: NSBitmapImageRep, maxDimension: CGFloat) -> NSBitmapImageRep {
+        let w = CGFloat(bitmap.pixelsWide)
+        let h = CGFloat(bitmap.pixelsHigh)
+        let longest = max(w, h)
+
+        guard longest > maxDimension else { return bitmap }
+
+        let scale = maxDimension / longest
+        let newW = Int(w * scale)
+        let newH = Int(h * scale)
+
+        guard let resized = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: newW,
+            pixelsHigh: newH,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return bitmap }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: resized)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        bitmap.draw(in: NSRect(x: 0, y: 0, width: newW, height: newH))
+        NSGraphicsContext.restoreGraphicsState()
+
+        return resized
     }
 }
