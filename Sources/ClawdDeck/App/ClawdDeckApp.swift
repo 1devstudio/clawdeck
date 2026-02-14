@@ -43,26 +43,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Remove the toolbar border line between title bar and content
         window.titlebarSeparatorStyle = .none
 
-        // Strip the rounded background from toolbar item containers
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            stripToolbarItemBackgrounds(in: window.contentView?.superview)
+        // Strip bordered style from all toolbar items
+        if let toolbar = window.toolbar {
+            for item in toolbar.items {
+                item.isBordered = false
+            }
+        }
+
+        // Also strip backgrounds from toolbar item viewer NSViews
+        // (delayed because SwiftUI toolbar views are created asynchronously)
+        for delay in [0.1, 0.3, 0.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                // Re-strip toolbar items (SwiftUI may recreate them)
+                if let toolbar = window.toolbar {
+                    for item in toolbar.items {
+                        item.isBordered = false
+                    }
+                }
+                // Walk NSView tree and strip backgrounds
+                stripToolbarContainerBackgrounds(in: window.contentView?.superview)
+            }
         }
     }
 
-    /// Recursively find and make toolbar item container backgrounds transparent.
-    private static func stripToolbarItemBackgrounds(in view: NSView?) {
+    /// Recursively find toolbar-related views and remove their backgrounds.
+    private static func stripToolbarContainerBackgrounds(in view: NSView?) {
         guard let view = view else { return }
         let className = String(describing: type(of: view))
 
-        // NSToolbarItemViewer is the container that draws the rounded background
-        if className.contains("ToolbarItemViewer") || className.contains("ToolbarItem") {
+        if className.contains("ToolbarItemViewer") ||
+           className.contains("ToolbarItemGroupViewer") ||
+           className.contains("NSToolbarView") ||
+           className.contains("ToolbarClipView") {
             view.wantsLayer = true
             view.layer?.backgroundColor = .clear
             view.layer?.borderWidth = 0
+            view.layer?.borderColor = .clear
+            // Force no border on the view itself
+            if let cell = (view as? NSControl)?.cell {
+                cell.isBordered = false
+            }
         }
 
         for subview in view.subviews {
-            stripToolbarItemBackgrounds(in: subview)
+            stripToolbarContainerBackgrounds(in: subview)
         }
     }
 }
