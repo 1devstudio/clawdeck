@@ -181,6 +181,12 @@ final class AppViewModel {
 
     /// Select a session and load its history.
     func selectSession(_ sessionKey: String) async {
+        // Guard against redundant selection (sidebar onChange + ChatView .task
+        // can both trigger this for the same key, cancelling the in-flight load).
+        guard sessionKey != selectedSessionKey || !messageStore.hasMessages(for: sessionKey) else {
+            return
+        }
+
         selectedSessionKey = sessionKey
 
         // Cancel any in-flight history load for a previously selected session.

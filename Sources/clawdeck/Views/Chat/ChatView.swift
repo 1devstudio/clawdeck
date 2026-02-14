@@ -120,11 +120,8 @@ struct ChatView: View {
             )
         }
         // Title is set at the MainView level (agent name)
-        .task {
-            if viewModel.messages.isEmpty {
-                await viewModel.loadHistory()
-            }
-        }
+        // History is loaded by AppViewModel.selectSession() — no .task needed here.
+        // Adding a .task would race with selectSession and cancel the in-flight load.
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
