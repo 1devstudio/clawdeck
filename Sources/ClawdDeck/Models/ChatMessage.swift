@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// Role of a chat message sender.
 enum MessageRole: String, Codable, Sendable {
@@ -18,6 +19,14 @@ enum MessageState: String, Sendable {
     case error       // Failed
 }
 
+/// An image attached to a message (for display in chat bubbles).
+struct MessageImage: Identifiable {
+    let id = UUID()
+    let image: NSImage
+    let mimeType: String
+    let fileName: String?
+}
+
 /// A single message within a chat session.
 @Observable
 final class ChatMessage: Identifiable {
@@ -31,6 +40,9 @@ final class ChatMessage: Identifiable {
     var runId: String?
     var errorMessage: String?
     var model: String?
+
+    /// Image attachments sent with this message.
+    var images: [MessageImage] = []
 
     /// Tracks where the current streaming segment starts within `content`.
     /// Used by MessageStore to detect new segments vs cumulative growth.
