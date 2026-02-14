@@ -152,7 +152,9 @@ struct TopBarView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Search field
+            Spacer()
+
+            // Search field (centered)
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.tertiary)
@@ -181,35 +183,38 @@ struct TopBarView: View {
 
             Spacer()
 
-            // Connection status
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                Text(connectionState.rawValue.capitalized)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+            // Right-aligned controls
+            HStack(spacing: 14) {
+                // Connection status
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                    Text(connectionState.rawValue.capitalized)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
 
-            // Inspector toggle
-            Button {
-                isInspectorVisible.toggle()
-            } label: {
-                Image(systemName: "sidebar.right")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Toggle Inspector (⌘⇧I)")
+                // Inspector toggle
+                Button {
+                    isInspectorVisible.toggle()
+                } label: {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Inspector (⌘⇧I)")
 
-            // Settings
-            Button(action: onSettings) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                // Settings
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
             }
-            .buttonStyle(.plain)
-            .help("Settings")
         }
         .frame(minWidth: 400)
     }
