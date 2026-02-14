@@ -66,10 +66,14 @@ struct MainView: View {
             // Search bar — centered via .principal
             ToolbarItem(placement: .principal) {
                 TextField("Search sessions…", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                     .frame(width: 500)
+                    .focusEffectDisabled()
             }
 
             // Right-aligned controls — plain style, no button chrome
