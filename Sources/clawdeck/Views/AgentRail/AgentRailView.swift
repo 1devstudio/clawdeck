@@ -127,7 +127,7 @@ struct AgentRailItem: View {
     /// Load a custom avatar image from the app's avatars directory.
     private func loadCustomAvatar(named filename: String) -> NSImage? {
         let avatarDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("ClawdDeck/avatars")
+            .appendingPathComponent("clawdeck/avatars")
         guard let url = avatarDir?.appendingPathComponent(filename) else { return nil }
         return NSImage(contentsOf: url)
     }

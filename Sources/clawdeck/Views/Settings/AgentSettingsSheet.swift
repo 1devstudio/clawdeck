@@ -283,7 +283,7 @@ struct AgentSettingsSheet: View {
 
     private func saveAvatarToDisk(data: Data, filename: String) -> Bool {
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return false }
-        let avatarDir = appSupport.appendingPathComponent("ClawdDeck/avatars")
+        let avatarDir = appSupport.appendingPathComponent("clawdeck/avatars")
         try? FileManager.default.createDirectory(at: avatarDir, withIntermediateDirectories: true)
         let fileURL = avatarDir.appendingPathComponent(filename)
         return (try? data.write(to: fileURL)) != nil

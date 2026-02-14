@@ -26,7 +26,7 @@ final class SidebarViewModel {
 
     /// Display name of the active agent.
     var agentDisplayName: String {
-        appViewModel.connectionManager.activeProfile?.displayName ?? "ClawdDeck"
+        appViewModel.connectionManager.activeProfile?.displayName ?? "clawdeck"
     }
 
     /// Agents from the app state.

@@ -7,7 +7,7 @@ enum GatewayProtocol {
     static let clientVersion = "0.1.0"
     static let clientPlatform = "macos"
     static let clientMode = "ui"
-    static let clientDisplayName = "Clawd Deck"
+    static let clientDisplayName = "clawdeck"
     static let role = "operator"
     static let scopes = ["operator.read", "operator.write", "operator.admin"]
 

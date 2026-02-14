@@ -114,7 +114,7 @@ final class GatewaySettingsViewModel {
             try await client.configPatch(
                 raw: configText,
                 baseHash: configHash,
-                note: "Edited via ClawdDeck Settings"
+                note: "Edited via clawdeck Settings"
             )
 
             successMessage = "Config saved. Gateway will restart."

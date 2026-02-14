@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "ClawdDeck",
+    name: "clawdeck",
     platforms: [
         .macOS(.v14)
     ],
@@ -13,12 +13,12 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "ClawdDeck",
+            name: "clawdeck",
             dependencies: [
                 .product(name: "MarkdownUI", package: "swift-markdown-ui"),
                 .product(name: "HighlightSwift", package: "HighlightSwift")
             ],
-            path: "Sources/ClawdDeck",
+            path: "Sources/clawdeck",
             resources: [
                 .process("Resources")
             ]
