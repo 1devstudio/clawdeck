@@ -402,7 +402,7 @@ struct IconPickerGrid: View {
 // MARK: - Model Picker (Autocomplete)
 
 /// A model entry with its qualified ID for display and selection.
-private struct ModelOption: Identifiable {
+struct ModelOption: Identifiable {
     let qualifiedId: String   // "provider/model-id"
     let displayName: String   // "Claude Opus 4.6"
     let provider: String      // "anthropic"
@@ -411,6 +411,7 @@ private struct ModelOption: Identifiable {
 
 /// Autocomplete model picker that fetches from the gateway via `models.list`.
 /// Type to filter by model name or provider/id; click a suggestion to select.
+/// Uses `.popover()` so the dropdown escapes Form clipping on macOS.
 struct ModelPicker: View {
     @Binding var selectedModel: String
     let client: GatewayClient?
@@ -418,21 +419,19 @@ struct ModelPicker: View {
     @State private var allModels: [ModelOption] = []
     @State private var isLoading = true
     @State private var searchText = ""
-    @State private var showSuggestions = false
+    @State private var showPopover = false
     @State private var hoveredId: String?
-    @FocusState private var isFocused: Bool
 
-    /// Display text: show the friendly name if we have it, otherwise the raw ID.
+    /// Friendly name for the currently selected model, if known.
     private var displayName: String? {
         allModels.first(where: { $0.qualifiedId == selectedModel })?.displayName
     }
 
     /// Filtered suggestions based on search text.
     private var suggestions: [ModelOption] {
-        let query = searchText.lowercased()
+        let query = searchText.lowercased().trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else {
-            // Show a reasonable subset when empty (first 30)
-            return Array(allModels.prefix(30))
+            return Array(allModels.prefix(50))
         }
         return allModels.filter { model in
             model.displayName.lowercased().contains(query) ||
@@ -441,7 +440,7 @@ struct ModelPicker: View {
         }
     }
 
-    /// Suggestions grouped by provider for display.
+    /// Suggestions grouped by provider.
     private var groupedSuggestions: [(provider: String, models: [ModelOption])] {
         var grouped: [String: [ModelOption]] = [:]
         for model in suggestions {
@@ -451,140 +450,145 @@ struct ModelPicker: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            // Text field
-            HStack(spacing: 4) {
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
-                TextField("", text: $searchText, prompt: Text("Search models…"))
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
-                    .focused($isFocused)
-                    .onChange(of: searchText) { _, _ in
-                        showSuggestions = true
+        VStack(alignment: .trailing, spacing: 2) {
+            // Clickable field that opens the popover
+            Button {
+                searchText = ""
+                showPopover = true
+            } label: {
+                HStack(spacing: 6) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.mini)
                     }
-                    .onChange(of: isFocused) { _, focused in
-                        if focused {
-                            showSuggestions = true
-                            // Select all text on focus for easy replacement
-                            if searchText == (displayName ?? selectedModel) {
-                                searchText = ""
-                            }
-                        }
-                    }
-                    .onSubmit {
-                        // If there's an exact match in suggestions, use it
-                        if let match = suggestions.first {
-                            selectModel(match)
-                        }
-                        showSuggestions = false
-                    }
-
-                // Clear / current selection indicator
-                if !selectedModel.isEmpty && !isFocused {
-                    Image(systemName: "checkmark.circle.fill")
+                    Text(displayName ?? (selectedModel.isEmpty ? "Select model…" : selectedModel))
                         .font(.system(size: 12))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(selectedModel.isEmpty ? .secondary : .primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+                modelSearchPopover
             }
 
-            // Current selection label (shown when not editing)
-            if !isFocused && !selectedModel.isEmpty {
+            // Qualified ID subtitle
+            if !selectedModel.isEmpty && displayName != nil {
                 Text(selectedModel)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.top, 2)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if showSuggestions && isFocused && !suggestions.isEmpty {
-                suggestionsDropdown
-                    .offset(y: 26)
             }
         }
         .task {
             await loadModels()
-            // Initialize search text to current display name
-            searchText = displayName ?? selectedModel
         }
     }
 
-    // MARK: - Suggestions Dropdown
+    // MARK: - Search Popover
 
-    private var suggestionsDropdown: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(groupedSuggestions, id: \.provider) { group in
-                    // Provider header
-                    Text(group.provider.capitalized)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.top, 6)
-                        .padding(.bottom, 2)
-
-                    ForEach(group.models) { model in
-                        Button {
-                            selectModel(model)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(model.displayName)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.primary)
-                                    Text(model.qualifiedId)
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundStyle(.tertiary)
-                                }
-                                Spacer()
-                                if model.qualifiedId == selectedModel {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(.green)
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(hoveredId == model.qualifiedId ? Color.accentColor.opacity(0.1) : Color.clear)
-                            )
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .onHover { isHovered in
-                            hoveredId = isHovered ? model.qualifiedId : nil
-                        }
+    private var modelSearchPopover: some View {
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                TextField("", text: $searchText, prompt: Text("Search models…"))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                     }
+                    .buttonStyle(.plain)
                 }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
 
-                if suggestions.isEmpty {
+            Divider()
+
+            // Results
+            if suggestions.isEmpty {
+                VStack(spacing: 4) {
                     Text("No models match "\(searchText)"")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .padding(8)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(16)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(groupedSuggestions, id: \.provider) { group in
+                            // Provider header
+                            Text(group.provider.capitalized)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 10)
+                                .padding(.top, 8)
+                                .padding(.bottom, 2)
+
+                            ForEach(group.models) { model in
+                                Button {
+                                    selectedModel = model.qualifiedId
+                                    showPopover = false
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(model.displayName)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(.primary)
+                                            Text(model.qualifiedId)
+                                                .font(.system(size: 10, design: .monospaced))
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        Spacer()
+                                        if model.qualifiedId == selectedModel {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(.blue)
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(hoveredId == model.qualifiedId ? Color.blue.opacity(0.1) : Color.clear)
+                                    )
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .onHover { isHovered in
+                                    hoveredId = isHovered ? model.qualifiedId : nil
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
             }
-            .padding(.vertical, 4)
         }
-        .frame(width: 300, maxHeight: 250)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-        .zIndex(100)
-    }
-
-    // MARK: - Actions
-
-    private func selectModel(_ model: ModelOption) {
-        selectedModel = model.qualifiedId
-        searchText = model.displayName
-        showSuggestions = false
-        isFocused = false
+        .frame(width: 320, height: 300)
     }
 
     // MARK: - Data Loading
