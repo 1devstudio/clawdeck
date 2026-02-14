@@ -811,7 +811,7 @@ enum MarkdownParser {
 
     static func defaultParagraphStyle() -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = 2
+        style.lineSpacing = 4
         style.paragraphSpacing = 6   // Space after each paragraph block
         return style
     }
