@@ -76,8 +76,8 @@ struct MessageComposer: View {
                 .animation(.easeOut(duration: 0.15), value: editorHeight)
                 .focused($isFocused)
 
-                // Abort button (visible during streaming)
-                if isStreaming {
+                // Abort button (visible while waiting for or receiving a response)
+                if isSending || isStreaming {
                     Button(action: onAbort) {
                         Image(systemName: "stop.circle.fill")
                             .font(.system(size: 26))

@@ -184,6 +184,8 @@ final class ChatViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+        // Clear sending state so the abort button disappears immediately
+        isSending = false
     }
 
     /// Load or reload chat history.
