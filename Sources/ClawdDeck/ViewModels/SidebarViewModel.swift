@@ -24,6 +24,11 @@ final class SidebarViewModel {
     var renamingSessionKey: String?
     var renameText = ""
 
+    /// Display name of the active agent.
+    var agentDisplayName: String {
+        appViewModel.connectionManager.activeProfile?.displayName ?? "ClawdDeck"
+    }
+
     /// Agents from the app state.
     var agents: [Agent] {
         appViewModel.agents

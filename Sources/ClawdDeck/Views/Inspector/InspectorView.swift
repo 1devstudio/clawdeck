@@ -67,7 +67,6 @@ struct InspectorView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Inspector")
     }
 
     private func commitLabel() {

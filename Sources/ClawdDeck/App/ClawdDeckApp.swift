@@ -31,8 +31,7 @@ struct ClawdDeckApp: App {
                 }
             }
         }
-        .windowStyle(.titleBar)
-        .windowToolbarStyle(.unified(showsTitle: true))
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 700)
         .commands {
             TextEditingCommands()

@@ -6,32 +6,54 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Search bar + settings header
+            // Header: agent name + action buttons
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 12))
-                    TextField("Search sessions", text: $viewModel.searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                }
-                .padding(6)
-                .background(.quaternary.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                Text(viewModel.agentDisplayName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+
+                Spacer()
 
                 Button {
-                    viewModel.showAgentSettings()
+                    Task { await viewModel.refreshSessions() }
                 } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Agent Settings")
+                .help("Refresh")
+                .disabled(viewModel.isLoading)
+
+                Button {
+                    Task { await viewModel.createNewSession() }
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("New Session (⌘N)")
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            // Search bar
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11))
+                TextField("Search sessions", text: $viewModel.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.quaternary.opacity(0.3))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
 
             List(selection: $viewModel.selectedSessionKey) {
                 // Sessions grouped by time
@@ -72,25 +94,6 @@ struct SidebarView: View {
                     systemImage: "tray",
                     description: Text("Start a conversation or connect to a gateway.")
                 )
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    Task { await viewModel.createNewSession() }
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                }
-                .help("New Session (⌘N)")
-                .keyboardShortcut("n", modifiers: .command)
-
-                Button {
-                    Task { await viewModel.refreshSessions() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .help("Refresh")
-                .disabled(viewModel.isLoading)
             }
         }
         .onChange(of: viewModel.selectedSessionKey) { _, newKey in
