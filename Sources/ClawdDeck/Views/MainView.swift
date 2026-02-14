@@ -65,31 +65,10 @@ struct MainView: View {
         .toolbar {
             // Search bar — centered via .principal
             ToolbarItem(placement: .principal) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.tertiary)
-                        .font(.system(size: 12))
-
-                    TextField("Search sessions…", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.tertiary)
-                                .font(.system(size: 11))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .frame(width: 500)
+                TextField("Search sessions…", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13))
+                    .frame(width: 500)
             }
 
             // Right-aligned controls — plain style, no button chrome
