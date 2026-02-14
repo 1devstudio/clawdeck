@@ -41,7 +41,7 @@ struct HighlightedCodeBlock: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(headerBackground.opacity(0.6))
+            .background(headerBackground)
 
             Divider()
                 .opacity(0.5)
@@ -62,14 +62,7 @@ struct HighlightedCodeBlock: View {
                 .textSelection(.enabled)
             }
         }
-        .background {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(codeBackground.opacity(0.6))
-            }
-        }
+        .background(codeBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)

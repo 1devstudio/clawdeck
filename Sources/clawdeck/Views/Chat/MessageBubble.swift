@@ -93,10 +93,7 @@ struct MessageBubble: View {
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
                         .padding(.bottom, 10)
-                        .background {
-                            bubbleBackground
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
                         .overlay {
                             if message.state == .error {
                                 RoundedRectangle(cornerRadius: 12)
@@ -107,11 +104,8 @@ struct MessageBubble: View {
                             } else if isSearchMatch {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
-                            } else {
-                                glassBorder
                             }
                         }
-                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
 
                         // Copy buttons — shown on hover for assistant messages
                         if isHovered && message.role == .assistant && message.state != .streaming {
@@ -277,81 +271,17 @@ struct MessageBubble: View {
         }
     }
 
-    /// Glass bubble background — frosted material + tint + top-light gradient.
-    @ViewBuilder
-    private var bubbleBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 12)
-
+    /// Liquid Glass style per message role.
+    private var bubbleGlassStyle: some GlassEffectStyle {
         switch message.role {
         case .user:
-            ZStack {
-                shape.fill(.regularMaterial)
-                shape.fill(themeColor.opacity(0.10))
-                // Top-light refraction gradient
-                shape.fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
+            return .regular.tint(themeColor)
         case .assistant:
-            ZStack {
-                shape.fill(.regularMaterial)
-                shape.fill(Color.primary.opacity(0.04))
-                shape.fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
+            return .regular
         case .system:
-            ZStack {
-                shape.fill(.regularMaterial)
-                shape.fill(Color.yellow.opacity(0.08))
-                shape.fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
+            return .regular.tint(.yellow)
         case .toolCall, .toolResult:
-            ZStack {
-                shape.fill(.regularMaterial)
-                shape.fill(Color.gray.opacity(0.06))
-                shape.fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.10), Color.white.opacity(0.0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-        }
-    }
-
-    /// Glass edge — bright highlight on top, subtle shadow on bottom.
-    private var glassBorder: some View {
-        ZStack {
-            // Specular highlight on top edge
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.35),
-                            Color.white.opacity(0.08),
-                            Color.black.opacity(0.08)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.5
-                )
+            return .regular.tint(.gray)
         }
     }
 }
@@ -401,13 +331,6 @@ struct MessageCopyButtons: View {
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
+        .glassEffect(in: .rect(cornerRadius: 6))
     }
 }

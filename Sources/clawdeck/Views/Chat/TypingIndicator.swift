@@ -35,39 +35,7 @@ struct TypingIndicator: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.regularMaterial)
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.primary.opacity(0.04))
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.35),
-                                    Color.white.opacity(0.08),
-                                    Color.black.opacity(0.08)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 0.5
-                        )
-                )
-                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                .glassEffect(in: .rect(cornerRadius: 12))
             }
 
             Spacer(minLength: 60)

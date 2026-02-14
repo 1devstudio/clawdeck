@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "clawdeck",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     dependencies: [
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.0"),
