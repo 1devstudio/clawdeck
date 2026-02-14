@@ -203,6 +203,11 @@ final class AppViewModel {
                 method: GatewayMethod.chatHistory,
                 params: ChatHistoryParams(sessionKey: sessionKey, limit: 100)
             )
+
+            // After the await, check if this load is still relevant.
+            // The user may have switched sessions while we waited.
+            guard !Task.isCancelled else { return }
+
             guard response.ok, let payload = response.payload else {
                 print("[AppViewModel] chat.history failed: \(response.error?.message ?? "unknown")")
                 return
@@ -228,6 +233,11 @@ final class AppViewModel {
             messageStore.setMessages(messages, for: sessionKey)
         } catch is CancellationError {
             // Expected when the user switches sessions before the load completes.
+            print("[AppViewModel] History load cancelled (CancellationError) for \(sessionKey)")
+        } catch GatewayClientError.cancelled {
+            // Also expected — GatewayClient throws its own cancelled error
+            // when the WebSocket disconnects or pending requests are flushed.
+            print("[AppViewModel] History load cancelled (GatewayClient) for \(sessionKey)")
         } catch {
             print("[AppViewModel] Failed to load history: \(error)")
         }
