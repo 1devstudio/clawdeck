@@ -8,8 +8,8 @@ import SwiftUI
 final class AgentSettingsViewModel {
     // MARK: - State
     
-    /// Loading state.
-    var isLoading = false
+    /// Loading state — starts true to prevent flashing default values.
+    var isLoading = true
     
     /// Saving state.
     var isSaving = false
