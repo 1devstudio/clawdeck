@@ -22,6 +22,11 @@ final class AppViewModel {
     /// In-flight history load task — cancelled when selecting a different session.
     private var historyLoadTask: Task<Void, Never>?
 
+    /// Session key for the in-flight history load.
+    /// Prevents re-entering selectSession from cancelling a load for
+    /// the same session that's already in progress.
+    private var historyLoadingKey: String?
+
     /// Get or create a ChatViewModel for a session key.
     func chatViewModel(for sessionKey: String) -> ChatViewModel {
         if let existing = chatViewModels[sessionKey] {
@@ -181,22 +186,25 @@ final class AppViewModel {
 
     /// Select a session and load its history.
     func selectSession(_ sessionKey: String) async {
-        // Guard against redundant selection (sidebar onChange + ChatView .task
-        // can both trigger this for the same key, cancelling the in-flight load).
-        guard sessionKey != selectedSessionKey || !messageStore.hasMessages(for: sessionKey) else {
-            return
-        }
-
         selectedSessionKey = sessionKey
 
-        // Cancel any in-flight history load for a previously selected session.
-        historyLoadTask?.cancel()
+        // Already have messages — nothing to load.
+        guard !messageStore.hasMessages(for: sessionKey) else { return }
 
-        // Load history if not already loaded
-        if !messageStore.hasMessages(for: sessionKey) {
-            let task = Task { await loadHistory(for: sessionKey) }
-            historyLoadTask = task
-            await task.value
+        // Already loading this exact session — don't cancel and restart.
+        guard historyLoadingKey != sessionKey else { return }
+
+        // Cancel any in-flight load for a *different* session.
+        historyLoadTask?.cancel()
+        historyLoadingKey = sessionKey
+
+        let task = Task { await loadHistory(for: sessionKey) }
+        historyLoadTask = task
+        await task.value
+
+        // Clear the loading key if it still matches (wasn't replaced).
+        if historyLoadingKey == sessionKey {
+            historyLoadingKey = nil
         }
     }
 
