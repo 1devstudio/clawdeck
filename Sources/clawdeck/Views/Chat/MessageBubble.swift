@@ -290,9 +290,9 @@ struct MessageBubble: View {
         case .assistant:
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
+                    .fill(.thinMaterial)
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.primary.opacity(0.03))
+                    .fill(Color.primary.opacity(0.06))
             }
         case .system:
             ZStack {
@@ -314,7 +314,7 @@ struct MessageBubble: View {
     /// Subtle border to define bubble edges against any background.
     private var bubbleBorder: some View {
         RoundedRectangle(cornerRadius: 12)
-            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+            .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
     }
 }
 

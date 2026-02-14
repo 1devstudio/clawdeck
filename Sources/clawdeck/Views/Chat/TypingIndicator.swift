@@ -38,15 +38,15 @@ struct TypingIndicator: View {
                 .background {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
+                            .fill(.thinMaterial)
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.primary.opacity(0.03))
+                            .fill(Color.primary.opacity(0.06))
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                        .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
                 )
             }
 
