@@ -69,8 +69,9 @@ struct MarkdownTextView: NSViewRepresentable {
 
             guard let textView else { return }
 
-            let attributed = MarkdownParser.parse(markdown, colorScheme: colorScheme)
-            textView.textStorage?.setAttributedString(attributed)
+            let result = MarkdownParser.parseWithRegions(markdown, colorScheme: colorScheme)
+            textView.textStorage?.setAttributedString(result.attributedString)
+            textView.codeBlockRegions = result.codeBlockRegions
             textView.invalidateIntrinsicContentSize()
 
             // Async: apply syntax highlighting to code blocks
@@ -79,50 +80,47 @@ struct MarkdownTextView: NSViewRepresentable {
             }
         }
 
-        /// Find fenced code blocks and apply syntax highlighting.
+        /// Apply syntax highlighting to code blocks using tracked regions.
         @MainActor
         private func highlightCodeBlocks(in markdown: String, colorScheme: ColorScheme) async {
             guard let textView, let textStorage = textView.textStorage else { return }
-
-            let codeBlocks = MarkdownParser.extractCodeBlocks(from: markdown)
-            guard !codeBlocks.isEmpty else { return }
+            guard !textView.codeBlockRegions.isEmpty else { return }
 
             let colors: HighlightColors = colorScheme == .dark
                 ? .dark(.github)
                 : .light(.github)
 
-            for block in codeBlocks {
-                guard let range = MarkdownParser.findCodeBlockRange(
-                    code: block.code,
-                    in: textStorage.string
-                ) else { continue }
+            let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
+            let bgColor: NSColor = colorScheme == .dark
+                ? NSColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0)
+                : NSColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
+            let codeParaStyle = NSMutableParagraphStyle()
+            codeParaStyle.lineSpacing = 2
+
+            for region in textView.codeBlockRegions {
+                guard region.codeRange.location + region.codeRange.length <= textStorage.length else { continue }
 
                 do {
                     let result: HighlightResult
-                    if let lang = block.language, !lang.isEmpty {
-                        result = try await highlight.request(block.code, mode: .languageAlias(lang), colors: colors)
+                    if let lang = region.language, !lang.isEmpty {
+                        result = try await highlight.request(region.code, mode: .languageAlias(lang), colors: colors)
                     } else {
-                        result = try await highlight.request(block.code, mode: .automatic, colors: colors)
+                        result = try await highlight.request(region.code, mode: .automatic, colors: colors)
                     }
 
                     // Convert SwiftUI AttributedString to NSAttributedString
                     let nsAttr = NSMutableAttributedString(result.attributedText)
 
-                    // Preserve the monospaced font and background
-                    let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
-                    let bgColor: NSColor = colorScheme == .dark
-                        ? NSColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0)
-                        : NSColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
+                    // Preserve monospaced font, background, and paragraph style
                     nsAttr.addAttributes([
                         .font: monoFont,
-                        .backgroundColor: bgColor
+                        .backgroundColor: bgColor,
+                        .paragraphStyle: codeParaStyle
                     ], range: NSRange(location: 0, length: nsAttr.length))
 
-                    // Apply to the text storage
-                    if range.location + range.length <= textStorage.length {
-                        textStorage.replaceCharacters(in: range, with: nsAttr)
-                        textView.invalidateIntrinsicContentSize()
-                    }
+                    // Apply to the code portion only (not the header)
+                    textStorage.replaceCharacters(in: region.codeRange, with: nsAttr)
+                    textView.invalidateIntrinsicContentSize()
                 } catch {
                     // Keep the plain monospaced text on error
                 }
@@ -131,12 +129,48 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 }
 
-// MARK: - Self-sizing NSTextView
+// MARK: - Self-sizing NSTextView with code block hover
 
-/// An `NSTextView` subclass that calculates its own `intrinsicContentSize`
-/// based on the laid-out text, allowing SwiftUI to size it correctly without
-/// a wrapping `NSScrollView`.
+/// Tracks the range and raw source of a code block in the attributed string.
+struct CodeBlockRegion {
+    let range: NSRange       // Range in the text storage (includes header)
+    let codeRange: NSRange   // Range of just the code (for highlighting replacement)
+    let code: String         // Raw source code
+    let language: String?    // Language tag (if any)
+}
+
+/// An `NSTextView` subclass that:
+/// - Calculates its own `intrinsicContentSize` for SwiftUI layout
+/// - Shows a floating "Copy" button when hovering over code blocks
+/// - Adds a "Copy Code Block" context menu item
 final class MarkdownNSTextView: NSTextView {
+
+    /// Code block regions set by the coordinator after rendering.
+    var codeBlockRegions: [CodeBlockRegion] = []
+
+    /// The floating copy button (created lazily).
+    private lazy var copyButton: NSButton = {
+        let btn = NSButton(title: "Copy", target: self, action: #selector(copyHoveredCodeBlock))
+        btn.bezelStyle = .recessed
+        btn.controlSize = .small
+        btn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        btn.isBordered = true
+        btn.isHidden = true
+        btn.wantsLayer = true
+        btn.layer?.cornerRadius = 4
+        btn.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.9).cgColor
+        addSubview(btn)
+        return btn
+    }()
+
+    /// The code block currently being hovered (for copy action).
+    private var hoveredCodeBlock: CodeBlockRegion?
+
+    /// Tracking area for mouse movement.
+    private var hoverTrackingArea: NSTrackingArea?
+
+    // MARK: - Intrinsic sizing
+
     override var intrinsicContentSize: NSSize {
         guard let layoutManager = layoutManager,
               let textContainer = textContainer else {
@@ -156,6 +190,149 @@ final class MarkdownNSTextView: NSTextView {
     }
 
     override var mouseDownCanMoveWindow: Bool { false }
+
+    // MARK: - Tracking area
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = hoverTrackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        hoverTrackingArea = area
+    }
+
+    // MARK: - Mouse hover
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        updateHover(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        hideCodeCopyButton()
+    }
+
+    private func updateHover(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        guard let layoutManager = layoutManager,
+              let textContainer = textContainer else {
+            hideCodeCopyButton()
+            return
+        }
+
+        // Find character index at mouse position
+        let textContainerOrigin = NSPoint(
+            x: textContainerInset.width,
+            y: textContainerInset.height
+        )
+        let adjustedPoint = NSPoint(
+            x: point.x - textContainerOrigin.x,
+            y: point.y - textContainerOrigin.y
+        )
+
+        let charIndex = layoutManager.characterIndex(
+            for: adjustedPoint,
+            in: textContainer,
+            fractionOfDistanceBetweenInsertionPoints: nil
+        )
+
+        // Check if the character is inside any code block region
+        if let region = codeBlockRegions.first(where: { NSLocationInRange(charIndex, $0.range) }) {
+            hoveredCodeBlock = region
+            showCodeCopyButton(for: region)
+        } else {
+            hideCodeCopyButton()
+        }
+    }
+
+    private func showCodeCopyButton(for region: CodeBlockRegion) {
+        guard let layoutManager = layoutManager,
+              let textContainer = textContainer else { return }
+
+        // Get the bounding rect of the code block's first line for positioning
+        var glyphRange = NSRange()
+        layoutManager.characterRange(
+            forGlyphRange: layoutManager.glyphRange(
+                forCharacterRange: NSRange(location: region.range.location, length: 1),
+                actualCharacterRange: nil
+            ),
+            actualGlyphRange: &glyphRange
+        )
+
+        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+        let buttonSize = copyButton.fittingSize
+
+        // Position in top-right of the code block
+        copyButton.frame = NSRect(
+            x: bounds.width - buttonSize.width - 8,
+            y: lineRect.origin.y + textContainerInset.height + 4,
+            width: buttonSize.width,
+            height: buttonSize.height
+        )
+        copyButton.isHidden = false
+    }
+
+    private func hideCodeCopyButton() {
+        hoveredCodeBlock = nil
+        copyButton.isHidden = true
+    }
+
+    @objc private func copyHoveredCodeBlock() {
+        guard let region = hoveredCodeBlock else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(region.code, forType: .string)
+
+        // Briefly show "Copied" feedback
+        let originalTitle = copyButton.title
+        copyButton.title = "Copied!"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.copyButton.title = originalTitle
+        }
+    }
+
+    // MARK: - Context menu
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+
+        // Check if right-click is inside a code block
+        let point = convert(event.locationInWindow, from: nil)
+        if let layoutManager = layoutManager, let textContainer = textContainer {
+            let adjustedPoint = NSPoint(
+                x: point.x - textContainerInset.width,
+                y: point.y - textContainerInset.height
+            )
+            let charIndex = layoutManager.characterIndex(
+                for: adjustedPoint,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: nil
+            )
+            if let region = codeBlockRegions.first(where: { NSLocationInRange(charIndex, $0.range) }) {
+                hoveredCodeBlock = region
+
+                // Insert "Copy Code Block" at the top
+                let item = NSMenuItem(
+                    title: "Copy Code Block",
+                    action: #selector(copyHoveredCodeBlock),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                menu.insertItem(item, at: 0)
+                menu.insertItem(.separator(), at: 1)
+            }
+        }
+
+        return menu
+    }
 }
 
 // MARK: - Markdown Parser
@@ -172,8 +349,27 @@ enum MarkdownParser {
         let code: String
     }
 
-    /// Parse markdown into a styled `NSAttributedString`.
+    /// Result of parsing markdown, including the attributed string and code block regions.
+    struct ParseResult {
+        let attributedString: NSAttributedString
+        let codeBlockRegions: [CodeBlockRegion]
+    }
+
+    /// Parse markdown into a styled `NSAttributedString` and track code block regions.
+    static func parseWithRegions(_ markdown: String, colorScheme: ColorScheme) -> ParseResult {
+        var regions: [CodeBlockRegion] = []
+        let attributed = parse(markdown, colorScheme: colorScheme, regions: &regions)
+        return ParseResult(attributedString: attributed, codeBlockRegions: regions)
+    }
+
+    /// Parse markdown into a styled `NSAttributedString` (without region tracking).
     static func parse(_ markdown: String, colorScheme: ColorScheme) -> NSAttributedString {
+        var regions: [CodeBlockRegion] = []
+        return parse(markdown, colorScheme: colorScheme, regions: &regions)
+    }
+
+    /// Parse markdown into a styled `NSAttributedString`.
+    static func parse(_ markdown: String, colorScheme: ColorScheme, regions: inout [CodeBlockRegion]) -> NSAttributedString {
         let result = NSMutableAttributedString()
         let lines = markdown.components(separatedBy: "\n")
 
@@ -210,7 +406,21 @@ enum MarkdownParser {
                     i += 1
                 }
                 let code = codeLines.joined(separator: "\n")
-                result.append(styledCodeBlock(code, language: language.isEmpty ? nil : language, colorScheme: colorScheme))
+                let regionStart = result.length
+                let styledBlock = styledCodeBlock(code, language: language.isEmpty ? nil : language, colorScheme: colorScheme)
+                result.append(styledBlock)
+
+                // Track the region: full range includes header, codeRange is just the code
+                let lang = language.isEmpty ? nil : language
+                let headerLength = (lang ?? "Code").capitalized.count + 1 // +1 for \n
+                let codeStart = regionStart + headerLength
+                regions.append(CodeBlockRegion(
+                    range: NSRange(location: regionStart, length: styledBlock.length),
+                    codeRange: NSRange(location: codeStart, length: code.utf16.count),
+                    code: code,
+                    language: lang
+                ))
+
                 result.append(NSAttributedString(string: "\n", attributes: defaultAttrs))
                 lastBlockWasCode = true
                 continue
@@ -515,11 +725,30 @@ enum MarkdownParser {
     static func styledCodeBlock(_ code: String, language: String?, colorScheme: ColorScheme) -> NSAttributedString {
         let result = NSMutableAttributedString()
 
-        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
         let bgColor: NSColor = colorScheme == .dark
             ? NSColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0)
             : NSColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
+        let headerBgColor: NSColor = colorScheme == .dark
+            ? NSColor(red: 0.12, green: 0.13, blue: 0.15, alpha: 1.0)
+            : NSColor(red: 0.93, green: 0.93, blue: 0.95, alpha: 1.0)
 
+        // Language header line
+        let displayLang = (language ?? "Code").capitalized
+        let headerFont = NSFont.systemFont(ofSize: NSFont.systemFontSize - 2, weight: .medium)
+        let headerParaStyle = NSMutableParagraphStyle()
+        headerParaStyle.paragraphSpacingBefore = 2
+        headerParaStyle.paragraphSpacing = 4
+
+        let headerAttrs: [NSAttributedString.Key: Any] = [
+            .font: headerFont,
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .backgroundColor: headerBgColor,
+            .paragraphStyle: headerParaStyle
+        ]
+        result.append(NSAttributedString(string: displayLang + "\n", attributes: headerAttrs))
+
+        // Code body
+        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
         let codeParaStyle = NSMutableParagraphStyle()
         codeParaStyle.lineSpacing = 2
 
@@ -529,7 +758,6 @@ enum MarkdownParser {
             .backgroundColor: bgColor,
             .paragraphStyle: codeParaStyle
         ]
-
         result.append(NSAttributedString(string: code, attributes: codeAttrs))
 
         return result
