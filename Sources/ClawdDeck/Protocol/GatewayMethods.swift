@@ -202,15 +202,30 @@ struct SessionsDeleteParams: Codable, Sendable {
 
 // MARK: - Chat types
 
+/// A single attachment to include in a chat.send request.
+///
+/// The gateway expects:
+/// - `content`: base64-encoded file data (no data URL prefix)
+/// - `mimeType`: e.g. "image/png", "image/jpeg"
+/// - `fileName`: optional display name
+struct ChatAttachment: Codable, Sendable {
+    let content: String      // base64-encoded data
+    let mimeType: String     // e.g. "image/png"
+    let fileName: String?
+    let type: String?        // e.g. "image"
+}
+
 /// Parameters for chat.send.
 struct ChatSendParams: Codable, Sendable {
     let sessionKey: String
     let message: String
+    let attachments: [ChatAttachment]?
     let idempotencyKey: String
 
-    init(sessionKey: String, message: String, idempotencyKey: String = UUID().uuidString) {
+    init(sessionKey: String, message: String, attachments: [ChatAttachment]? = nil, idempotencyKey: String = UUID().uuidString) {
         self.sessionKey = sessionKey
         self.message = message
+        self.attachments = attachments?.isEmpty == true ? nil : attachments
         self.idempotencyKey = idempotencyKey
     }
 }

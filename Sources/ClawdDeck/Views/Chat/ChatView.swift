@@ -68,11 +68,21 @@ struct ChatView: View {
                 text: $viewModel.draftText,
                 isSending: viewModel.isSending,
                 isStreaming: viewModel.isStreaming,
+                pendingAttachments: viewModel.pendingAttachments,
                 onSend: {
                     Task { await viewModel.sendMessage() }
                 },
                 onAbort: {
                     Task { await viewModel.abortGeneration() }
+                },
+                onAddAttachment: { url in
+                    viewModel.addAttachment(from: url)
+                },
+                onPasteImage: { image in
+                    viewModel.addAttachment(image: image)
+                },
+                onRemoveAttachment: { attachment in
+                    viewModel.removeAttachment(attachment)
                 }
             )
         }

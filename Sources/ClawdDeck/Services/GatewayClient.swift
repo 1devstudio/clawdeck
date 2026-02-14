@@ -166,9 +166,9 @@ actor GatewayClient {
 
     // MARK: - Convenience methods
 
-    /// Send a chat message.
-    func chatSend(sessionKey: String, message: String) async throws -> ChatSendResult {
-        let params = ChatSendParams(sessionKey: sessionKey, message: message)
+    /// Send a chat message, optionally with image attachments.
+    func chatSend(sessionKey: String, message: String, attachments: [ChatAttachment]? = nil) async throws -> ChatSendResult {
+        let params = ChatSendParams(sessionKey: sessionKey, message: message, attachments: attachments)
         let response = try await send(method: GatewayMethod.chatSend, params: params)
         guard response.ok, let payload = response.payload else {
             throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
