@@ -24,6 +24,9 @@ final class GatewayManager {
     /// Event processing tasks keyed by gateway ID.
     private var eventTasks: [String: Task<Void, Never>] = [:]
 
+    /// In-memory cache for gateway tokens to avoid repeated Keychain prompts.
+    private var tokenCache: [String: String] = [:]
+
     /// Handler for incoming events.
     var onEvent: ((EventFrame, String) -> Void)?  // (event, gatewayId)
 
@@ -40,9 +43,10 @@ final class GatewayManager {
     func addGatewayProfile(_ profile: GatewayProfile) {
         gatewayProfiles.append(profile)
 
-        // Save token to keychain if provided
+        // Save token to keychain + memory cache if provided
         if let token = profile.token {
             KeychainHelper.saveGatewayToken(token, profileId: profile.id)
+            tokenCache[profile.id] = token
         }
 
         saveGatewayProfiles()
@@ -64,6 +68,7 @@ final class GatewayManager {
         // Clean up stored data
         agentSummaries.removeValue(forKey: profile.id)
         lastErrors.removeValue(forKey: profile.id)
+        tokenCache.removeValue(forKey: profile.id)
         
         KeychainHelper.deleteGatewayToken(profileId: profile.id)
         saveGatewayProfiles()
@@ -76,6 +81,7 @@ final class GatewayManager {
             gatewayProfiles[index] = profile
             if let token = profile.token {
                 KeychainHelper.saveGatewayToken(token, profileId: profile.id)
+                tokenCache[profile.id] = token
             }
             saveGatewayProfiles()
         }
@@ -155,10 +161,16 @@ final class GatewayManager {
 
         lastErrors.removeValue(forKey: gatewayId)
 
-        // Resolve token: from profile or keychain
+        // Resolve token: from profile, memory cache, or keychain (in that order).
+        // The memory cache avoids repeated Keychain prompts on reconnect.
         var resolvedProfile = profile
         if resolvedProfile.token == nil {
-            resolvedProfile.token = KeychainHelper.loadGatewayToken(profileId: profile.id)
+            if let cached = tokenCache[profile.id] {
+                resolvedProfile.token = cached
+            } else if let keychainToken = KeychainHelper.loadGatewayToken(profileId: profile.id) {
+                tokenCache[profile.id] = keychainToken
+                resolvedProfile.token = keychainToken
+            }
         }
 
         let client = GatewayClient(profile: resolvedProfile)
