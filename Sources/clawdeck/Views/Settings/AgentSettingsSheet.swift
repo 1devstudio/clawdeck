@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Settings sheet for configuring agent identity, gateway connection, and model settings.
 struct AgentSettingsSheet: View {
@@ -151,11 +152,18 @@ struct AgentSettingsSheet: View {
                                 .fill(viewModel.agentAccentColor.opacity(0.2))
                                 .frame(width: 40, height: 40)
 
-                            if let icon = viewModel.selectedIcon {
-                                Image(systemName: icon)
+                            switch viewModel.avatarSelection {
+                            case .sfSymbol(let name):
+                                Image(systemName: name)
                                     .font(.system(size: 18))
                                     .foregroundStyle(viewModel.agentAccentColor)
-                            } else {
+                            case .customImage(let image, _):
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 36, height: 36)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            case .none:
                                 Text(String(viewModel.agentDisplayName.prefix(2)).uppercased())
                                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                                     .foregroundStyle(viewModel.agentAccentColor)
@@ -163,13 +171,13 @@ struct AgentSettingsSheet: View {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(viewModel.selectedIcon ?? "Initials")
+                            Text(avatarSelectionLabel)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
-                            if viewModel.selectedIcon != nil {
+                            if viewModel.avatarSelection != .none {
                                 Button("Clear") {
-                                    viewModel.selectedIcon = nil
+                                    viewModel.avatarSelection = .none
                                 }
                                 .font(.caption)
                                 .buttonStyle(.plain)
@@ -178,15 +186,54 @@ struct AgentSettingsSheet: View {
                         }
                     }
 
-                    // Icon grid
+                    // SF Symbol grid
                     IconPickerGrid(
-                        selectedIcon: $viewModel.selectedIcon,
+                        selectedIcon: $viewModel.selectedSFSymbol,
                         accentColor: viewModel.agentAccentColor
                     )
+
+                    // Upload custom image
+                    Button {
+                        pickAvatarImage()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.system(size: 12))
+                            Text("Upload Image…")
+                                .font(.system(size: 12))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.12))
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.vertical, 2)
         }
+    }
+
+    private var avatarSelectionLabel: String {
+        switch viewModel.avatarSelection {
+        case .none: return "Initials"
+        case .sfSymbol(let name): return name
+        case .customImage: return "Custom Image"
+        }
+    }
+
+    private func pickAvatarImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .heic]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select an avatar image"
+        panel.prompt = "Choose"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        viewModel.selectCustomImage(from: url)
     }
 
     private var gatewayConnectionSection: some View {

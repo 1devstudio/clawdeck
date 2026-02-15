@@ -50,8 +50,48 @@ final class AgentSettingsViewModel {
     /// Primary model (from agents.defaults.model.primary).
     var primaryModel: String = ""
 
-    /// Selected SF Symbol icon for the agent rail (from AgentBinding.localAvatarName).
-    var selectedIcon: String?
+    /// Represents the three possible avatar states.
+    enum AvatarSelection: Equatable {
+        case none
+        case sfSymbol(String)
+        case customImage(NSImage, filename: String?)
+
+        static func == (lhs: AvatarSelection, rhs: AvatarSelection) -> Bool {
+            switch (lhs, rhs) {
+            case (.none, .none): return true
+            case (.sfSymbol(let a), .sfSymbol(let b)): return a == b
+            case (.customImage(_, let a), .customImage(_, let b)): return a == b
+            default: return false
+            }
+        }
+    }
+
+    /// Current avatar selection for the agent rail.
+    var avatarSelection: AvatarSelection = .none
+
+    /// Convenience binding for IconPickerGrid — selecting an SF Symbol clears any custom image.
+    var selectedSFSymbol: String? {
+        get {
+            if case .sfSymbol(let name) = avatarSelection { return name }
+            return nil
+        }
+        set {
+            if let name = newValue {
+                avatarSelection = .sfSymbol(name)
+            } else if case .sfSymbol = avatarSelection {
+                avatarSelection = .none
+            }
+        }
+    }
+
+    /// Handle a user-selected image file from the file picker.
+    func selectCustomImage(from url: URL) {
+        guard let image = NSImage(contentsOf: url) else {
+            errorMessage = "Could not load image from selected file"
+            return
+        }
+        avatarSelection = .customImage(image, filename: nil)
+    }
     
     // MARK: - Gateway Connection (local settings)
     
@@ -166,6 +206,7 @@ final class AgentSettingsViewModel {
         // Snapshot originals for dirty detection
         originalAgentName = agentDisplayName
         originalAgentEmoji = agentEmoji
+        originalAgentAccentColor = agentAccentColor
         originalPrimaryModel = primaryModel
     }
     
@@ -176,9 +217,18 @@ final class AgentSettingsViewModel {
         if let binding = appViewModel.activeBinding {
             currentBinding = binding
 
-            // Load icon from binding's localAvatarName (stored as "sf:symbolname")
-            if let avatarName = binding.localAvatarName, avatarName.hasPrefix("sf:") {
-                selectedIcon = String(avatarName.dropFirst(3))
+            // Use the app's current accent color as immediate default
+            if let accentColor = appViewModel.customAccentColor {
+                agentAccentColor = accentColor
+            }
+
+            // Load avatar from binding's localAvatarName
+            if let avatarName = binding.localAvatarName, !avatarName.isEmpty {
+                if avatarName.hasPrefix("sf:") {
+                    avatarSelection = .sfSymbol(String(avatarName.dropFirst(3)))
+                } else if let image = AvatarImageManager.loadAvatar(named: avatarName) {
+                    avatarSelection = .customImage(image, filename: avatarName)
+                }
             }
             
             if let profile = appViewModel.gatewayManager.gatewayProfiles.first(where: { $0.id == binding.gatewayId }) {
@@ -354,11 +404,29 @@ final class AgentSettingsViewModel {
                 binding.localDisplayName = nil
             }
 
-            // Icon (stored as "sf:symbolname")
-            if let icon = selectedIcon {
-                binding.localAvatarName = "sf:\(icon)"
-            } else {
+            // Avatar (SF Symbol or custom image)
+            switch avatarSelection {
+            case .none:
+                if let oldName = binding.localAvatarName, !oldName.hasPrefix("sf:") {
+                    AvatarImageManager.deleteAvatar(named: oldName)
+                }
                 binding.localAvatarName = nil
+
+            case .sfSymbol(let name):
+                if let oldName = binding.localAvatarName, !oldName.hasPrefix("sf:") {
+                    AvatarImageManager.deleteAvatar(named: oldName)
+                }
+                binding.localAvatarName = "sf:\(name)"
+
+            case .customImage(let image, _):
+                do {
+                    let filename = try AvatarImageManager.saveAvatar(
+                        image: image, bindingId: binding.id
+                    )
+                    binding.localAvatarName = filename
+                } catch {
+                    errorMessage = "Failed to save avatar: \(error.localizedDescription)"
+                }
             }
             
             // Update through the gateway manager
@@ -427,6 +495,7 @@ final class AgentSettingsViewModel {
     private var originalGatewayHost = ""
     private var originalGatewayPort = ""
     private var originalGatewayUseTLS = true
+    private var originalAgentAccentColor: Color = .blue
     private var originalGatewayToken = ""
 
     /// Check if settings have unsaved changes.
@@ -438,7 +507,8 @@ final class AgentSettingsViewModel {
     var hasGatewayConfigChanges: Bool {
         agentDisplayName != originalAgentName ||
         agentEmoji != originalAgentEmoji ||
-        primaryModel != originalPrimaryModel
+        primaryModel != originalPrimaryModel ||
+        agentAccentColor != originalAgentAccentColor
     }
 
     /// Whether only local/profile fields changed (no restart needed).
