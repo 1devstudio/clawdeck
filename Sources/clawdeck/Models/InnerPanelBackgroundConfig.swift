@@ -2,6 +2,7 @@ import SwiftUI
 
 /// The two supported inner-panel background modes.
 enum InnerPanelBackgroundMode: String, CaseIterable, Identifiable {
+    case none = "none"
     case solidColor = "solidColor"
     case unsplash = "unsplash"
 
@@ -9,6 +10,7 @@ enum InnerPanelBackgroundMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .none: return "None"
         case .solidColor: return "Solid Color"
         case .unsplash: return "Unsplash Image"
         }
@@ -23,7 +25,7 @@ struct InnerPanelBackgroundConfig: Equatable {
     let unsplashPhotographer: String
 
     static let `default` = InnerPanelBackgroundConfig(
-        mode: .solidColor,
+        mode: .none,
         colorHex: "#1E1E2E",
         unsplashURL: "",
         unsplashPhotographer: ""

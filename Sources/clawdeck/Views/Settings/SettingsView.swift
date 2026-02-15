@@ -36,7 +36,7 @@ struct AppearanceSettingsView: View {
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
 
-    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.solidColor.rawValue
+    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.none.rawValue
     @AppStorage("bgSolidColorHex") private var bgSolidColorHex: String = "#1E1E2E"
     @AppStorage("bgUnsplashURL") private var bgUnsplashURL: String = ""
     @AppStorage("bgUnsplashPhotographer") private var bgUnsplashPhotographer: String = ""
@@ -60,7 +60,7 @@ struct AppearanceSettingsView: View {
 
     private var bgMode: Binding<InnerPanelBackgroundMode> {
         Binding(
-            get: { InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .solidColor },
+            get: { InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .none },
             set: { bgModeRaw = $0.rawValue }
         )
     }
@@ -75,7 +75,9 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if bgModeRaw == InnerPanelBackgroundMode.solidColor.rawValue {
+                if bgModeRaw == InnerPanelBackgroundMode.none.rawValue {
+                    // No extra controls needed
+                } else if bgModeRaw == InnerPanelBackgroundMode.solidColor.rawValue {
                     ColorPicker("Color", selection: $solidColor, supportsOpacity: false)
                         .onChange(of: solidColor) { _, newColor in
                             bgSolidColorHex = hexFromColor(newColor)

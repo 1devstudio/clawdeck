@@ -5,6 +5,7 @@ import AppKit
 /// Reads from the `innerPanelBackground` environment value.
 struct InnerPanelBackground: View {
     @Environment(\.innerPanelBackground) private var config
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var cachedImage: NSImage?
     @State private var isLoading = false
@@ -12,6 +13,10 @@ struct InnerPanelBackground: View {
     var body: some View {
         GeometryReader { geo in
             switch config.mode {
+            case .none:
+                Rectangle()
+                    .fill(Color(nsColor: adaptiveBackgroundColor))
+
             case .solidColor:
                 Rectangle()
                     .fill(Color(hex: config.colorHex))
@@ -32,6 +37,12 @@ struct InnerPanelBackground: View {
         .task(id: config.unsplashURL) {
             await loadUnsplashImage()
         }
+    }
+
+    private var adaptiveBackgroundColor: NSColor {
+        let base = NSColor.windowBackgroundColor
+        let blendColor: NSColor = colorScheme == .dark ? .white : .black
+        return base.blended(withFraction: 0.06, of: blendColor) ?? base
     }
 
     private func loadUnsplashImage() async {
