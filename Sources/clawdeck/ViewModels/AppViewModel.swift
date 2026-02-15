@@ -67,6 +67,15 @@ final class AppViewModel {
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
+    /// Cached list of available models from the active gateway.
+    var availableModels: [GatewayModel] = []
+
+    /// The agent-level default model ID (from SessionsListResult.defaults.model).
+    var defaultModelId: String?
+
+    /// The agent-level default model provider (from SessionsListResult.defaults.modelProvider).
+    var defaultModelProvider: String?
+
     /// Custom accent color set from Agent Settings. Applied app-wide.
     var customAccentColor: Color?
 
@@ -146,6 +155,9 @@ final class AppViewModel {
         allGatewaySessions.removeAll()
         sessions.removeAll()
         selectedSessionKey = nil
+        availableModels.removeAll()
+        defaultModelId = nil
+        defaultModelProvider = nil
         messageStore.clearAll()
         chatViewModels.removeAll()
     }
@@ -157,7 +169,8 @@ final class AppViewModel {
         AppLogger.info("Loading initial data...", category: "Session")
         await refreshAgents()
         await refreshSessions()
-        AppLogger.info("Loaded \(agents.count) agents, \(sessions.count) sessions", category: "Session")
+        await fetchModels()
+        AppLogger.info("Loaded \(agents.count) agents, \(sessions.count) sessions, \(availableModels.count) models", category: "Session")
     }
 
     /// Refresh agents from all connected gateways.
@@ -190,6 +203,10 @@ final class AppViewModel {
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
                 allGatewaySessions.map { ($0.key, $0.createdAt) }
             )
+
+            // Store default model info from the gateway response
+            defaultModelId = result.defaults?.model
+            defaultModelProvider = result.defaults?.modelProvider
 
             allGatewaySessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
@@ -224,6 +241,48 @@ final class AppViewModel {
         if let selectedKey = selectedSessionKey,
            !sessions.contains(where: { $0.key == selectedKey }) {
             selectedSessionKey = nil
+        }
+    }
+
+    // MARK: - Models
+
+    /// Fetch available models from the active gateway and cache them.
+    func fetchModels() async {
+        guard let client = activeClient else {
+            availableModels = []
+            return
+        }
+        do {
+            let result = try await client.modelsList()
+            availableModels = result.models
+            AppLogger.info("Fetched \(result.models.count) models from gateway", category: "Session")
+        } catch {
+            AppLogger.error("Failed to fetch models: \(error)", category: "Session")
+            // Keep any previously cached models
+        }
+    }
+
+    /// Set a model override for a session. Pass `nil` to reset to default.
+    ///
+    /// Sends `sessions.patch` with the model (or "default" to reset),
+    /// then updates the local session object.
+    func setSessionModel(_ modelId: String?, for sessionKey: String) async {
+        guard let client = activeClient else { return }
+        let patchModel = modelId ?? "default"
+        do {
+            try await client.patchSession(key: sessionKey, model: patchModel)
+            // Update the local session
+            if let session = sessions.first(where: { $0.key == sessionKey }) {
+                session.model = modelId
+                if let modelId, let gatewayModel = availableModels.first(where: { $0.id == modelId }) {
+                    session.modelProvider = gatewayModel.provider
+                } else {
+                    session.modelProvider = nil
+                }
+            }
+            AppLogger.info("Set model for \(sessionKey): \(patchModel)", category: "Session")
+        } catch {
+            AppLogger.error("Failed to set model for \(sessionKey): \(error)", category: "Session")
         }
     }
 

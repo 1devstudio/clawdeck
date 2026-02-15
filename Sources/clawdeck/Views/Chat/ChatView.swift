@@ -141,6 +141,12 @@ struct ChatView: View {
                 },
                 onRemoveAttachment: { attachment in
                     viewModel.removeAttachment(attachment)
+                },
+                currentModel: viewModel.currentModelId,
+                defaultModel: viewModel.defaultModelId,
+                availableModels: viewModel.availableModels,
+                onSelectModel: { modelId in
+                    Task { await viewModel.selectModel(modelId) }
                 }
             )
         }

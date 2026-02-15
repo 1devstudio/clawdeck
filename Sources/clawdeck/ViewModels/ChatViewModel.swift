@@ -112,6 +112,26 @@ final class ChatViewModel {
         appViewModel.messageStore.streamingContentVersion
     }
 
+    /// Available models from the gateway (relayed from AppViewModel).
+    var availableModels: [GatewayModel] {
+        appViewModel.availableModels
+    }
+
+    /// The session's per-session model override (nil = using agent default).
+    var currentModelId: String? {
+        session?.model
+    }
+
+    /// The agent-level default model ID.
+    var defaultModelId: String? {
+        appViewModel.defaultModelId
+    }
+
+    /// Set a model override for this session. Pass `nil` to reset to default.
+    func selectModel(_ modelId: String?) async {
+        await appViewModel.setSessionModel(modelId, for: sessionKey)
+    }
+
     /// Display name of the active agent (from the connection profile).
     var agentDisplayName: String {
         appViewModel.activeBinding?.displayName(from: appViewModel.gatewayManager) ?? "Assistant"
