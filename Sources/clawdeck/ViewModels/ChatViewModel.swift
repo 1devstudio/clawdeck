@@ -207,9 +207,10 @@ final class ChatViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-        // Clear all active states so the indicator disappears immediately
+        // Clear all active states so the indicator and abort button disappear immediately
         isSending = false
         isAwaitingResponse = false
+        appViewModel.messageStore.finalizeStreaming(for: sessionKey)
     }
 
     /// Load or reload chat history.

@@ -206,6 +206,16 @@ final class MessageStore {
         streamingMessages.values.contains { $0.sessionKey == sessionKey }
     }
 
+    /// Finalize all active streaming messages for a session (e.g. after abort).
+    /// Marks them as complete so the UI stops showing the typing indicator.
+    func finalizeStreaming(for sessionKey: String) {
+        let keys = streamingMessages.filter { $0.value.sessionKey == sessionKey }.map(\.key)
+        for key in keys {
+            streamingMessages[key]?.state = .complete
+            streamingMessages.removeValue(forKey: key)
+        }
+    }
+
     // MARK: - Cleanup
 
     /// Remove all messages for a session.
