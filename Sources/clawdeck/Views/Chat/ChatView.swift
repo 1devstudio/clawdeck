@@ -50,8 +50,8 @@ struct ChatView: View {
                             .id(message.id)
                         }
 
-                        if viewModel.isStreaming && viewModel.messages.last?.state != .streaming {
-                            // Show typing indicator while waiting for first delta
+                        if viewModel.isSending || (viewModel.isStreaming && viewModel.messages.last?.state != .streaming) {
+                            // Show typing indicator immediately after send and while waiting for first delta
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
@@ -76,6 +76,9 @@ struct ChatView: View {
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     scrollToBottom(proxy: proxy)
+                }
+                .onChange(of: viewModel.isSending) { _, isSending in
+                    if isSending { scrollToBottom(proxy: proxy) }
                 }
                 .onChange(of: viewModel.isStreaming) { _, _ in
                     scrollToBottom(proxy: proxy)
