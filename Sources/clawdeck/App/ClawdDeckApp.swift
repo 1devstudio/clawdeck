@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        for subview in view.subviews {
+        for subview in view.subviews as [NSView] {
             stripToolbarContainerBackgrounds(in: subview)
         }
     }
@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
-    @State private var isLogWindowPresented = false
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
@@ -170,7 +170,7 @@ struct ClawdDeckApp: App {
                 Divider()
                 
                 Button("Application Log") {
-                    isLogWindowPresented = true
+                    openWindow(id: "application-log")
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
             }
@@ -183,7 +183,7 @@ struct ClawdDeckApp: App {
                 .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
         }
         
-        Window("Application Log", id: "application-log", isPresented: $isLogWindowPresented) {
+        Window("Application Log", id: "application-log") {
             LogView()
                 .environment(\.messageTextSize, messageTextSize)
                 .environment(\.codeHighlightTheme, codeHighlightTheme)

@@ -77,7 +77,7 @@ final class AppLogger {
     
     // MARK: - Storage
     
-    @AppStorage("logLevel") private var logLevelRaw: String = AppLogLevel.info.rawValue
+    @ObservationIgnored @AppStorage("logLevel") private var logLevelRaw: String = AppLogLevel.info.rawValue
     private var _entries: [AppLogEntry] = []
     private let maxEntries = 5000
     private let lock = NSLock()
@@ -133,19 +133,19 @@ final class AppLogger {
     
     // MARK: - Static Convenience Methods
     
-    static func debug(_ message: String, category: String = "General") {
-        shared.log(.debug, message: message, category: category)
+    nonisolated static func debug(_ message: String, category: String = "General") {
+        Task { @MainActor in shared.log(.debug, message: message, category: category) }
     }
-    
-    static func info(_ message: String, category: String = "General") {
-        shared.log(.info, message: message, category: category)
+
+    nonisolated static func info(_ message: String, category: String = "General") {
+        Task { @MainActor in shared.log(.info, message: message, category: category) }
     }
-    
-    static func warning(_ message: String, category: String = "General") {
-        shared.log(.warning, message: message, category: category)
+
+    nonisolated static func warning(_ message: String, category: String = "General") {
+        Task { @MainActor in shared.log(.warning, message: message, category: category) }
     }
-    
-    static func error(_ message: String, category: String = "General") {
-        shared.log(.error, message: message, category: category)
+
+    nonisolated static func error(_ message: String, category: String = "General") {
+        Task { @MainActor in shared.log(.error, message: message, category: category) }
     }
 }
