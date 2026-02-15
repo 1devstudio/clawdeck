@@ -21,90 +21,50 @@ swift build
 swift run ClawdDeck
 ```
 
-## Connect
+## Connecting to Your Gateway
 
-1. Launch Clawd Deck
-2. Enter your gateway address (default: localhost:18789)
-3. Enter your gateway token (if configured)
-4. Click Connect
+ClawDeck connects to a running [Clawdbot](https://github.com/clawdbot/clawdbot) gateway. You'll need three things:
 
-## VPS Connection Setup Guide
+| Setting | Description | Example |
+|---------|-------------|---------|
+| **Host** | Your gateway's domain or IP | `my-server.example.com` |
+| **Port** | 443 for TLS, 18789 for local | `443` |
+| **Token** | Gateway auth token | `8321e17a...` |
 
-To connect ClawDeck to a remote server or VPS, you'll need to set up a Clawdbot gateway on your server.
+### Getting Your Connection Details
 
-### Prerequisites
+If your Clawdbot agent is already running, you can ask it directly in any connected channel (Telegram, webchat, etc.):
 
-- A VPS or server (any Linux distribution)
-- Node.js 20 or later installed on the server
-- Basic command line access to your server
+> **You:** *What's my gateway URL and auth token for ClawDeck?*
 
-### Installing Clawdbot Gateway
+The agent has access to the gateway config and Caddy setup, so it can look up and provide:
+- The external hostname from your Caddyfile or reverse proxy config
+- The auth token from the gateway config
+- The correct port and TLS settings
 
-Install the Clawdbot CLI globally on your server:
+### Manual Lookup
 
-```bash
-# Using pnpm (recommended)
-pnpm install -g clawdbot
-
-# Or using npm
-npm install -g clawdbot
-```
-
-### Gateway Configuration
-
-1. Initialize the gateway configuration:
-   ```bash
-   clawdbot init
-   ```
-
-2. Edit the generated configuration file to customize your setup. The config includes:
-   - Port settings (default: 18789 for local, 443 for TLS)
-   - Authentication tokens
-   - SSL/TLS certificates (if enabled)
-
-### TLS/SSL Setup
-
-For secure remote connections, we recommend using HTTPS/WSS:
-
-**Option 1: Reverse Proxy (Recommended)**
-- Set up nginx or Caddy as a reverse proxy
-- Use Let's Encrypt for automatic SSL certificates
-- Configure the proxy to forward WebSocket connections to your gateway
-
-**Option 2: Cloudflare Tunnel**
-- Use Cloudflare's tunnel service for secure access without port forwarding
-- No need to expose ports or manage certificates directly
-
-### Firewall Configuration
-
-Open the required port in your server's firewall:
+If you prefer to find the details yourself:
 
 ```bash
-# For TLS connections (port 443)
-sudo ufw allow 443
+# Gateway auth token
+cat ~/.clawdbot/clawdbot.json | python3 -c "import json,sys; print(json.load(sys.stdin)['gateway']['auth']['token'])"
 
-# For local/non-TLS connections (port 18789)
-sudo ufw allow 18789
+# External hostname (if using Caddy)
+grep -E '^[a-zA-Z0-9]' /etc/caddy/Caddyfile | head -1
+
+# Gateway port
+cat ~/.clawdbot/clawdbot.json | python3 -c "import json,sys; print(json.load(sys.stdin)['gateway']['port'])"
 ```
 
-### Getting Your Gateway Token
+### Connection Setup
 
-After initialization, find your gateway token in the configuration file:
+1. Launch ClawDeck
+2. Enter your **Host**, **Port**, and **Token**
+3. Enable **TLS** if connecting over the internet (port 443)
+4. Click **Connect**
 
-```bash
-cat ~/.config/clawdbot/config.json | grep token
-```
-
-### Connecting from ClawDeck
-
-1. In ClawDeck's connection setup, enter:
-   - **Host**: Your server's IP address or domain
-   - **Port**: 443 (for TLS) or 18789 (for local)
-   - **Token**: The token from your gateway config
-
-2. Click Connect to establish the connection
-
-For detailed setup instructions and troubleshooting, visit the [Clawdbot documentation](https://docs.clawd.bot).
+For gateway installation and configuration, see the [Clawdbot documentation](https://docs.clawd.bot).
 
 ## Features
 
