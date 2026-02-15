@@ -18,7 +18,7 @@ Or via command line:
 
 ```bash
 swift build
-swift run clawddeck
+swift run clawdeck
 ```
 
 ## Connecting to Your Gateway
