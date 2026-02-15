@@ -37,6 +37,9 @@ Pods/
 # Background assets (user-local, not for distribution)
 background/
 
+# Build distribution output
+dist/
+
 # IDE
 .idea/
 .vscode/
