@@ -66,6 +66,65 @@ cat ~/.clawdbot/clawdbot.json | python3 -c "import json,sys; print(json.load(sys
 
 For gateway installation and configuration, see the [Clawdbot documentation](https://docs.clawd.bot).
 
+### Securing Your VPS
+
+The Clawdbot gateway listens on `localhost:18789` by default and is **not exposed to the internet**. To connect from ClawDeck remotely, you need a reverse proxy with TLS.
+
+**1. Point a domain to your VPS**
+
+Add an A record for your domain (e.g. `gateway.example.com`) pointing to your VPS IP address.
+
+**2. Install Caddy** (recommended — automatic HTTPS via Let's Encrypt)
+
+```bash
+sudo apt install -y caddy
+```
+
+**3. Configure the reverse proxy**
+
+Edit `/etc/caddy/Caddyfile`:
+
+```
+gateway.example.com {
+    reverse_proxy localhost:18789
+}
+```
+
+Caddy will automatically obtain and renew a TLS certificate for your domain.
+
+```bash
+sudo systemctl restart caddy
+```
+
+**4. Configure the firewall**
+
+Only expose HTTPS — keep the gateway port closed to the outside:
+
+```bash
+# Allow HTTPS (Caddy handles TLS termination)
+sudo ufw allow 443/tcp
+
+# Allow SSH (so you don't lock yourself out)
+sudo ufw allow 22/tcp
+
+# Enable firewall
+sudo ufw enable
+
+# Verify — port 18789 should NOT be listed
+sudo ufw status
+```
+
+**5. Connect from ClawDeck**
+
+| Setting | Value |
+|---------|-------|
+| Host | `gateway.example.com` |
+| Port | `443` |
+| TLS | ✅ Enabled |
+| Token | Your gateway auth token |
+
+> **Tip:** The gateway auth token is your only authentication layer. Use a strong token and never commit it to version control. You can regenerate it in `~/.clawdbot/clawdbot.json` under `gateway.auth.token`.
+
 ## Features
 
 - Multiple agent support
