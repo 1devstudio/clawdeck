@@ -147,6 +147,7 @@ struct MessageBubble: View {
                     }
                 }
             }
+            .contentShape(Rectangle())
             .onHover { hovering in
                 isHovered = hovering
             }
