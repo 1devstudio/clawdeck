@@ -96,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
+    @State private var isLogWindowPresented = false
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
@@ -165,6 +166,13 @@ struct ClawdDeckApp: App {
                     appViewModel.isInspectorVisible.toggle()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+                
+                Divider()
+                
+                Button("Application Log") {
+                    isLogWindowPresented = true
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
             }
         }
 
@@ -174,5 +182,14 @@ struct ClawdDeckApp: App {
                 .environment(\.codeHighlightTheme, codeHighlightTheme)
                 .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
         }
+        
+        Window("Application Log", id: "application-log", isPresented: $isLogWindowPresented) {
+            LogView()
+                .environment(\.messageTextSize, messageTextSize)
+                .environment(\.codeHighlightTheme, codeHighlightTheme)
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 1000, height: 600)
     }
 }

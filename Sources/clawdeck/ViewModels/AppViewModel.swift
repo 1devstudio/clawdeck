@@ -154,10 +154,10 @@ final class AppViewModel {
 
     /// Load agents and sessions after connecting.
     func loadInitialData() async {
-        print("[AppViewModel] Loading initial data...")
+        AppLogger.info("Loading initial data...", category: "Session")
         await refreshAgents()
         await refreshSessions()
-        print("[AppViewModel] Loaded \(agents.count) agents, \(sessions.count) sessions")
+        AppLogger.info("Loaded \(agents.count) agents, \(sessions.count) sessions", category: "Session")
     }
 
     /// Refresh agents from all connected gateways.
@@ -170,7 +170,7 @@ final class AppViewModel {
         }
         
         agents = allAgents
-        print("[AppViewModel] Loaded \(agents.count) agents from \(gatewayManager.agentSummaries.count) gateways")
+        AppLogger.info("Loaded \(agents.count) agents from \(gatewayManager.agentSummaries.count) gateways", category: "Session")
     }
 
     /// Refresh sessions from the active binding's gateway.
@@ -184,7 +184,7 @@ final class AppViewModel {
         
         do {
             let result = try await client.listSessions()
-            print("[AppViewModel] sessions.list returned \(result.sessions.count) sessions for gateway \(binding.gatewayId)")
+            AppLogger.debug("sessions.list returned \(result.sessions.count) sessions for gateway \(binding.gatewayId)", category: "Session")
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
@@ -205,7 +205,7 @@ final class AppViewModel {
             // Filter to the active agent
             filterSessionsToActiveAgent()
         } catch {
-            print("[AppViewModel] Failed to list sessions: \(error)")
+            AppLogger.error("Failed to list sessions: \(error)", category: "Session")
         }
     }
 
@@ -235,24 +235,24 @@ final class AppViewModel {
 
         // Already have messages — nothing to load.
         guard !messageStore.hasMessages(for: sessionKey) else {
-            print("[AppViewModel] selectSession(\(sessionKey)): already has messages, skipping")
+            AppLogger.debug("selectSession(\(sessionKey)): already has messages, skipping", category: "Session")
             return
         }
 
         // Already loading this exact session — don't cancel and restart.
         guard historyLoadingKey != sessionKey else {
-            print("[AppViewModel] selectSession(\(sessionKey)): already loading, skipping")
+            AppLogger.debug("selectSession(\(sessionKey)): already loading, skipping", category: "Session")
             return
         }
 
         // Cancel any in-flight load for a *different* session.
         if let previousKey = historyLoadingKey {
-            print("[AppViewModel] selectSession(\(sessionKey)): cancelling load for \(previousKey)")
+            AppLogger.debug("selectSession(\(sessionKey)): cancelling load for \(previousKey)", category: "Session")
         }
         historyLoadTask?.cancel()
         historyLoadingKey = sessionKey
 
-        print("[AppViewModel] selectSession(\(sessionKey)): starting history load")
+        AppLogger.debug("selectSession(\(sessionKey)): starting history load", category: "Session")
         let task = Task { await loadHistory(for: sessionKey) }
         historyLoadTask = task
         await task.value
@@ -282,15 +282,15 @@ final class AppViewModel {
 
             // If we got here, the load failed (likely connection dropped).
             // Wait for actual reconnection before retrying with a smaller limit.
-            print("[AppViewModel] History load failed with limit=\(limit), waiting for reconnection...")
+            AppLogger.warning("History load failed with limit=\(limit), waiting for reconnection...", category: "Session")
             let reconnected = await waitForReconnection(timeout: 15)
             guard reconnected else {
-                print("[AppViewModel] ❌ Reconnection timed out for \(sessionKey)")
+                AppLogger.error("Reconnection timed out for \(sessionKey)", category: "Session")
                 return
             }
-            print("[AppViewModel] Reconnected, retrying with smaller limit...")
+            AppLogger.info("Reconnected, retrying with smaller limit...", category: "Session")
         }
-        print("[AppViewModel] ❌ All history load attempts failed for \(sessionKey)")
+        AppLogger.error("All history load attempts failed for \(sessionKey)", category: "Session")
     }
 
     /// Whether the active binding's gateway is connected.
@@ -326,7 +326,7 @@ final class AppViewModel {
             guard !Task.isCancelled else { return false }
 
             guard response.ok, let payload = response.payload else {
-                print("[AppViewModel] chat.history failed: \(response.error?.message ?? "unknown")")
+                AppLogger.error("chat.history failed: \(response.error?.message ?? "unknown")", category: "Session")
                 return false
             }
 
@@ -335,7 +335,7 @@ final class AppViewModel {
             let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
             let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
 
-            print("[AppViewModel] chat.history returned \(rawMessages.count) raw messages for \(sessionKey) (limit=\(limit))")
+            AppLogger.debug("chat.history returned \(rawMessages.count) raw messages for \(sessionKey) (limit=\(limit))", category: "Session")
 
             let allMessages = rawMessages.enumerated().compactMap { index, raw in
                 ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
@@ -346,20 +346,20 @@ final class AppViewModel {
             // around tool calls, but the user sees them as one reply.
             let messages = Self.mergeConsecutiveAssistantMessages(allMessages)
 
-            print("[AppViewModel] \(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages")
+            AppLogger.debug("\(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages", category: "Session")
             messageStore.setMessages(messages, for: sessionKey)
             return true
         } catch is CancellationError {
             // Expected when the user switches sessions before the load completes.
-            print("[AppViewModel] History load cancelled (task cancellation) for \(sessionKey)")
+            AppLogger.debug("History load cancelled (task cancellation) for \(sessionKey)", category: "Session")
             return false
         } catch GatewayClientError.cancelled {
             // Thrown when the WebSocket disconnects and all pending requests
             // are flushed (e.g. reconnection). Not a user-initiated cancel.
-            print("[AppViewModel] History load interrupted (connection lost, limit=\(limit)) for \(sessionKey)")
+            AppLogger.warning("History load interrupted (connection lost, limit=\(limit)) for \(sessionKey)", category: "Session")
             return false
         } catch {
-            print("[AppViewModel] ❌ Failed to load history for \(sessionKey): \(type(of: error)) — \(error.localizedDescription)")
+            AppLogger.error("Failed to load history for \(sessionKey): \(type(of: error)) — \(error.localizedDescription)", category: "Session")
             return false
         }
     }
@@ -387,9 +387,9 @@ final class AppViewModel {
             if let session = sessions.first(where: { $0.key == sessionKey }) {
                 session.label = label
             }
-            print("[AppViewModel] Renamed session \(sessionKey) to '\(label)'")
+            AppLogger.info("Renamed session \(sessionKey) to '\(label)'", category: "Session")
         } catch {
-            print("[AppViewModel] ❌ Failed to rename session: \(error)")
+            AppLogger.error("Failed to rename session: \(error)", category: "Session")
         }
     }
 
@@ -411,7 +411,7 @@ final class AppViewModel {
         )
         sessions.insert(newSession, at: 0)
         selectedSessionKey = sessionKey
-        print("[AppViewModel] Created new session: \(sessionKey)")
+        AppLogger.info("Created new session: \(sessionKey)", category: "Session")
     }
 
     // MARK: - Accent Color
@@ -470,12 +470,12 @@ final class AppViewModel {
         }
         
         guard let payload = event.payload else {
-            print("[AppViewModel] chat event has no payload")
+            AppLogger.warning("chat event has no payload", category: "Protocol")
             return
         }
         do {
             let chatEvent = try payload.decode(ChatEventPayload.self)
-            print("[AppViewModel] chat event: state=\(chatEvent.state) runId=\(chatEvent.runId) sessionKey=\(chatEvent.sessionKey) content=\(chatEvent.message?.content?.prefix(80) ?? "nil")")
+            AppLogger.debug("chat event: state=\(chatEvent.state) runId=\(chatEvent.runId) sessionKey=\(chatEvent.sessionKey) content=\(chatEvent.message?.content?.prefix(80) ?? "nil")", category: "Protocol")
             messageStore.handleChatEvent(chatEvent)
 
             // Update session's last message preview (but don't change updatedAt
@@ -491,13 +491,13 @@ final class AppViewModel {
                 }
             }
         } catch {
-            print("[AppViewModel] ❌ Failed to decode chat event: \(error)")
+            AppLogger.error("Failed to decode chat event: \(error)", category: "Protocol")
             // Log the raw payload for debugging
             if let dict = payload.dictValue {
-                print("[AppViewModel] Raw payload keys: \(dict.keys.sorted())")
+                AppLogger.debug("Raw payload keys: \(dict.keys.sorted())", category: "Protocol")
                 if let msg = dict["message"] as? [String: Any] {
-                    print("[AppViewModel] message keys: \(msg.keys.sorted())")
-                    print("[AppViewModel] content type: \(type(of: msg["content"] as Any))")
+                    AppLogger.debug("message keys: \(msg.keys.sorted())", category: "Protocol")
+                    AppLogger.debug("content type: \(type(of: msg["content"] as Any))", category: "Protocol")
                 }
             }
         }

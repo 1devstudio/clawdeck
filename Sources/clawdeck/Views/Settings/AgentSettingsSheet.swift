@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import Foundation
 
 /// Settings sheet for configuring agent identity, gateway connection, and model settings.
 struct AgentSettingsSheet: View {
@@ -664,7 +665,7 @@ struct ModelPicker: View {
                 .map { ModelOption(qualifiedId: "\($0.provider)/\($0.id)", displayName: $0.name, provider: $0.provider) }
                 .sorted { $0.displayName < $1.displayName }
         } catch {
-            print("[ModelPicker] Failed to load models: \(error)")
+            AppLogger.error("Failed to load models: \(error)", category: "UI")
         }
 
         isLoading = false
