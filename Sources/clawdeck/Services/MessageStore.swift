@@ -105,20 +105,29 @@ final class MessageStore {
             if let existing = streamingMessages[runId] {
                 // The gateway sends cumulative text within each text segment,
                 // but resets to a short string when a new segment begins
-                // (e.g. after tool calls). We detect this by checking if the
-                // new content is a prefix of what we already have — if not,
-                // a new segment started.
+                // (e.g. after tool calls).
+                //
+                // Detection logic:
+                // 1. newContent is shorter AND is a prefix of current → stale/duplicate delta, skip
+                // 2. newContent is shorter AND is NOT a prefix → new segment started
+                // 3. newContent is longer or equal → same segment growing, replace
                 let currentSegmentText = String(existing.content.suffix(from: existing.content.index(existing.content.startIndex, offsetBy: existing.segmentOffset)))
 
-                if !newContent.isEmpty && !currentSegmentText.hasPrefix(newContent) && newContent.count < currentSegmentText.count {
-                    // New segment — keep accumulated text + append new
-                    if !existing.content.isEmpty {
-                        existing.content += "\n\n"
+                if !newContent.isEmpty && newContent.count < currentSegmentText.count {
+                    if currentSegmentText.hasPrefix(newContent) {
+                        // Stale delta — shorter prefix of what we already have. Skip it
+                        // to avoid truncating accumulated content at tool-call boundaries.
+                    } else {
+                        // New segment — different and shorter content means the gateway
+                        // reset for a new text block (e.g. after a tool call).
+                        if !existing.content.isEmpty {
+                            existing.content += "\n\n"
+                        }
+                        existing.segmentOffset = existing.content.count
+                        existing.content += newContent
                     }
-                    existing.segmentOffset = existing.content.count
-                    existing.content += newContent
                 } else {
-                    // Same segment growing — replace from segment offset
+                    // Same segment growing (or equal) — replace from segment offset
                     let prefix = String(existing.content.prefix(existing.segmentOffset))
                     existing.content = prefix + newContent
                 }
@@ -148,11 +157,16 @@ final class MessageStore {
                     if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         // No delta content — use final directly
                         existing.content = content
-                    } else if !currentSegmentText.hasPrefix(content) && content.count < currentSegmentText.count {
-                        // Final is a new segment
-                        existing.content += "\n\n" + content
+                    } else if content.count < currentSegmentText.count {
+                        if currentSegmentText.hasPrefix(content) {
+                            // Final has shorter prefix of current segment — keep accumulated content
+                            // (don't truncate what we already have)
+                        } else {
+                            // Final is a new segment
+                            existing.content += "\n\n" + content
+                        }
                     } else {
-                        // Final replaces current segment (complete version)
+                        // Final replaces current segment (complete version, equal or longer)
                         let prefix = String(existing.content.prefix(existing.segmentOffset))
                         existing.content = prefix + content
                     }
