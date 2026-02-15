@@ -34,6 +34,9 @@ Pods/
 *~.nib
 *.plist.bak
 
+# Background assets (user-local, not for distribution)
+background/
+
 # IDE
 .idea/
 .vscode/
