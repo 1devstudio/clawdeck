@@ -43,6 +43,7 @@ struct ChatView: View {
                             MessageBubble(
                                 message: message,
                                 agentDisplayName: viewModel.agentDisplayName,
+                                agentAvatarEmoji: viewModel.agentAvatarEmoji,
                                 searchQuery: viewModel.searchQuery,
                                 isCurrentMatch: message.id == viewModel.focusedMatchId
                             )
