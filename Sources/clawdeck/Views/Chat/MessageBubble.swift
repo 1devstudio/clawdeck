@@ -30,7 +30,7 @@ struct MessageBubble: View {
                     if message.role == .assistant {
                         Image(systemName: "sparkle")
                             .font(.system(size: messageTextSize - 3))
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(themeColor)
                     }
                     Text(roleLabel)
                         .font(.system(size: messageTextSize - 2))
