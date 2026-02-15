@@ -63,8 +63,12 @@ final class ChatViewModel {
     /// Pending image attachments to send with the next message.
     var pendingAttachments: [PendingAttachment] = []
 
-    /// Whether a message is currently being sent.
+    /// Whether a message is currently being sent (RPC in-flight).
     var isSending = false
+
+    /// Whether we're waiting for the agent's first streaming delta after the RPC returned.
+    /// Bridges the gap between `isSending` (RPC done) and `isStreaming` (first delta).
+    var isAwaitingResponse = false
 
     /// Whether history is loading.
     var isLoadingHistory = false
@@ -80,6 +84,12 @@ final class ChatViewModel {
     /// Whether the assistant is currently streaming a response.
     var isStreaming: Bool {
         appViewModel.messageStore.isStreaming(sessionKey: sessionKey)
+    }
+
+    /// Whether the typing indicator should be shown — covers the full lifecycle:
+    /// sending (RPC in-flight) → awaiting response (RPC done, waiting for first delta) → streaming (before first content appears).
+    var showTypingIndicator: Bool {
+        isSending || isAwaitingResponse || (isStreaming && messages.last?.state != .streaming)
     }
 
     /// Whether there are older messages available to load.
@@ -175,6 +185,8 @@ final class ChatViewModel {
                 attachments: chatAttachments
             )
             appViewModel.messageStore.markSent(messageId: outgoing.id, sessionKey: sessionKey)
+            // RPC succeeded — now wait for the agent's first streaming delta
+            isAwaitingResponse = true
         } catch {
             appViewModel.messageStore.markError(
                 messageId: outgoing.id,
@@ -195,8 +207,9 @@ final class ChatViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-        // Clear sending state so the abort button disappears immediately
+        // Clear all active states so the indicator disappears immediately
         isSending = false
+        isAwaitingResponse = false
     }
 
     /// Load or reload chat history.

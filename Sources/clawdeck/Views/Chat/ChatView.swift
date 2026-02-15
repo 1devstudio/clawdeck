@@ -50,8 +50,7 @@ struct ChatView: View {
                             .id(message.id)
                         }
 
-                        if viewModel.isSending || (viewModel.isStreaming && viewModel.messages.last?.state != .streaming) {
-                            // Show typing indicator immediately after send and while waiting for first delta
+                        if viewModel.showTypingIndicator {
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
@@ -75,12 +74,19 @@ struct ChatView: View {
                     }
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
+                    // A new message arrived — if it's from the assistant, we're no longer awaiting
+                    if viewModel.isAwaitingResponse,
+                       let last = viewModel.messages.last,
+                       last.role == .assistant {
+                        viewModel.isAwaitingResponse = false
+                    }
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     if isSending { scrollToBottom(proxy: proxy) }
                 }
-                .onChange(of: viewModel.isStreaming) { _, _ in
+                .onChange(of: viewModel.isStreaming) { _, isStreaming in
+                    if isStreaming { viewModel.isAwaitingResponse = false }
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: viewModel.streamingContentVersion) { _, _ in
@@ -118,7 +124,7 @@ struct ChatView: View {
             // Composer
             MessageComposer(
                 text: $viewModel.draftText,
-                isSending: viewModel.isSending,
+                isSending: viewModel.isSending || viewModel.isAwaitingResponse,
                 isStreaming: viewModel.isStreaming,
                 pendingAttachments: viewModel.pendingAttachments,
                 onSend: {
