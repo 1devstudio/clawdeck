@@ -107,6 +107,17 @@ final class ChatViewModel {
         appViewModel.activeBinding?.displayName(from: appViewModel.gatewayManager) ?? "Assistant"
     }
 
+    /// Avatar emoji of the active agent from the gateway (e.g. "🤖"), or nil.
+    var agentAvatarEmoji: String? {
+        guard let binding = appViewModel.activeBinding,
+              let summaries = appViewModel.gatewayManager.agentSummaries[binding.gatewayId],
+              let summary = summaries.first(where: { $0.id == binding.agentId }) else { return nil }
+        // Prefer emoji field, fall back to avatar
+        if let emoji = summary.emoji, !emoji.isEmpty { return emoji }
+        if let avatar = summary.avatar, !avatar.isEmpty { return avatar }
+        return nil
+    }
+
     // MARK: - Init
 
     init(sessionKey: String, appViewModel: AppViewModel) {

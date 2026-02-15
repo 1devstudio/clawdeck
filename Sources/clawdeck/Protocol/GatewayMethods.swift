@@ -79,14 +79,22 @@ struct HelloOk: Codable, Sendable {
 // MARK: - Agent types
 
 /// Lightweight agent representation from the gateway.
-/// The gateway returns minimal info: just `id` and optionally a few fields.
+/// The gateway returns `id` and an optional nested `identity` object.
 struct AgentSummary: Codable, Sendable {
     let id: String
-    let name: String?
-    let avatar: String?
+    let identity: Identity?
     let `default`: Bool?
 
-    // The gateway may only return `id` — all other fields are optional.
+    struct Identity: Codable, Sendable {
+        let name: String?
+        let emoji: String?
+        let theme: String?
+    }
+
+    // Convenience accessors matching the old flat API.
+    var name: String? { identity?.name }
+    var avatar: String? { identity?.emoji }
+    var emoji: String? { identity?.emoji }
 }
 
 /// Result of agents.list.

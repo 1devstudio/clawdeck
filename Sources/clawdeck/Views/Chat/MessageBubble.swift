@@ -7,6 +7,7 @@ import HighlightSwift
 struct MessageBubble: View {
     let message: ChatMessage
     var agentDisplayName: String = "Assistant"
+    var agentAvatarEmoji: String? = nil
     var searchQuery: String = ""
     @Environment(\.themeColor) private var themeColor
     @Environment(\.messageTextSize) private var messageTextSize
@@ -28,9 +29,14 @@ struct MessageBubble: View {
                 // Role label
                 HStack(spacing: 4) {
                     if message.role == .assistant {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: messageTextSize - 3))
-                            .foregroundStyle(themeColor)
+                        if let emoji = agentAvatarEmoji {
+                            Text(emoji)
+                                .font(.system(size: messageTextSize - 3))
+                        } else {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: messageTextSize - 3))
+                                .foregroundStyle(themeColor)
+                        }
                     }
                     Text(roleLabel)
                         .font(.system(size: messageTextSize - 2))
