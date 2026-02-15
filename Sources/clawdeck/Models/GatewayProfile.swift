@@ -34,7 +34,7 @@ struct GatewayProfile: Identifiable, Codable, Hashable {
     init(
         id: String = UUID().uuidString,
         displayName: String? = nil,
-        host: String = "vps-0a60f62f.vps.ovh.net",
+        host: String = "gateway.example.com",
         port: Int = 443,
         path: String = "/ws",
         useTLS: Bool = true,
