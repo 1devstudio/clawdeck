@@ -9,6 +9,7 @@ struct SettingsView: View {
     enum SettingsTab: String, CaseIterable {
         case appearance = "Appearance"
         case shortcuts = "Shortcuts"
+        case advanced = "Advanced"
     }
 
     var body: some View {
@@ -24,6 +25,12 @@ struct SettingsView: View {
                     Label("Shortcuts", systemImage: "keyboard")
                 }
                 .tag(SettingsTab.shortcuts)
+
+            AdvancedSettingsView()
+                .tabItem {
+                    Label("Advanced", systemImage: "gearshape.2")
+                }
+                .tag(SettingsTab.advanced)
         }
         .frame(width: 500, height: 500)
     }
@@ -161,6 +168,60 @@ struct ShortcutSettingsView: View {
                 LabeledContent("Send Message", value: "⌘↩")
                 LabeledContent("Stop Generation", value: "Esc")
                 LabeledContent("Focus Composer", value: "⌘L")
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// MARK: - Advanced Settings
+
+struct AdvancedSettingsView: View {
+    @AppStorage("logLevel") private var logLevelRaw: String = AppLogLevel.info.rawValue
+    
+    private var logLevel: Binding<AppLogLevel> {
+        Binding(
+            get: { AppLogLevel(rawValue: logLevelRaw) ?? .info },
+            set: { logLevelRaw = $0.rawValue }
+        )
+    }
+    
+    var body: some View {
+        Form {
+            Section("Logging") {
+                Picker("Log Level", selection: logLevel) {
+                    ForEach(AppLogLevel.allCases) { level in
+                        HStack {
+                            Image(systemName: level.sfSymbol)
+                                .foregroundStyle(level.color)
+                            Text(level.displayName)
+                        }
+                        .tag(level)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Log Level Descriptions:")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("• Debug: All messages including detailed debugging information")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("• Info: General information messages and status updates")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("• Warning: Important messages that may indicate issues")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("• Error: Only critical errors and failures")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .formStyle(.grouped)

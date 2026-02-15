@@ -356,7 +356,7 @@ final class AgentSettingsViewModel {
 
         // Phase 2: Waiting for gateway restart
         restartPhase = .waitingForRestart
-        print("[AgentSettings] Config patch applied, waiting for gateway restart...")
+        AppLogger.info("Config patch applied, waiting for gateway restart...", category: "Session")
         try? await Task.sleep(nanoseconds: 3_000_000_000)
 
         // Phase 3: Reconnecting
@@ -366,7 +366,7 @@ final class AgentSettingsViewModel {
         if let appVM = appViewModel,
            let binding = appVM.activeBinding,
            !appVM.gatewayManager.isConnected(binding.gatewayId) {
-            print("[AgentSettings] Reconnecting after config patch...")
+            AppLogger.debug("Reconnecting after config patch...", category: "Session")
             await appVM.gatewayManager.reconnect(gatewayId: binding.gatewayId)
             // Reload agents/sessions after reconnecting
             await appVM.loadInitialData()

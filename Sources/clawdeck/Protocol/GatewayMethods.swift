@@ -356,7 +356,7 @@ extension ChatEventMessage: Codable {
                     contentBlocks = nil
                 }
             } catch {
-                print("[ChatEventMessage] ⚠️ Failed to decode content as [ContentBlock] or String: \(error)")
+                AppLogger.error("Failed to decode content as [ContentBlock] or String: \(error)", category: "Protocol")
                 contentBlocks = nil
             }
         }

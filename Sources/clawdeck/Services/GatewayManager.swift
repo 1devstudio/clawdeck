@@ -227,10 +227,10 @@ final class GatewayManager {
         
         do {
             let result = try await client.listAgents()
-            print("[GatewayManager] Gateway \(gatewayId): agents.list returned \(result.agents.count) agents")
+            AppLogger.debug("Gateway \(gatewayId): agents.list returned \(result.agents.count) agents", category: "Network")
             agentSummaries[gatewayId] = result.agents
         } catch {
-            print("[GatewayManager] Failed to list agents for gateway \(gatewayId): \(error)")
+            AppLogger.error("Failed to list agents for gateway \(gatewayId): \(error)", category: "Network")
         }
     }
 
