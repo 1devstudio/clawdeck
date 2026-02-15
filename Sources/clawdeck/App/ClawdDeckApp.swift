@@ -100,7 +100,7 @@ struct ClawdDeckApp: App {
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @AppStorage("codeHighlightTheme") private var codeHighlightThemeRaw: String = HighlightTheme.github.rawValue
 
-    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.solidColor.rawValue
+    @AppStorage("bgMode") private var bgModeRaw: String = InnerPanelBackgroundMode.none.rawValue
     @AppStorage("bgSolidColorHex") private var bgSolidColorHex: String = "#1E1E2E"
     @AppStorage("bgUnsplashURL") private var bgUnsplashURL: String = ""
     @AppStorage("bgUnsplashPhotographer") private var bgUnsplashPhotographer: String = ""
@@ -115,7 +115,7 @@ struct ClawdDeckApp: App {
 
     private var innerPanelBackgroundConfig: InnerPanelBackgroundConfig {
         InnerPanelBackgroundConfig(
-            mode: InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .solidColor,
+            mode: InnerPanelBackgroundMode(rawValue: bgModeRaw) ?? .none,
             colorHex: bgSolidColorHex,
             unsplashURL: bgUnsplashURL,
             unsplashPhotographer: bgUnsplashPhotographer
