@@ -159,11 +159,18 @@ case "$SIGN_MODE" in
         ;;
 esac
 
+# ---- Copy install instructions ----
+cp "$SCRIPT_DIR/INSTALL.md" "$DIST_DIR/INSTALL.md"
+
 # ---- Package as .zip ----
 echo "📦 Creating zip..."
 cd "$DIST_DIR"
 rm -f "$APP_NAME.zip"
 ditto -c -k --keepParent "$APP_NAME.app" "$APP_NAME.zip"
+
+# Add INSTALL.md to the zip
+zip -j "$APP_NAME.zip" INSTALL.md > /dev/null 2>&1
+
 ZIP_SIZE=$(du -h "$APP_NAME.zip" | cut -f1)
 echo "✅ dist/$APP_NAME.zip ($ZIP_SIZE)"
 
