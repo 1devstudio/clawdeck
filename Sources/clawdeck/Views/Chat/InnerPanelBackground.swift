@@ -34,6 +34,10 @@ struct InnerPanelBackground: View {
                 }
             }
         }
+        .onAppear {
+            // Try synchronous disk cache first for instant display on launch
+            loadCachedImageSync()
+        }
         .task(id: config.unsplashURL) {
             await loadUnsplashImage()
         }
@@ -43,6 +47,16 @@ struct InnerPanelBackground: View {
         let base = NSColor.windowBackgroundColor
         let blendColor: NSColor = colorScheme == .dark ? .white : .black
         return base.blended(withFraction: 0.06, of: blendColor) ?? base
+    }
+
+    /// Synchronously load from disk cache — no actor hop, no async.
+    /// Gives an instant background on app launch even if a Keychain dialog or
+    /// other modal is blocking the run loop.
+    private func loadCachedImageSync() {
+        guard config.mode == .unsplash,
+              cachedImage == nil,
+              let url = URL(string: config.unsplashURL) else { return }
+        cachedImage = BackgroundImageCache.shared.cachedImageSync(for: url)
     }
 
     private func loadUnsplashImage() async {
