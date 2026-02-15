@@ -7,7 +7,6 @@ struct LogView: View {
     @State private var selectedCategory: String = "All"
     @State private var searchText: String = ""
     @State private var autoScroll: Bool = true
-    @State private var scrollProxy: ScrollViewReader?
     
     private var categories: [String] {
         let allCategories = Set(logger.entries.map { $0.category })
