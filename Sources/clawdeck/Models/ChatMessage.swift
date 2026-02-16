@@ -155,11 +155,15 @@ extension ChatMessage {
                     return text
                 case "thinking":
                     return nil  // Skip thinking blocks
-                case "toolCall":
-                    // Extract tool call info for visualization
+                case "toolCall", "tool_use":
+                    // Extract tool call info for visualization.
+                    // Gateway stores: { type: "toolCall", id, name, arguments: {...} }
+                    // Anthropic raw: { type: "tool_use", id, name, input: {...} }
                     let toolCallId = block["id"] as? String ?? block["toolCallId"] as? String ?? UUID().uuidString
-                    let toolName = block["toolName"] as? String ?? block["name"] as? String ?? "tool"
-                    let args = block["args"] as? [String: Any] ?? block["input"] as? [String: Any]
+                    let toolName = block["name"] as? String ?? block["toolName"] as? String ?? "tool"
+                    let args = block["arguments"] as? [String: Any]
+                        ?? block["args"] as? [String: Any]
+                        ?? block["input"] as? [String: Any]
                     let toolCall = ToolCall(
                         id: toolCallId,
                         name: toolName,
