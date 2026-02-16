@@ -121,6 +121,23 @@ struct ChatView: View {
                 .background(.yellow.opacity(0.1))
             }
 
+            // Model selector — above composer, right-aligned
+            if !viewModel.availableModels.isEmpty {
+                HStack {
+                    Spacer()
+                    ModelSelectorButton(
+                        currentModel: viewModel.currentModelId,
+                        defaultModel: viewModel.defaultModelId,
+                        models: viewModel.availableModels,
+                        onSelect: { modelId in
+                            Task { await viewModel.selectModel(modelId) }
+                        }
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+            }
+
             // Composer
             MessageComposer(
                 text: $viewModel.draftText,
@@ -142,12 +159,6 @@ struct ChatView: View {
                 },
                 onRemoveAttachment: { attachment in
                     viewModel.removeAttachment(attachment)
-                },
-                currentModel: viewModel.currentModelId,
-                defaultModel: viewModel.defaultModelId,
-                availableModels: viewModel.availableModels,
-                onSelectModel: { modelId in
-                    Task { await viewModel.selectModel(modelId) }
                 }
             )
         }

@@ -20,12 +20,6 @@ struct MessageComposer: View {
     var onPasteImage: (NSImage) -> Void
     var onRemoveAttachment: (PendingAttachment) -> Void
 
-    // Model selector
-    var currentModel: String? = nil
-    var defaultModel: String? = nil
-    var availableModels: [GatewayModel] = []
-    var onSelectModel: ((String?) -> Void)? = nil
-
     @FocusState private var isFocused: Bool
     @State private var isDropTargeted = false
     @State private var editorHeight: CGFloat = 32
@@ -52,16 +46,6 @@ struct MessageComposer: View {
                 .glassEffect(in: .circle)
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
-
-                // Model selector pill — hidden when no models are available
-                if !availableModels.isEmpty, let onSelectModel {
-                    ModelSelectorButton(
-                        currentModel: currentModel,
-                        defaultModel: defaultModel,
-                        models: availableModels,
-                        onSelect: onSelectModel
-                    )
-                }
 
                 // Text field — pill-shaped like iMessage
                 ComposerTextEditor(
