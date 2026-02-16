@@ -11,9 +11,6 @@ struct ChatView: View {
     /// Height of the bottom bar (model selector + composer) for scroll inset.
     @State private var bottomBarHeight: CGFloat = 60
 
-    /// Width of the chat scroll area (for bubble width constraints).
-    @State private var chatWidth: CGFloat = 600
-
     /// Message whose steps are shown in the right sidebar (nil = sidebar hidden).
     /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
     @State private var sidebarMessage: ChatMessage? = nil
@@ -98,17 +95,8 @@ struct ChatView: View {
                     .padding(.top, 12)
                     // Bottom padding so short conversations can scroll above the composer
                     .padding(.bottom, bottomBarHeight + 24)
-                    .environment(\.chatWidth, chatWidth)
                 }
                 .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ChatWidthKey.self, value: geo.size.width)
-                    }
-                )
-                .onPreferenceChange(ChatWidthKey.self) { width in
-                    chatWidth = width
-                }
                 .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
@@ -278,10 +266,4 @@ private struct BottomBarHeightKey: PreferenceKey {
     }
 }
 
-/// Preference key for the chat scroll view's width (used by bubble width constraints).
-private struct ChatWidthKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 600
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// (ChatWidthKey removed — bubbles size to content naturally)
