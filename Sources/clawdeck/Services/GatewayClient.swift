@@ -60,6 +60,15 @@ actor GatewayClient {
     /// Current connection state — updated on main actor for UI.
     @MainActor private(set) var state: ConnectionState = .disconnected
 
+    /// Callback invoked on @MainActor whenever connection state changes.
+    /// Set once before connect(), read from @MainActor setState() — no race.
+    nonisolated(unsafe) private var stateChangeHandler: (@MainActor @Sendable (ConnectionState) -> Void)?
+
+    /// Set a handler to be called on @MainActor when connection state transitions.
+    func setStateChangeHandler(_ handler: @escaping @MainActor @Sendable (ConnectionState) -> Void) {
+        stateChangeHandler = handler
+    }
+
     /// Reconnect tracking.
     private var reconnectDelay: Double = GatewayProtocol.Reconnect.initialDelaySeconds
     private var shouldReconnect = false
@@ -494,7 +503,11 @@ actor GatewayClient {
 
     @MainActor
     private func setState(_ newState: ConnectionState) {
+        let oldState = state
         state = newState
+        if oldState != newState {
+            stateChangeHandler?(newState)
+        }
     }
 
 }

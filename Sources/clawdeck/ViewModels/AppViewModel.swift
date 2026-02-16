@@ -119,6 +119,13 @@ final class AppViewModel {
             }
         }
 
+        // Wire up connection state change handling
+        gatewayManager.onConnectionStateChange = { [weak self] newState, gatewayId in
+            Task { @MainActor in
+                self?.handleConnectionStateChange(newState, gatewayId: gatewayId)
+            }
+        }
+
         // Load persisted accent color
         loadAccentColor()
 
@@ -537,6 +544,25 @@ final class AppViewModel {
             break
 
         default:
+            break
+        }
+    }
+
+    private func handleConnectionStateChange(_ newState: ConnectionState, gatewayId: String) {
+        // Only act on the active gateway's state changes
+        guard let binding = activeBinding, binding.gatewayId == gatewayId else { return }
+
+        switch newState {
+        case .disconnected, .reconnecting:
+            // Finalize orphaned streaming messages to clear typing indicators
+            AppLogger.info("Active gateway \(gatewayId) \(newState.rawValue), finalizing streams", category: "Network")
+            messageStore.finalizeAllStreaming()
+            // Reset send/await state on all active ChatViewModels
+            for (_, vm) in chatViewModels {
+                vm.isSending = false
+                vm.isAwaitingResponse = false
+            }
+        case .connecting, .connected:
             break
         }
     }
