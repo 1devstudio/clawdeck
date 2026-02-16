@@ -1,12 +1,35 @@
 import SwiftUI
 
-/// Right sidebar showing all tool call steps for a message, already expanded.
+/// A step shown in the sidebar — either a tool call or a thinking block.
+enum SidebarStep: Identifiable {
+    case tool(ToolCall)
+    case thinking(id: String, content: String)
+
+    var id: String {
+        switch self {
+        case .tool(let tc): return tc.id
+        case .thinking(let id, _): return id
+        }
+    }
+}
+
+/// Right sidebar showing all steps for a message (tool calls + thinking), already expanded.
 struct ToolStepsSidebar: View {
-    let toolCalls: [ToolCall]
+    let steps: [SidebarStep]
     let onClose: () -> Void
 
     @Environment(\.messageTextSize) private var messageTextSize
     @Environment(\.themeColor) private var themeColor
+
+    /// Convenience: just the tool calls from steps.
+    private var toolCalls: [ToolCall] {
+        steps.compactMap { if case .tool(let tc) = $0 { return tc } else { return nil } }
+    }
+
+    /// Convenience: thinking blocks from steps.
+    private var thinkingBlocks: [(id: String, content: String)] {
+        steps.compactMap { if case .thinking(let id, let c) = $0 { return (id, c) } else { return nil } }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -17,12 +40,17 @@ struct ToolStepsSidebar: View {
             // Steps list — scrollable, all expanded
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(toolCalls.enumerated()), id: \.element.id) { index, toolCall in
-                        ToolStepRow(
-                            toolCall: toolCall,
-                            stepNumber: index + 1,
-                            totalSteps: toolCalls.count
-                        )
+                    ForEach(Array(steps.enumerated()), id: \.element.id) { _, step in
+                        switch step {
+                        case .thinking(_, let content):
+                            ThinkingStepRow(content: content)
+                        case .tool(let toolCall):
+                            ToolStepRow(
+                                toolCall: toolCall,
+                                stepNumber: toolStepNumber(for: toolCall),
+                                totalSteps: toolCalls.count
+                            )
+                        }
                     }
                 }
                 .padding(12)
@@ -39,10 +67,10 @@ struct ToolStepsSidebar: View {
             // Status dot
             overallStatusDot
 
-            Text("Tool Steps")
+            Text("Steps")
                 .font(.system(size: messageTextSize, weight: .semibold))
 
-            Text("(\(toolCalls.count))")
+            Text("(\(steps.count))")
                 .font(.system(size: messageTextSize - 1))
                 .foregroundStyle(.secondary)
 
@@ -50,6 +78,10 @@ struct ToolStepsSidebar: View {
 
             // Summary badges
             HStack(spacing: 6) {
+                if !thinkingBlocks.isEmpty {
+                    StatusBadge(count: thinkingBlocks.count, color: .purple, icon: "brain")
+                }
+
                 let succeeded = toolCalls.filter { $0.phase == .completed }.count
                 let failed = toolCalls.filter { $0.phase == .error }.count
                 let running = toolCalls.filter { $0.phase == .running }.count
@@ -79,6 +111,11 @@ struct ToolStepsSidebar: View {
         .padding(.vertical, 10)
     }
 
+    /// Get the 1-based tool step number for a given tool call.
+    private func toolStepNumber(for toolCall: ToolCall) -> Int {
+        (toolCalls.firstIndex(where: { $0.id == toolCall.id }) ?? 0) + 1
+    }
+
     @ViewBuilder
     private var overallStatusDot: some View {
         let hasRunning = toolCalls.contains { $0.phase == .running }
@@ -91,6 +128,84 @@ struct ToolStepsSidebar: View {
         } else {
             Circle().fill(.green).frame(width: 8, height: 8)
         }
+    }
+}
+
+// MARK: - Thinking Step Row
+
+/// A thinking/reasoning block shown in the sidebar.
+struct ThinkingStepRow: View {
+    let content: String
+
+    @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.themeColor) private var themeColor
+    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "brain")
+                        .font(.system(size: messageTextSize - 2, weight: .medium))
+                        .foregroundStyle(.purple.opacity(0.8))
+
+                    Text("Thought process")
+                        .font(.system(size: messageTextSize - 1, weight: .semibold))
+
+                    Text("(\(formatCharCount(content.count)))")
+                        .font(.system(size: messageTextSize - 3))
+                        .foregroundStyle(.tertiary)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: messageTextSize - 4, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Divider().opacity(0.3)
+
+                ScrollView {
+                    Text(content)
+                        .font(.system(size: messageTextSize - 1))
+                        .italic()
+                        .foregroundStyle(.secondary.opacity(0.8))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                }
+                .frame(maxHeight: 400)
+            }
+        }
+        .background(stepBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.purple.opacity(0.2), lineWidth: 0.5)
+        )
+    }
+
+    private var stepBackground: Color {
+        colorScheme == .dark
+            ? Color.purple.opacity(0.04)
+            : Color.purple.opacity(0.03)
+    }
+
+    private func formatCharCount(_ count: Int) -> String {
+        if count >= 1000 {
+            return String(format: "%.1fk chars", Double(count) / 1000)
+        }
+        return "\(count) chars"
     }
 }
 

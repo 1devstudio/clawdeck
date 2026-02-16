@@ -1,18 +1,35 @@
 import SwiftUI
 
-/// Compact pill showing tool call summary (status dot, step count, duration).
-/// Placed above the message bubble, right-aligned. Tapping opens the tool steps sidebar.
+/// Compact pill showing step summary (thinking + tool calls, status dot, count, duration).
+/// Placed above the message bubble, right-aligned. Tapping opens the steps sidebar.
 struct ToolStepsPill: View {
-    let toolCalls: [ToolCall]
+    let steps: [SidebarStep]
     let onTap: () -> Void
 
     @Environment(\.messageTextSize) private var messageTextSize
+
+    /// Just the tool calls from steps.
+    private var toolCalls: [ToolCall] {
+        steps.compactMap { if case .tool(let tc) = $0 { return tc } else { return nil } }
+    }
+
+    /// Whether any thinking blocks are present.
+    private var hasThinking: Bool {
+        steps.contains { if case .thinking = $0 { return true } else { return false } }
+    }
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 6) {
                 // Status dot
                 statusDot
+
+                // Thinking indicator
+                if hasThinking {
+                    Image(systemName: "brain")
+                        .font(.system(size: messageTextSize - 4, weight: .medium))
+                        .foregroundStyle(.purple.opacity(0.7))
+                }
 
                 // Step count
                 Text(stepsLabel)
@@ -46,7 +63,7 @@ struct ToolStepsPill: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("\(toolCalls.count) tool steps — click to view details")
+        .help("\(steps.count) steps — click to view details")
     }
 
     // MARK: - Status
@@ -78,29 +95,25 @@ struct ToolStepsPill: View {
     // MARK: - Labels
 
     private var stepsLabel: String {
-        let count = toolCalls.count
+        let count = steps.count
         return count == 1 ? "1 step" : "\(count) steps"
     }
 
     /// Total duration from first tool start to last tool completion.
     private var totalDuration: String? {
-        guard toolCalls.count > 0 else { return nil }
+        guard !toolCalls.isEmpty else { return nil }
         guard let earliest = toolCalls.map(\.startedAt).min() else { return nil }
 
-        // Use now for running, or the latest started + small buffer for completed
         let end: Date
         if overallStatus == .running {
             end = Date()
         } else {
-            // Approximate end: last tool's startedAt + a small delta.
-            // We don't track endedAt, so use the message timestamp gap.
-            // For now, just show duration from first to last tool start.
             guard let latest = toolCalls.map(\.startedAt).max() else { return nil }
             end = latest
         }
 
         let seconds = end.timeIntervalSince(earliest)
-        if seconds < 0.1 { return nil } // Too fast to be meaningful
+        if seconds < 0.1 { return nil }
         if seconds < 60 {
             return String(format: "%.1fs", seconds)
         }
