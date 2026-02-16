@@ -172,9 +172,10 @@ struct MainView: View {
         .onChange(of: appViewModel.isSidebarCollapsed) { _, collapsed in
             withAnimation(.easeInOut(duration: 0.2)) {
                 if collapsed {
+                    // Remember the current width so we can restore it later.
                     sidebarWidthBeforeCollapse = sidebarWidth
-                    sidebarWidth = 0
                 } else {
+                    // Restore the previous width when expanding.
                     sidebarWidth = sidebarWidthBeforeCollapse
                 }
             }

@@ -157,7 +157,7 @@ struct ClawdDeckApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
-                Button("Duplicate Session") {
+                Button("New Session in New Window") {
                     Task { await appViewModel.createNewSession() }
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
@@ -168,6 +168,7 @@ struct ClawdDeckApp: App {
                     appViewModel.closeCurrentSession()
                 }
                 .keyboardShortcut("w", modifiers: .command)
+                .disabled(appViewModel.selectedSessionKey == nil)
             }
 
             // MARK: - View / Sidebar
@@ -201,6 +202,7 @@ struct ClawdDeckApp: App {
                     appViewModel.focusComposer()
                 }
                 .keyboardShortcut("l", modifiers: .command)
+                .disabled(appViewModel.selectedSessionKey == nil)
 
                 Divider()
 
@@ -208,11 +210,13 @@ struct ClawdDeckApp: App {
                     appViewModel.selectPreviousSession()
                 }
                 .keyboardShortcut(.upArrow, modifiers: .command)
+                .disabled(appViewModel.sidebarViewModel.filteredSessions.isEmpty)
 
                 Button("Next Session") {
                     appViewModel.selectNextSession()
                 }
                 .keyboardShortcut(.downArrow, modifiers: .command)
+                .disabled(appViewModel.sidebarViewModel.filteredSessions.isEmpty)
             }
 
             // MARK: - Agent Switching (⌘1-9)
