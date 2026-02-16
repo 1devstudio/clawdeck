@@ -27,17 +27,19 @@ struct MessageImage: Identifiable {
     let fileName: String?
 }
 
-/// A segment of a message — either text content or a group of tool calls.
+/// A segment of a message — either text content, a group of tool calls, or a thinking block.
 /// Messages are rendered as an ordered sequence of segments, preserving
-/// the interleaving of text and tool calls as they actually occurred.
+/// the interleaving of text, tool calls, and thinking blocks as they actually occurred.
 enum MessageSegment: Identifiable {
     case text(id: String, content: String)
     case toolGroup(id: String, toolCalls: [ToolCall])
+    case thinking(id: String, content: String)
 
     var id: String {
         switch self {
         case .text(let id, _): return id
         case .toolGroup(let id, _): return id
+        case .thinking(let id, _): return id
         }
     }
 
@@ -46,8 +48,18 @@ enum MessageSegment: Identifiable {
         return false
     }
 
+    var isThinking: Bool {
+        if case .thinking = self { return true }
+        return false
+    }
+
     var textContent: String? {
         if case .text(_, let content) = self { return content }
+        return nil
+    }
+
+    var thinkingContent: String? {
+        if case .thinking(_, let content) = self { return content }
         return nil
     }
 }
@@ -274,7 +286,12 @@ extension ChatMessage {
                     pendingToolCalls.append(toolCall)
 
                 case "thinking":
-                    continue  // Skip thinking blocks
+                    guard let thinkingText = block["thinking"] as? String, !thinkingText.isEmpty else {
+                        continue
+                    }
+                    flushToolCalls()
+                    segments.append(.thinking(id: "think-\(segIndex)", content: thinkingText))
+                    segIndex += 1
 
                 default:
                     continue
