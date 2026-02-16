@@ -56,6 +56,19 @@ struct InspectorView: View {
                 LabeledContent("Messages", value: "\(messages.count)")
                 LabeledContent("User messages", value: "\(messages.filter { $0.role == .user }.count)")
                 LabeledContent("Assistant messages", value: "\(messages.filter { $0.role == .assistant }.count)")
+
+                if let total = session.totalTokens, total > 0 {
+                    let contextTokens = session.contextTokens ?? appViewModel.defaultContextTokens
+                    if let ctx = contextTokens, ctx > 0 {
+                        let pct = min(100, Int(round(Double(total) / Double(ctx) * 100)))
+                        LabeledContent("Context usage") {
+                            Text("\(formatTokenCount(total)) / \(formatTokenCount(ctx)) (\(pct)%)")
+                                .monospacedDigit()
+                        }
+                    } else {
+                        LabeledContent("Total tokens", value: formatTokenCount(total))
+                    }
+                }
             }
 
             Section {
@@ -67,6 +80,16 @@ struct InspectorView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func formatTokenCount(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            let m = Double(count) / 1_000_000
+            return m >= 10 ? String(format: "%.0fM", m) : String(format: "%.1fM", m)
+        } else if count >= 1000 {
+            return String(format: "%.0fk", Double(count) / 1000)
+        }
+        return "\(count)"
     }
 
     private func commitLabel() {

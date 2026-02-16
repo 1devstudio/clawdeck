@@ -124,10 +124,19 @@ struct ChatView: View {
                 .background(.yellow.opacity(0.1))
             }
 
-            // Model selector — above composer, right-aligned
+            // Model selector + context usage — above composer, right-aligned
             if !viewModel.availableModels.isEmpty {
-                HStack {
+                HStack(spacing: 8) {
                     Spacer()
+
+                    // Context window usage indicator
+                    if let total = viewModel.totalTokens, total > 0 {
+                        ContextUsageView(
+                            totalTokens: total,
+                            contextTokens: viewModel.contextTokens
+                        )
+                    }
+
                     ModelSelectorButton(
                         currentModel: viewModel.currentModelId,
                         defaultModel: viewModel.defaultModelId,

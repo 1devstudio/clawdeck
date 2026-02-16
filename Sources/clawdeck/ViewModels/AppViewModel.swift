@@ -85,6 +85,9 @@ final class AppViewModel {
     /// The agent-level default model provider (from SessionsListResult.defaults.modelProvider).
     var defaultModelProvider: String?
 
+    /// The agent-level default context window size in tokens.
+    var defaultContextTokens: Int?
+
     /// Custom accent color set from Agent Settings. Applied app-wide.
     var customAccentColor: Color?
 
@@ -177,6 +180,7 @@ final class AppViewModel {
         availableModels.removeAll()
         defaultModelId = nil
         defaultModelProvider = nil
+        defaultContextTokens = nil
         messageStore.clearAll()
         chatViewModels.removeAll()
     }
@@ -226,6 +230,7 @@ final class AppViewModel {
             // Store default model info from the gateway response
             defaultModelId = result.defaults?.model
             defaultModelProvider = result.defaults?.modelProvider
+            defaultContextTokens = result.defaults?.contextTokens
 
             allGatewaySessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
@@ -416,6 +421,22 @@ final class AppViewModel {
             }
         } catch {
             AppLogger.debug("Usage backfill failed for \(sessionKey): \(error)", category: "Session")
+        }
+    }
+
+    /// Refresh a session's token counts from the gateway (sessions.list).
+    /// Called after a response completes to update the context usage indicator.
+    private func refreshSessionTokens(for sessionKey: String) async {
+        guard let client = activeClient else { return }
+        do {
+            let result = try await client.listSessions()
+            if let summary = result.sessions.first(where: { $0.key == sessionKey }),
+               let session = sessions.first(where: { $0.key == sessionKey }) {
+                session.totalTokens = summary.totalTokens
+                session.contextTokens = summary.contextTokens ?? result.defaults?.contextTokens
+            }
+        } catch {
+            AppLogger.debug("Failed to refresh session tokens: \(error)", category: "Session")
         }
     }
 
@@ -679,14 +700,17 @@ final class AppViewModel {
 
                 // Backfill usage data if the final event didn't include it.
                 // The gateway's WebSocket broadcast omits usage; fetch it from history.
-                if chatEvent.usage == nil || chatEvent.usage?.dictValue == nil {
-                    let sessionKey = chatEvent.sessionKey
-                    let runId = chatEvent.runId
-                    Task {
-                        // Brief delay to let the gateway finalize the transcript
-                        try? await Task.sleep(nanoseconds: 500_000_000)
+                // After stream completes, refresh session token counts and
+                // backfill per-message usage (gateway omits both from WebSocket events).
+                let sessionKey = chatEvent.sessionKey
+                let runId = chatEvent.runId
+                Task {
+                    // Brief delay to let the gateway finalize the transcript
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    if chatEvent.usage == nil || chatEvent.usage?.dictValue == nil {
                         await backfillUsage(for: sessionKey, runId: runId)
                     }
+                    await refreshSessionTokens(for: sessionKey)
                 }
             }
         } catch {
