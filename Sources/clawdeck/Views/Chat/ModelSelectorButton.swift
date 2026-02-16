@@ -175,7 +175,7 @@ private struct ModelSelectorPopover: View {
                 .padding(8)
             }
         }
-        .frame(width: 280, height: 400)
+        .frame(width: 340, height: 400)
     }
 
     // MARK: - Default Row
@@ -248,12 +248,12 @@ private struct ModelSelectorPopover: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(model.name.isEmpty ? model.id : model.name)
                         .font(.system(size: 12, weight: .regular))
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(model.id)
                         .font(.system(size: 9))
                         .foregroundStyle(.quaternary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()
