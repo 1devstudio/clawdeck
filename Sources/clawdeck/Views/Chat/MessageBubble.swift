@@ -83,6 +83,13 @@ struct MessageBubble: View {
                             ToolCallsView(toolCalls: toolCalls)
                                 .padding(.leading, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                        case .thinking(_, let content):
+                            ThinkingBlockView(
+                                content: content,
+                                isStreaming: message.state == .streaming
+                            )
+                            .padding(.leading, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 } else if hasTextContent {
@@ -426,6 +433,85 @@ struct UsageDetailPopover: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+    }
+}
+
+// MARK: - Thinking Block View
+
+/// A collapsible block showing the model's thinking/reasoning process.
+struct ThinkingBlockView: View {
+    let content: String
+    let isStreaming: Bool
+    @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.themeColor) private var themeColor
+
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header — always visible, clickable to expand
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+                HStack(spacing: 6) {
+                    if isStreaming {
+                        ProgressView()
+                            .controlSize(.mini)
+                    } else {
+                        Image(systemName: "brain")
+                            .font(.system(size: messageTextSize - 3, weight: .medium))
+                            .foregroundStyle(themeColor.opacity(0.7))
+                    }
+
+                    Text(isStreaming ? "Thinking…" : "Thought process")
+                        .font(.system(size: messageTextSize - 2, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    if !isStreaming {
+                        Text("(\(formatCharCount(content.count)))")
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: messageTextSize - 4, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded content
+            if isExpanded || isStreaming {
+                Divider()
+                    .opacity(0.5)
+
+                ScrollView {
+                    Text(content)
+                        .font(.system(size: messageTextSize - 1))
+                        .italic()
+                        .foregroundStyle(.secondary.opacity(0.8))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                }
+                .frame(maxHeight: 300)
+            }
+        }
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        .onAppear {
+            if isStreaming { isExpanded = true }
+        }
+    }
+
+    private func formatCharCount(_ count: Int) -> String {
+        if count >= 1000 {
+            return String(format: "%.1fk chars", Double(count) / 1000)
+        }
+        return "\(count) chars"
     }
 }
 

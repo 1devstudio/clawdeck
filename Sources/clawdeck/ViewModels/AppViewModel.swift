@@ -815,12 +815,18 @@ final class AppViewModel {
                 // The gateway may repeat the same text in each assistant
                 // continuation turn during multi-step tool use.
                 let existingTexts = Set(last.segments.compactMap(\.textContent))
+                let existingThinking = Set(last.segments.compactMap(\.thinkingContent))
 
                 for segment in message.segments {
                     if case .text(_, let content) = segment {
                         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
                         if trimmed.isEmpty || existingTexts.contains(content) {
                             continue  // Skip duplicate or empty text
+                        }
+                    }
+                    if case .thinking(_, let content) = segment {
+                        if existingThinking.contains(content) {
+                            continue  // Skip duplicate thinking
                         }
                     }
                     last.segments.append(segment)
