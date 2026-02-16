@@ -11,8 +11,9 @@ struct ChatView: View {
     /// Height of the bottom bar (model selector + composer) for scroll inset.
     @State private var bottomBarHeight: CGFloat = 60
 
-    /// Steps currently shown in the right sidebar (nil = sidebar hidden).
-    @State private var sidebarSteps: [SidebarStep]? = nil
+    /// Message whose steps are shown in the right sidebar (nil = sidebar hidden).
+    /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
+    @State private var sidebarMessage: ChatMessage? = nil
 
     var body: some View {
         HStack(spacing: 0) {
@@ -53,12 +54,12 @@ struct ChatView: View {
                                 agentAvatarEmoji: viewModel.agentAvatarEmoji,
                                 searchQuery: viewModel.searchQuery,
                                 isCurrentMatch: message.id == viewModel.focusedMatchId,
-                                onStepsTapped: { steps in
+                                onStepsTapped: { _ in
                                     withAnimation(.easeInOut(duration: 0.2)) {
-                                        if sidebarSteps != nil {
-                                            sidebarSteps = nil
+                                        if sidebarMessage != nil {
+                                            sidebarMessage = nil
                                         } else {
-                                            sidebarSteps = steps
+                                            sidebarMessage = message
                                         }
                                     }
                                 }
@@ -199,12 +200,12 @@ struct ChatView: View {
             }
         } // end ZStack
 
-        // Steps sidebar — slides in from the right
-        if let steps = sidebarSteps {
+        // Steps sidebar — slides in from the right, reactive to message changes
+        if let msg = sidebarMessage {
             Divider()
-            ToolStepsSidebar(steps: steps) {
+            ToolStepsSidebar(steps: msg.sidebarSteps) {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    sidebarSteps = nil
+                    sidebarMessage = nil
                 }
             }
             .transition(.move(edge: .trailing))

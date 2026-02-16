@@ -51,8 +51,8 @@ struct MessageBubble: View {
                             .controlSize(.mini)
                     }
 
-                    // Steps pill — for completed messages with tool calls or thinking
-                    if message.role == .assistant && message.state != .streaming {
+                    // Steps pill — shown for messages with tool calls or thinking
+                    if message.role == .assistant {
                         let allSteps = message.sidebarSteps
                         if !allSteps.isEmpty {
                             Spacer()
@@ -367,7 +367,8 @@ struct MessageBubble: View {
         return completedConsolidatedSegments
     }
 
-    /// Streaming: preserve interleaved order but merge adjacent text.
+    /// Streaming: merge adjacent text, keep thinking inline for live feedback,
+    /// skip tool groups (shown via the pill + sidebar in real time).
     private var streamingConsolidatedSegments: [ConsolidatedSegment] {
         var result: [ConsolidatedSegment] = []
         var pendingTexts: [String] = []
@@ -389,9 +390,9 @@ struct MessageBubble: View {
                 if pendingId == nil { pendingId = id }
                 pendingTexts.append(content)
 
-            case .toolGroup(let id, let toolCalls):
+            case .toolGroup:
+                // Tool groups shown in the pill + sidebar, not inline
                 flushText()
-                result.append(ConsolidatedSegment(id: id, kind: .toolGroup(toolCalls)))
 
             case .thinking(let id, let content):
                 flushText()
