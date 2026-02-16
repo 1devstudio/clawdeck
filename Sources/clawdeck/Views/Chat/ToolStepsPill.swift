@@ -24,13 +24,6 @@ struct ToolStepsPill: View {
                 // Status dot
                 statusDot
 
-                // Thinking indicator
-                if hasThinking {
-                    Image(systemName: "brain")
-                        .font(.system(size: messageTextSize - 4, weight: .medium))
-                        .foregroundStyle(.purple.opacity(0.7))
-                }
-
                 // Step count
                 Text(stepsLabel)
                     .font(.system(size: messageTextSize - 3, weight: .medium))
