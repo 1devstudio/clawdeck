@@ -62,6 +62,10 @@ struct MessageBubble: View {
                         }
                     }
                 }
+                .frame(
+                    maxWidth: message.role == .assistant ? .infinity : nil,
+                    alignment: .leading
+                )
 
                 // Image attachments (above message bubble)
                 if !message.images.isEmpty {
@@ -135,10 +139,6 @@ struct MessageBubble: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovered = hovering
             }
 
             if message.role != .user {
@@ -244,6 +244,10 @@ struct MessageBubble: View {
                 .padding(.top, 6)
                 .padding(.trailing, 6)
             }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
         }
     }
 
