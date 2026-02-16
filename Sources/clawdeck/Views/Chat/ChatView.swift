@@ -81,9 +81,8 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    // Extra bottom padding so messages can scroll above the composer
-                    .padding(.bottom, bottomBarHeight + 8)
                 }
+                .contentMargins(.bottom, bottomBarHeight + 8, for: .scrollContent)
                 .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
