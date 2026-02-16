@@ -244,6 +244,53 @@ final class MessageStore {
         lastDeltaLength.removeAll()
     }
 
+    // MARK: - Tool calls
+
+    /// Handle a tool call event from the agent stream.
+    func handleToolEvent(runId: String, sessionKey: String, phase: String, toolCallId: String, toolName: String, args: [String: Any]?, result: String?, isError: Bool) {
+        // Find the streaming message for this run, or the most recent assistant message
+        let message = streamingMessages[runId]
+            ?? allMessagesBySession[sessionKey]?.last(where: { $0.role == .assistant && $0.runId == runId })
+
+        guard let message else {
+            AppLogger.debug("Tool event for unknown runId=\(runId), creating placeholder", category: "Protocol")
+            // Create a streaming placeholder so tool calls have somewhere to live
+            let placeholder = ChatMessage.streamPlaceholder(runId: runId, sessionKey: sessionKey)
+            streamingMessages[runId] = placeholder
+            allMessagesBySession[sessionKey, default: []].append(placeholder)
+            let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+            visibleCountBySession[sessionKey] = currentVisible + 1
+            handleToolEvent(runId: runId, sessionKey: sessionKey, phase: phase, toolCallId: toolCallId, toolName: toolName, args: args, result: result, isError: isError)
+            return
+        }
+
+        switch phase {
+        case "start":
+            let toolCall = ToolCall(id: toolCallId, name: toolName, args: args)
+            message.toolCalls.append(toolCall)
+            AppLogger.debug("Tool start: \(toolName) (\(toolCallId)) for runId=\(runId)", category: "Protocol")
+
+        case "update":
+            if let existing = message.toolCalls.first(where: { $0.id == toolCallId }) {
+                existing.result = result
+            }
+
+        case "result":
+            if let existing = message.toolCalls.first(where: { $0.id == toolCallId }) {
+                existing.result = result
+                existing.isError = isError
+                existing.phase = isError ? .error : .completed
+                AppLogger.debug("Tool \(isError ? "error" : "result"): \(toolName) (\(toolCallId))", category: "Protocol")
+            }
+
+        default:
+            break
+        }
+
+        // Trigger UI update
+        streamingContentVersion += 1
+    }
+
     // MARK: - Cleanup
 
     /// Remove all messages for a session.

@@ -44,6 +44,9 @@ final class ChatMessage: Identifiable {
     /// Image attachments sent with this message.
     var images: [MessageImage] = []
 
+    /// Tool calls made during this assistant response (in order of invocation).
+    var toolCalls: [ToolCall] = []
+
     /// Tracks where the current streaming segment starts within `content`.
     /// Used by MessageStore to detect new segments vs cumulative growth.
     var segmentOffset: Int = 0
@@ -133,13 +136,14 @@ extension ChatMessage {
         default: return nil
         }
 
-        // Extract text content
+        // Extract text content and tool calls
         let textContent: String
+        var historyToolCalls: [ToolCall] = []
         if let content = raw["content"] as? String {
             // Plain string content
             textContent = content
         } else if let contentBlocks = raw["content"] as? [[String: Any]] {
-            // Array of content blocks — extract text blocks
+            // Array of content blocks — extract text blocks and tool calls
             let textParts = contentBlocks.compactMap { block -> String? in
                 guard let type = block["type"] as? String else { return nil }
                 switch type {
@@ -152,7 +156,18 @@ extension ChatMessage {
                 case "thinking":
                     return nil  // Skip thinking blocks
                 case "toolCall":
-                    return nil  // Skip tool calls
+                    // Extract tool call info for visualization
+                    let toolCallId = block["id"] as? String ?? block["toolCallId"] as? String ?? UUID().uuidString
+                    let toolName = block["toolName"] as? String ?? block["name"] as? String ?? "tool"
+                    let args = block["args"] as? [String: Any] ?? block["input"] as? [String: Any]
+                    let toolCall = ToolCall(
+                        id: toolCallId,
+                        name: toolName,
+                        phase: .completed,
+                        args: args
+                    )
+                    historyToolCalls.append(toolCall)
+                    return nil
                 default:
                     return nil
                 }
@@ -174,7 +189,7 @@ extension ChatMessage {
 
         let model = raw["model"] as? String
 
-        return ChatMessage(
+        let message = ChatMessage(
             id: "history-\(index)",
             role: messageRole,
             content: textContent,
@@ -183,5 +198,7 @@ extension ChatMessage {
             state: .complete,
             model: model
         )
+        message.toolCalls = historyToolCalls
+        return message
     }
 }

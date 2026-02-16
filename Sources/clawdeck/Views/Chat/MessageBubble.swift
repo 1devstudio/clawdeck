@@ -130,6 +130,12 @@ struct MessageBubble: View {
                     }
                 }
 
+                // Tool calls (collapsible blocks between or before text)
+                if !message.toolCalls.isEmpty {
+                    ToolCallsView(toolCalls: message.toolCalls)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 // Error message
                 if message.state == .error, let error = message.errorMessage {
                     Text(error)
