@@ -15,16 +15,13 @@ struct ChatView: View {
     /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
     @State private var sidebarMessage: ChatMessage? = nil
 
-    /// Whether messages have been rendered and initial scroll completed.
-    @State private var hasScrolledToBottom = false
-
     var body: some View {
         HStack(spacing: 0) {
         ZStack(alignment: .bottom) {
             // Message list
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 12) {
+                    LazyVStack(spacing: 12) {
                         // "Load earlier messages" button
                         if viewModel.hasMoreMessages {
                             Button {
@@ -73,28 +70,27 @@ struct ChatView: View {
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
+
+                        // Bottom spacer — ensures last message can scroll above the composer.
+                        // This is real content height so LazyVStack accounts for it.
+                        Spacer()
+                            .frame(height: bottomBarHeight + 24)
+                            .id("bottom-spacer")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 }
-                .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
-                .opacity(hasScrolledToBottom || viewModel.messages.isEmpty ? 1 : 0)
+                .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
                 }
-                .onChange(of: viewModel.messages.count) { oldCount, newCount in
+                .onChange(of: viewModel.messages.count) { _, _ in
                     if viewModel.isAwaitingResponse,
                        let last = viewModel.messages.last,
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-
-                    if !hasScrolledToBottom && newCount > 0 {
-                        // First batch of messages arrived — do initial scroll
-                        initialScrollToBottom(proxy: proxy)
-                    } else {
-                        scrollToBottom(proxy: proxy)
-                    }
+                    scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     if isSending { scrollToBottom(proxy: proxy) }
@@ -128,7 +124,7 @@ struct ChatView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.ultraThinMaterial)
+                .background(.regularMaterial)
             }
 
             // Floating bottom bar: error banner + model selector + composer
@@ -226,7 +222,7 @@ struct ChatView: View {
         } // end HStack
     }
 
-    /// Scroll to the last message.
+    /// Scroll to the last message, targeting it above the composer.
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let targetId: String = {
             if viewModel.showTypingIndicator { return "typing-indicator" }
@@ -243,22 +239,6 @@ struct ChatView: View {
             proxy.scrollTo(targetId, anchor: .bottom)
         }
     }
-
-    /// Initial scroll after history loads — waits for layout then reveals content.
-    private func initialScrollToBottom(proxy: ScrollViewProxy) {
-        guard let lastId = viewModel.messages.last?.id else { return }
-
-        // Give VStack time to lay out, then scroll and reveal.
-        // Multiple attempts ensure it works even on slower machines.
-        for delay in [0.05, 0.15, 0.3] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                proxy.scrollTo(lastId, anchor: .bottom)
-                if !self.hasScrolledToBottom {
-                    self.hasScrolledToBottom = true
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Layout preference keys
@@ -270,5 +250,3 @@ private struct BottomBarHeightKey: PreferenceKey {
         value = nextValue()
     }
 }
-
-// (ChatWidthKey removed — bubbles size to content naturally)
