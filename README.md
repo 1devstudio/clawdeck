@@ -6,8 +6,8 @@ Native macOS desktop app for [Clawdbot](https://github.com/clawdbot/clawdbot).
 
 ## Requirements
 
-- macOS 14+ (Sonoma)
-- Xcode 15+
+- macOS 26+ (Tahoe)
+- Xcode 26+
 - A running Clawdbot gateway
 
 ## Build

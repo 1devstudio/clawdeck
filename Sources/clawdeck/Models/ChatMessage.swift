@@ -144,7 +144,11 @@ extension ChatMessage {
                 guard let type = block["type"] as? String else { return nil }
                 switch type {
                 case "text":
-                    return block["text"] as? String
+                    let text = block["text"] as? String
+                    if text == nil {
+                        AppLogger.warning("History text block has nil text at index \(index)", category: "Protocol")
+                    }
+                    return text
                 case "thinking":
                     return nil  // Skip thinking blocks
                 case "toolCall":

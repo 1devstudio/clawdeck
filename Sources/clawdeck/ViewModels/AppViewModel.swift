@@ -76,6 +76,15 @@ final class AppViewModel {
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
+    /// Cached list of available models from the active gateway.
+    var availableModels: [GatewayModel] = []
+
+    /// The agent-level default model ID (from SessionsListResult.defaults.model).
+    var defaultModelId: String?
+
+    /// The agent-level default model provider (from SessionsListResult.defaults.modelProvider).
+    var defaultModelProvider: String?
+
     /// Custom accent color set from Agent Settings. Applied app-wide.
     var customAccentColor: Color?
 
@@ -110,6 +119,13 @@ final class AppViewModel {
             }
         }
 
+        // Wire up connection state change handling
+        gatewayManager.onConnectionStateChange = { [weak self] newState, gatewayId in
+            Task { @MainActor in
+                self?.handleConnectionStateChange(newState, gatewayId: gatewayId)
+            }
+        }
+
         // Load persisted accent color
         loadAccentColor()
 
@@ -124,12 +140,14 @@ final class AppViewModel {
     /// Connect to all gateways and load initial data.
     func connectAndLoad() async {
         await gatewayManager.connectAll()
-        await loadInitialData()
-        
-        // Set active binding to the first one if none is selected
+
+        // Set active binding before loading data — loadInitialData() needs
+        // activeClient (which depends on activeBinding) to fetch models.
         if activeBinding == nil, let firstBinding = gatewayManager.sortedAgentBindings.first {
-            await switchAgent(firstBinding)
+            activeBinding = firstBinding
         }
+
+        await loadInitialData()
     }
 
     /// Switch to a different agent binding.
@@ -138,9 +156,10 @@ final class AppViewModel {
         activeBinding = binding
         
         if previousGatewayId != binding.gatewayId {
-            // Different gateway — reload sessions from the new gateway
+            // Different gateway — reload sessions and models from the new gateway
             allGatewaySessions.removeAll()
             await refreshSessions()
+            await fetchModels()
         } else {
             // Same gateway — just filter the cached sessions (instant)
             filterSessionsToActiveAgent()
@@ -155,6 +174,9 @@ final class AppViewModel {
         allGatewaySessions.removeAll()
         sessions.removeAll()
         selectedSessionKey = nil
+        availableModels.removeAll()
+        defaultModelId = nil
+        defaultModelProvider = nil
         messageStore.clearAll()
         chatViewModels.removeAll()
     }
@@ -166,7 +188,8 @@ final class AppViewModel {
         AppLogger.info("Loading initial data...", category: "Session")
         await refreshAgents()
         await refreshSessions()
-        AppLogger.info("Loaded \(agents.count) agents, \(sessions.count) sessions", category: "Session")
+        await fetchModels()
+        AppLogger.info("Loaded \(agents.count) agents, \(sessions.count) sessions, \(availableModels.count) models", category: "Session")
     }
 
     /// Refresh agents from all connected gateways.
@@ -199,6 +222,10 @@ final class AppViewModel {
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
                 allGatewaySessions.map { ($0.key, $0.createdAt) }
             )
+
+            // Store default model info from the gateway response
+            defaultModelId = result.defaults?.model
+            defaultModelProvider = result.defaults?.modelProvider
 
             allGatewaySessions = result.sessions
                 .sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
@@ -233,6 +260,56 @@ final class AppViewModel {
         if let selectedKey = selectedSessionKey,
            !sessions.contains(where: { $0.key == selectedKey }) {
             selectedSessionKey = nil
+        }
+    }
+
+    // MARK: - Models
+
+    /// Fetch available models from the active gateway and cache them.
+    func fetchModels() async {
+        guard let client = activeClient else {
+            availableModels = []
+            return
+        }
+        do {
+            let result = try await client.modelsList()
+            availableModels = result.models
+            AppLogger.info("Fetched \(result.models.count) models from gateway", category: "Session")
+        } catch {
+            AppLogger.error("Failed to fetch models: \(error)", category: "Session")
+            // Keep any previously cached models
+        }
+    }
+
+    /// Set a model override for a session. Pass `nil` to reset to default.
+    ///
+    /// Sends `sessions.patch` with the model (or "default" to reset),
+    /// then updates the local session object.
+    func setSessionModel(_ modelId: String?, for sessionKey: String) async {
+        guard let client = activeClient else { return }
+        let patchModel = modelId ?? "default"
+        do {
+            try await client.patchSession(key: sessionKey, model: patchModel)
+            // Update the local session with the bare model ID and provider
+            if let session = sessions.first(where: { $0.key == sessionKey }) {
+                if let modelId {
+                    // modelId may be "provider/id" — split to store separately
+                    let parts = modelId.split(separator: "/", maxSplits: 1)
+                    if parts.count == 2 {
+                        session.modelProvider = String(parts[0])
+                        session.model = String(parts[1])
+                    } else {
+                        session.model = modelId
+                        session.modelProvider = availableModels.first(where: { $0.id == modelId })?.provider
+                    }
+                } else {
+                    session.model = nil
+                    session.modelProvider = nil
+                }
+            }
+            AppLogger.info("Set model for \(sessionKey): \(patchModel)", category: "Session")
+        } catch {
+            AppLogger.error("Failed to set model for \(sessionKey): \(error)", category: "Session")
         }
     }
 
@@ -467,6 +544,25 @@ final class AppViewModel {
             break
 
         default:
+            break
+        }
+    }
+
+    private func handleConnectionStateChange(_ newState: ConnectionState, gatewayId: String) {
+        // Only act on the active gateway's state changes
+        guard let binding = activeBinding, binding.gatewayId == gatewayId else { return }
+
+        switch newState {
+        case .disconnected, .reconnecting:
+            // Finalize orphaned streaming messages to clear typing indicators
+            AppLogger.info("Active gateway \(gatewayId) \(newState.rawValue), finalizing streams", category: "Network")
+            messageStore.finalizeAllStreaming()
+            // Reset send/await state on all active ChatViewModels
+            for (_, vm) in chatViewModels {
+                vm.isSending = false
+                vm.isAwaitingResponse = false
+            }
+        case .connecting, .connected:
             break
         }
     }

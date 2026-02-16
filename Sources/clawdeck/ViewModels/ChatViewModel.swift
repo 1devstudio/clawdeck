@@ -112,6 +112,34 @@ final class ChatViewModel {
         appViewModel.messageStore.streamingContentVersion
     }
 
+    /// Available models from the gateway (relayed from AppViewModel).
+    var availableModels: [GatewayModel] {
+        appViewModel.availableModels
+    }
+
+    /// The session's per-session model override as "provider/id" (nil = using agent default).
+    var currentModelId: String? {
+        guard let model = session?.model else { return nil }
+        if let provider = session?.modelProvider {
+            return "\(provider)/\(model)"
+        }
+        return model
+    }
+
+    /// The agent-level default model as "provider/id".
+    var defaultModelId: String? {
+        guard let model = appViewModel.defaultModelId else { return nil }
+        if let provider = appViewModel.defaultModelProvider {
+            return "\(provider)/\(model)"
+        }
+        return model
+    }
+
+    /// Set a model override for this session. Pass `nil` to reset to default.
+    func selectModel(_ modelId: String?) async {
+        await appViewModel.setSessionModel(modelId, for: sessionKey)
+    }
+
     /// Focus composer trigger — relays from AppViewModel.
     var focusComposerTrigger: Int {
         appViewModel.focusComposerTrigger
