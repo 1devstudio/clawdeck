@@ -111,6 +111,9 @@ final class MessageStore {
                 // 1. newContent is shorter AND is a prefix of current → stale/duplicate delta, skip
                 // 2. newContent is shorter AND is NOT a prefix → new segment started
                 // 3. newContent is longer or equal → same segment growing, replace
+                //
+                // Safety: never allow a delta to shrink the total accumulated content.
+                // This prevents race conditions at segment boundaries from dropping text.
                 let currentSegmentText = String(existing.content.suffix(from: existing.content.index(existing.content.startIndex, offsetBy: existing.segmentOffset)))
 
                 if !newContent.isEmpty && newContent.count < currentSegmentText.count {
@@ -127,9 +130,13 @@ final class MessageStore {
                         existing.content += newContent
                     }
                 } else {
-                    // Same segment growing (or equal) — replace from segment offset
-                    let prefix = String(existing.content.prefix(existing.segmentOffset))
-                    existing.content = prefix + newContent
+                    // Same segment growing (or equal) — replace from segment offset.
+                    // Guard: only apply if the resulting content is at least as long
+                    // as what we already have, preventing accidental truncation.
+                    let candidate = String(existing.content.prefix(existing.segmentOffset)) + newContent
+                    if candidate.count >= existing.content.count {
+                        existing.content = candidate
+                    }
                 }
                 streamingContentVersion += 1
             } else {
@@ -151,24 +158,24 @@ final class MessageStore {
         case "final":
             if let existing = streamingMessages[runId] {
                 // Finalize the streaming message.
+                //
+                // The final event's content may only contain the *last* text
+                // segment (after the last tool call), not the full accumulated
+                // response. We must never let it shrink what we already have
+                // from streaming deltas — that causes visible truncation.
                 if let content = event.message?.content, !content.isEmpty {
-                    let currentSegmentText = String(existing.content.suffix(from: existing.content.index(existing.content.startIndex, offsetBy: existing.segmentOffset)))
-
                     if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        // No delta content — use final directly
+                        // No delta content was received — use final directly
                         existing.content = content
-                    } else if content.count < currentSegmentText.count {
-                        if currentSegmentText.hasPrefix(content) {
-                            // Final has shorter prefix of current segment — keep accumulated content
-                            // (don't truncate what we already have)
-                        } else {
-                            // Final is a new segment
-                            existing.content += "\n\n" + content
-                        }
+                    } else if content.count > existing.content.count {
+                        // Final is strictly longer than everything we accumulated —
+                        // the gateway sent the complete response. Use it.
+                        existing.content = content
                     } else {
-                        // Final replaces current segment (complete version, equal or longer)
-                        let prefix = String(existing.content.prefix(existing.segmentOffset))
-                        existing.content = prefix + content
+                        // Final is shorter or equal to accumulated content.
+                        // Keep what we have from streaming — it's more complete.
+                        // This handles multi-segment responses where the final
+                        // event only carries the last segment's text.
                     }
                 }
                 existing.state = .complete
