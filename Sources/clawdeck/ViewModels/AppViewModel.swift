@@ -133,12 +133,14 @@ final class AppViewModel {
     /// Connect to all gateways and load initial data.
     func connectAndLoad() async {
         await gatewayManager.connectAll()
-        await loadInitialData()
-        
-        // Set active binding to the first one if none is selected
+
+        // Set active binding before loading data — loadInitialData() needs
+        // activeClient (which depends on activeBinding) to fetch models.
         if activeBinding == nil, let firstBinding = gatewayManager.sortedAgentBindings.first {
-            await switchAgent(firstBinding)
+            activeBinding = firstBinding
         }
+
+        await loadInitialData()
     }
 
     /// Switch to a different agent binding.
@@ -147,9 +149,10 @@ final class AppViewModel {
         activeBinding = binding
         
         if previousGatewayId != binding.gatewayId {
-            // Different gateway — reload sessions from the new gateway
+            // Different gateway — reload sessions and models from the new gateway
             allGatewaySessions.removeAll()
             await refreshSessions()
+            await fetchModels()
         } else {
             // Same gateway — just filter the cached sessions (instant)
             filterSessionsToActiveAgent()
