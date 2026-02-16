@@ -65,13 +65,9 @@ struct ChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
+                .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
-                    // Scroll to bottom when the view first appears (session switch).
-                    // Dispatch async so the LazyVStack has laid out the bottom anchor.
-                    DispatchQueue.main.async {
-                        scrollToBottom(proxy: proxy, animated: false)
-                    }
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     // A new message arrived — if it's from the assistant, we're no longer awaiting
@@ -119,6 +115,23 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
                 .background(.yellow.opacity(0.1))
+            }
+
+            // Model selector — above composer, right-aligned
+            if !viewModel.availableModels.isEmpty {
+                HStack {
+                    Spacer()
+                    ModelSelectorButton(
+                        currentModel: viewModel.currentModelId,
+                        defaultModel: viewModel.defaultModelId,
+                        models: viewModel.availableModels,
+                        onSelect: { modelId in
+                            Task { await viewModel.selectModel(modelId) }
+                        }
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
             }
 
             // Composer

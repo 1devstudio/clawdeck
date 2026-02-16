@@ -30,6 +30,9 @@ final class GatewayManager {
     /// Handler for incoming events.
     var onEvent: ((EventFrame, String) -> Void)?  // (event, gatewayId)
 
+    /// Handler for connection state changes.
+    var onConnectionStateChange: ((ConnectionState, String) -> Void)?  // (newState, gatewayId)
+
     // MARK: - Init
 
     init() {
@@ -175,6 +178,11 @@ final class GatewayManager {
 
         let client = GatewayClient(profile: resolvedProfile)
         clients[gatewayId] = client
+
+        // Wire up connection state change notifications
+        await client.setStateChangeHandler { [weak self] newState in
+            self?.onConnectionStateChange?(newState, gatewayId)
+        }
 
         // Start event processing
         eventTasks[gatewayId] = Task { [weak self] in

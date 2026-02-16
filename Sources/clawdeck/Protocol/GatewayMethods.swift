@@ -322,7 +322,14 @@ struct ChatEventMessage: Sendable {
     /// Convenience: joined text from all "text" content blocks.
     var content: String? {
         guard let blocks = contentBlocks else { return nil }
-        let texts = blocks.compactMap { $0.type == "text" ? $0.text : nil }
+        var texts: [String] = []
+        for block in blocks where block.type == "text" {
+            if let text = block.text {
+                texts.append(text)
+            } else {
+                AppLogger.warning("Text content block has nil text — possibly malformed gateway response", category: "Protocol")
+            }
+        }
         return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
     }
 }
