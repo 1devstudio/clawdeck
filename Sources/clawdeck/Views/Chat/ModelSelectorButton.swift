@@ -118,7 +118,7 @@ private struct ModelSelectorPopover: View {
             }
             .padding(8)
         }
-        .frame(width: 280, maxHeight: 400)
+        .frame(maxWidth: 280, maxHeight: 400)
     }
 
     // MARK: - Default Row
