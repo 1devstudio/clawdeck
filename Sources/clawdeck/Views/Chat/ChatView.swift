@@ -8,21 +8,22 @@ struct ChatView: View {
     /// Throttle streaming scroll — don't fire on every single delta.
     @State private var lastStreamingScroll: Date = .distantPast
 
+    /// Height of the bottom bar (model selector + composer) for scroll inset.
+    @State private var bottomBarHeight: CGFloat = 60
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Message list
+        ZStack(alignment: .bottom) {
+            // Message list — fills the entire area, with bottom padding
+            // so content can scroll up above the floating composer.
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         // "Load earlier messages" button
                         if viewModel.hasMoreMessages {
                             Button {
-                                // Remember the topmost visible message so we can
-                                // scroll back to it after more messages appear.
                                 let anchorId = viewModel.messages.first?.id
                                 viewModel.loadMoreMessages()
                                 if let anchorId {
-                                    // Scroll to keep the user's position stable
                                     DispatchQueue.main.async {
                                         proxy.scrollTo(anchorId, anchor: .top)
                                     }
@@ -65,14 +66,15 @@ struct ChatView: View {
                             .id("bottom-anchor")
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.top, 12)
+                    // Extra bottom padding so messages can scroll above the composer
+                    .padding(.bottom, bottomBarHeight + 8)
                 }
                 .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
-                    // A new message arrived — if it's from the assistant, we're no longer awaiting
                     if viewModel.isAwaitingResponse,
                        let last = viewModel.messages.last,
                        last.role == .assistant {
@@ -88,8 +90,6 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: viewModel.streamingContentVersion) { _, _ in
-                    // Throttle: scroll at most every 150ms during streaming
-                    // to avoid layout thrashing with Markdown height changes.
                     let now = Date()
                     guard now.timeIntervalSince(lastStreamingScroll) > 0.15 else { return }
                     lastStreamingScroll = now
@@ -104,79 +104,87 @@ struct ChatView: View {
                 }
             }
 
-            // Error banner
-            if let error = viewModel.errorMessage {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(error)
+            // Floating bottom bar: error banner + model selector + composer
+            VStack(spacing: 0) {
+                // Error banner
+                if let error = viewModel.errorMessage {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Dismiss") {
+                            viewModel.clearError()
+                        }
+                        .buttonStyle(.plain)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Dismiss") {
-                        viewModel.clearError()
                     }
-                    .buttonStyle(.plain)
-                    .font(.caption)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(.yellow.opacity(0.1))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(.yellow.opacity(0.1))
-            }
 
-            // Model selector + context usage — above composer, right-aligned
-            if !viewModel.availableModels.isEmpty {
-                HStack(spacing: 8) {
-                    Spacer()
+                // Model selector + context usage — right-aligned
+                if !viewModel.availableModels.isEmpty {
+                    HStack(spacing: 8) {
+                        Spacer()
 
-                    // Context window usage indicator
-                    if let total = viewModel.totalTokens, total > 0 {
-                        ContextUsageView(
-                            totalTokens: total,
-                            contextTokens: viewModel.contextTokens
+                        if let total = viewModel.totalTokens, total > 0 {
+                            ContextUsageView(
+                                totalTokens: total,
+                                contextTokens: viewModel.contextTokens
+                            )
+                        }
+
+                        ModelSelectorButton(
+                            currentModel: viewModel.currentModelId,
+                            defaultModel: viewModel.defaultModelId,
+                            models: viewModel.availableModels,
+                            onSelect: { modelId in
+                                Task { await viewModel.selectModel(modelId) }
+                            }
                         )
                     }
-
-                    ModelSelectorButton(
-                        currentModel: viewModel.currentModelId,
-                        defaultModel: viewModel.defaultModelId,
-                        models: viewModel.availableModels,
-                        onSelect: { modelId in
-                            Task { await viewModel.selectModel(modelId) }
-                        }
-                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-            }
 
-            // Composer
-            MessageComposer(
-                text: $viewModel.draftText,
-                isSending: viewModel.isSending || viewModel.isAwaitingResponse,
-                isStreaming: viewModel.isStreaming,
-                pendingAttachments: viewModel.pendingAttachments,
-                focusTrigger: viewModel.focusComposerTrigger,
-                onSend: {
-                    Task { await viewModel.sendMessage() }
-                },
-                onAbort: {
-                    Task { await viewModel.abortGeneration() }
-                },
-                onAddAttachment: { url in
-                    viewModel.addAttachment(from: url)
-                },
-                onPasteImage: { image in
-                    viewModel.addAttachment(image: image)
-                },
-                onRemoveAttachment: { attachment in
-                    viewModel.removeAttachment(attachment)
+                // Composer
+                MessageComposer(
+                    text: $viewModel.draftText,
+                    isSending: viewModel.isSending || viewModel.isAwaitingResponse,
+                    isStreaming: viewModel.isStreaming,
+                    pendingAttachments: viewModel.pendingAttachments,
+                    focusTrigger: viewModel.focusComposerTrigger,
+                    onSend: {
+                        Task { await viewModel.sendMessage() }
+                    },
+                    onAbort: {
+                        Task { await viewModel.abortGeneration() }
+                    },
+                    onAddAttachment: { url in
+                        viewModel.addAttachment(from: url)
+                    },
+                    onPasteImage: { image in
+                        viewModel.addAttachment(image: image)
+                    },
+                    onRemoveAttachment: { attachment in
+                        viewModel.removeAttachment(attachment)
+                    }
+                )
+            }
+            .background(.ultraThinMaterial.opacity(0))
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: BottomBarHeightKey.self, value: geo.size.height)
                 }
             )
+            .onPreferenceChange(BottomBarHeightKey.self) { height in
+                bottomBarHeight = height
+            }
         }
-        // Title is set at the MainView level (agent name)
-        // History is loaded by AppViewModel.selectSession() — no .task needed here.
-        // Adding a .task would race with selectSession and cancel the in-flight load.
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
@@ -198,5 +206,15 @@ struct ChatView: View {
         } else {
             scroll()
         }
+    }
+}
+
+// MARK: - Bottom bar height tracking
+
+/// Preference key to measure the floating bottom bar height dynamically.
+private struct BottomBarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 60
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
