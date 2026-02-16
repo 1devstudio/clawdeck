@@ -98,7 +98,7 @@ struct ChatView: View {
                     .padding(.top, 12)
                     .environment(\.chatWidth, chatWidth)
                 }
-                .contentMargins(.bottom, bottomBarHeight + 8, for: .scrollContent)
+                .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(key: ChatWidthKey.self, value: geo.size.width)
