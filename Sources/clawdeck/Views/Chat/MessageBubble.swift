@@ -88,11 +88,17 @@ struct MessageBubble: View {
                 if message.hasSegments && message.role == .assistant {
                     // Render consolidated segments: merge adjacent text segments
                     // into a single bubble so they don't appear as separate messages.
-                    ForEach(consolidatedSegments, id: \.id) { group in
+                    let segments = consolidatedSegments
+                    let lastTextId = segments.last(where: {
+                        if case .text = $0.kind { return true }
+                        return false
+                    })?.id
+
+                    ForEach(segments, id: \.id) { group in
                         switch group.kind {
                         case .text(let text):
                             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                textBubble(content: text)
+                                textBubble(content: text, showMeta: group.id == lastTextId)
                             }
                         case .toolGroup(let toolCalls):
                             ToolCallsView(toolCalls: toolCalls)
@@ -117,18 +123,6 @@ struct MessageBubble: View {
                     Text(error)
                         .font(.system(size: messageTextSize - 3))
                         .foregroundStyle(.red)
-                }
-
-                // Timestamp + usage badge on the same line
-                HStack(spacing: 6) {
-                    Text(message.timestamp, style: .time)
-                        .font(.system(size: messageTextSize - 3))
-                        .foregroundStyle(.tertiary)
-
-                    if message.role == .assistant, let usage = message.usage {
-                        Spacer()
-                        UsageBadgeView(usage: usage)
-                    }
                 }
 
                 // Sending indicator
@@ -156,37 +150,55 @@ struct MessageBubble: View {
     // MARK: - Text bubble
 
     @ViewBuilder
-    private func textBubble(content: String) -> some View {
+    private func textBubble(content: String, showMeta: Bool = true) -> some View {
         ZStack(alignment: .topTrailing) {
-            Group {
-                if message.role == .assistant && message.state != .error {
-                    Markdown(content)
-                        .markdownTextStyle {
-                            FontSize(messageTextSize)
+            VStack(alignment: .leading, spacing: 0) {
+                Group {
+                    if message.role == .assistant && message.state != .error {
+                        Markdown(content)
+                            .markdownTextStyle {
+                                FontSize(messageTextSize)
+                            }
+                            .markdownTextStyle(\.code) {
+                                FontFamilyVariant(.monospaced)
+                                FontSize(.em(0.88))
+                                ForegroundColor(inlineCodeColor)
+                                BackgroundColor(inlineCodeColor.opacity(0.12))
+                            }
+                            .markdownBlockStyle(\.codeBlock) { configuration in
+                                HighlightedCodeBlock(
+                                    code: configuration.content,
+                                    language: configuration.language
+                                )
+                                .markdownMargin(top: .em(0.4), bottom: .em(0.4))
+                            }
+                            .textSelection(.enabled)
+                    } else {
+                        Text(content)
+                            .font(.system(size: messageTextSize))
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, showMeta ? 4 : 10)
+
+                // Timestamp + usage inside the bubble
+                if showMeta {
+                    HStack(spacing: 6) {
+                        Text(message.timestamp, style: .time)
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.tertiary)
+
+                        if message.role == .assistant, let usage = message.usage {
+                            Spacer()
+                            UsageBadgeView(usage: usage)
                         }
-                        .markdownTextStyle(\.code) {
-                            FontFamilyVariant(.monospaced)
-                            FontSize(.em(0.88))
-                            ForegroundColor(inlineCodeColor)
-                            BackgroundColor(inlineCodeColor.opacity(0.12))
-                        }
-                        .markdownBlockStyle(\.codeBlock) { configuration in
-                            HighlightedCodeBlock(
-                                code: configuration.content,
-                                language: configuration.language
-                            )
-                            .markdownMargin(top: .em(0.4), bottom: .em(0.4))
-                        }
-                        .textSelection(.enabled)
-                } else {
-                    Text(content)
-                        .font(.system(size: messageTextSize))
-                        .textSelection(.enabled)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
             .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
             .overlay {
                 if message.state == .error {
