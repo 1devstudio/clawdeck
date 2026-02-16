@@ -160,14 +160,27 @@ struct ShortcutSettingsView: View {
             Section("Navigation") {
                 LabeledContent("Quick Open", value: "⌘K")
                 LabeledContent("New Session", value: "⌘N")
+                LabeledContent("Duplicate Session", value: "⌘⇧N")
+                LabeledContent("Close Session", value: "⌘W")
                 LabeledContent("Toggle Sidebar", value: "⌘⇧S")
                 LabeledContent("Toggle Inspector", value: "⌘⇧I")
+                LabeledContent("Application Log", value: "⌘⇧L")
             }
 
             Section("Chat") {
-                LabeledContent("Send Message", value: "⌘↩")
+                LabeledContent("Send Message", value: "↩")
+                LabeledContent("New Line", value: "⇧↩")
                 LabeledContent("Stop Generation", value: "Esc")
                 LabeledContent("Focus Composer", value: "⌘L")
+            }
+
+            Section("Session Navigation") {
+                LabeledContent("Previous Session", value: "⌘↑")
+                LabeledContent("Next Session", value: "⌘↓")
+            }
+
+            Section("Agent Switching") {
+                LabeledContent("Switch to Agent 1–9", value: "⌘1 – ⌘9")
             }
         }
         .formStyle(.grouped)
