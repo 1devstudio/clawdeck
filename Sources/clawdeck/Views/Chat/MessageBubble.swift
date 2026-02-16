@@ -72,18 +72,19 @@ struct MessageBubble: View {
 
                 // Message content — interleaved segments or plain text
                 if message.hasSegments && message.role == .assistant {
-                    // Render segments in order: text bubbles interleaved with tool groups
-                    ForEach(message.segments) { segment in
-                        switch segment {
-                        case .text(_, let text):
+                    // Render consolidated segments: merge adjacent text segments
+                    // into a single bubble so they don't appear as separate messages.
+                    ForEach(consolidatedSegments, id: \.id) { group in
+                        switch group.kind {
+                        case .text(let text):
                             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 textBubble(content: text)
                             }
-                        case .toolGroup(_, let toolCalls):
+                        case .toolGroup(let toolCalls):
                             ToolCallsView(toolCalls: toolCalls)
                                 .padding(.leading, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                        case .thinking(_, let content):
+                        case .thinking(let content):
                             ThinkingBlockView(
                                 content: content,
                                 isStreaming: message.state == .streaming
@@ -104,10 +105,17 @@ struct MessageBubble: View {
                         .foregroundStyle(.red)
                 }
 
-                // Timestamp
-                Text(message.timestamp, style: .time)
-                    .font(.system(size: messageTextSize - 3))
-                    .foregroundStyle(.tertiary)
+                // Timestamp + usage badge on the same line
+                HStack(spacing: 6) {
+                    Text(message.timestamp, style: .time)
+                        .font(.system(size: messageTextSize - 3))
+                        .foregroundStyle(.tertiary)
+
+                    if message.role == .assistant, let usage = message.usage {
+                        Spacer()
+                        UsageBadgeView(usage: usage)
+                    }
+                }
 
                 // Sending indicator
                 if message.state == .sending {
@@ -326,6 +334,212 @@ struct MessageBubble: View {
         case .toolCall, .toolResult:
             return .regular.tint(.gray)
         }
+    }
+
+    // MARK: - Segment consolidation
+
+    /// Merge text segments into as few bubbles as possible.
+    ///
+    /// For completed messages, all text segments are joined into a single bubble
+    /// with tool groups collected separately. This prevents multi-step tool use
+    /// turns from rendering 20+ tiny narration bubbles.
+    ///
+    /// For streaming messages, we keep the interleaved order so the user can
+    /// see progress as it happens.
+    private var consolidatedSegments: [ConsolidatedSegment] {
+        if message.state == .streaming {
+            return streamingConsolidatedSegments
+        }
+        return completedConsolidatedSegments
+    }
+
+    /// Streaming: preserve interleaved order but merge adjacent text.
+    private var streamingConsolidatedSegments: [ConsolidatedSegment] {
+        var result: [ConsolidatedSegment] = []
+        var pendingTexts: [String] = []
+        var pendingId: String?
+
+        func flushText() {
+            guard !pendingTexts.isEmpty, let id = pendingId else { return }
+            let joined = pendingTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+            pendingTexts = []
+            pendingId = nil
+        }
+
+        for segment in message.segments {
+            switch segment {
+            case .text(let id, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if pendingId == nil { pendingId = id }
+                pendingTexts.append(content)
+
+            case .toolGroup(let id, let toolCalls):
+                flushText()
+                result.append(ConsolidatedSegment(id: id, kind: .toolGroup(toolCalls)))
+
+            case .thinking(let id, let content):
+                flushText()
+                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            }
+        }
+        flushText()
+        return result
+    }
+
+    /// Completed: collect all text into one bubble, all tool groups into one
+    /// collapsed section, and thinking blocks stay separate.
+    private var completedConsolidatedSegments: [ConsolidatedSegment] {
+        var result: [ConsolidatedSegment] = []
+        var allTexts: [String] = []
+        var allToolCalls: [ToolCall] = []
+        var firstTextId: String?
+        var firstToolGroupId: String?
+
+        for segment in message.segments {
+            switch segment {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
+
+            case .toolGroup(_, let toolCalls):
+                if firstToolGroupId == nil { firstToolGroupId = segment.id }
+                allToolCalls.append(contentsOf: toolCalls)
+
+            case .thinking(let id, let content):
+                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            }
+        }
+
+        // Emit: thinking blocks first (already added), then one text bubble,
+        // then one combined tool group.
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+        }
+
+        if !allToolCalls.isEmpty, let id = firstToolGroupId {
+            result.append(ConsolidatedSegment(id: id, kind: .toolGroup(allToolCalls)))
+        }
+
+        return result
+    }
+}
+
+/// A consolidated rendering segment — adjacent text segments merged into one.
+private struct ConsolidatedSegment: Identifiable {
+    let id: String
+    let kind: Kind
+
+    enum Kind {
+        case text(String)
+        case toolGroup([ToolCall])
+        case thinking(String)
+    }
+}
+
+// MARK: - Usage Badge View
+
+/// A subtle badge showing token usage and cost for an assistant message.
+struct UsageBadgeView: View {
+    let usage: MessageUsage
+    @Environment(\.messageTextSize) private var messageTextSize
+    @State private var showPopover = false
+
+    var body: some View {
+        if !usage.compactSummary.isEmpty {
+            Button(action: { showPopover.toggle() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "gauge.with.dots.needle.33percent")
+                        .font(.system(size: messageTextSize - 5))
+                    Text(usage.compactSummary)
+                        .font(.system(size: messageTextSize - 4, design: .monospaced))
+                }
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+                UsageDetailPopover(usage: usage)
+            }
+        }
+    }
+}
+
+/// Detailed usage breakdown shown in a popover.
+struct UsageDetailPopover: View {
+    let usage: MessageUsage
+    @Environment(\.messageTextSize) private var messageTextSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Token Usage")
+                .font(.system(size: messageTextSize - 1, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Divider()
+
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                usageRow(label: "Input", tokens: usage.inputTokens, cost: usage.cost?.input)
+                usageRow(label: "Output", tokens: usage.outputTokens, cost: usage.cost?.output)
+
+                if usage.cacheReadTokens > 0 {
+                    usageRow(label: "Cache Read", tokens: usage.cacheReadTokens, cost: usage.cost?.cacheRead)
+                }
+                if usage.cacheWriteTokens > 0 {
+                    usageRow(label: "Cache Write", tokens: usage.cacheWriteTokens, cost: usage.cost?.cacheWrite)
+                }
+
+                Divider()
+                    .gridCellColumns(3)
+
+                GridRow {
+                    Text("Total")
+                        .fontWeight(.semibold)
+                    Text(formatTokens(usage.totalTokens))
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                    if let total = usage.cost?.total, total > 0 {
+                        Text(String(format: "$%.4f", total))
+                            .fontWeight(.semibold)
+                            .monospacedDigit()
+                    } else {
+                        Text("")
+                    }
+                }
+            }
+            .font(.system(size: messageTextSize - 2))
+        }
+        .padding(12)
+        .frame(minWidth: 240)
+    }
+
+    @ViewBuilder
+    private func usageRow(label: String, tokens: Int, cost: Double?) -> some View {
+        GridRow {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Text(formatTokens(tokens))
+                .monospacedDigit()
+            if let cost, cost > 0 {
+                Text(String(format: "$%.4f", cost))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            } else {
+                Text("—")
+                    .foregroundStyle(.quaternary)
+            }
+        }
+    }
+
+    private func formatTokens(_ count: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
     }
 }
 

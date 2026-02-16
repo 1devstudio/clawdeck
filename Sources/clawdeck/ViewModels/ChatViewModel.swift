@@ -135,6 +135,16 @@ final class ChatViewModel {
         return model
     }
 
+    /// The session's total tokens used (context usage).
+    var totalTokens: Int? {
+        session?.totalTokens
+    }
+
+    /// The context window size for this session (from session or agent default).
+    var contextTokens: Int? {
+        session?.contextTokens ?? appViewModel.defaultContextTokens
+    }
+
     /// Set a model override for this session. Pass `nil` to reset to default.
     func selectModel(_ modelId: String?) async {
         await appViewModel.setSessionModel(modelId, for: sessionKey)

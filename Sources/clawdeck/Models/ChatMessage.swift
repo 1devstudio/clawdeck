@@ -64,6 +64,50 @@ enum MessageSegment: Identifiable {
     }
 }
 
+/// Token usage and cost information for an assistant message.
+struct MessageUsage {
+    var inputTokens: Int = 0
+    var outputTokens: Int = 0
+    var cacheReadTokens: Int = 0
+    var cacheWriteTokens: Int = 0
+    var totalTokens: Int = 0
+    var cost: MessageCost?
+
+    /// Compact token string (e.g. "17.2k" or "342")
+    var formattedTotalTokens: String {
+        if totalTokens >= 1_000_000 {
+            return String(format: "%.1fM", Double(totalTokens) / 1_000_000)
+        } else if totalTokens >= 1_000 {
+            let k = Double(totalTokens) / 1_000
+            return k >= 100 ? String(format: "%.0fk", k) : String(format: "%.1fk", k)
+        }
+        return "\(totalTokens)"
+    }
+
+    /// Compact cost string (e.g. "$0.01")
+    var formattedTotalCost: String? {
+        guard let total = cost?.total, total > 0 else { return nil }
+        return total < 0.01 ? "<$0.01" : String(format: "$%.2f", total)
+    }
+
+    /// Compact summary (e.g. "17.2k tokens · $0.01")
+    var compactSummary: String {
+        var parts: [String] = []
+        if totalTokens > 0 { parts.append("\(formattedTotalTokens) tokens") }
+        if let costStr = formattedTotalCost { parts.append(costStr) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// Cost breakdown for a message.
+struct MessageCost {
+    var input: Double = 0
+    var output: Double = 0
+    var cacheRead: Double = 0
+    var cacheWrite: Double = 0
+    var total: Double = 0
+}
+
 /// A single message within a chat session.
 @Observable
 final class ChatMessage: Identifiable {
@@ -85,6 +129,9 @@ final class ChatMessage: Identifiable {
     /// This is the primary data for rendering. `content` is kept in sync
     /// as the joined text (for search, copy, etc.)
     var segments: [MessageSegment] = []
+
+    /// Token usage and cost information (for assistant messages).
+    var usage: MessageUsage?
 
     /// Flat list of all tool calls (convenience accessor for search/merge).
     var toolCalls: [ToolCall] {
@@ -326,6 +373,30 @@ extension ChatMessage {
             model: model
         )
         message.segments = segments
+
+        // Parse usage data (for assistant messages)
+        if messageRole == .assistant, let usageDict = raw["usage"] as? [String: Any] {
+            var usage = MessageUsage()
+            usage.inputTokens = usageDict["input"] as? Int ?? 0
+            usage.outputTokens = usageDict["output"] as? Int ?? 0
+            usage.cacheReadTokens = usageDict["cacheRead"] as? Int ?? 0
+            usage.cacheWriteTokens = usageDict["cacheWrite"] as? Int ?? 0
+            usage.totalTokens = usageDict["totalTokens"] as? Int
+                ?? (usage.inputTokens + usage.outputTokens)
+
+            if let costDict = usageDict["cost"] as? [String: Any] {
+                var cost = MessageCost()
+                cost.input = (costDict["input"] as? Double) ?? 0
+                cost.output = (costDict["output"] as? Double) ?? 0
+                cost.cacheRead = (costDict["cacheRead"] as? Double) ?? 0
+                cost.cacheWrite = (costDict["cacheWrite"] as? Double) ?? 0
+                cost.total = (costDict["total"] as? Double) ?? 0
+                usage.cost = cost
+            }
+
+            message.usage = usage
+        }
+
         return message
     }
 }
