@@ -166,7 +166,7 @@ private struct ModelSelectorPopover: View {
                     }
 
                     if groupedModels.isEmpty && !searchText.isEmpty {
-                        Text("No models match "\(searchText)"")
+                        Text("No models match \"\(searchText)\"")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .padding(12)
