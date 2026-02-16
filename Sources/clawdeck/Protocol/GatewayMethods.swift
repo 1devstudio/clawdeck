@@ -295,17 +295,19 @@ struct ChatEventPayload: Codable, Sendable {
 struct ContentBlock: Sendable, Encodable {
     let type: String
     let text: String?
+    let thinking: String?
 }
 
 extension ContentBlock: Decodable {
     enum CodingKeys: String, CodingKey {
-        case type, text
+        case type, text, thinking
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = (try? container.decode(String.self, forKey: .type)) ?? "unknown"
         text = try? container.decodeIfPresent(String.self, forKey: .text)
+        thinking = try? container.decodeIfPresent(String.self, forKey: .thinking)
     }
 }
 
@@ -331,6 +333,18 @@ struct ChatEventMessage: Sendable {
             }
         }
         return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+    }
+
+    /// Joined thinking text from all "thinking" content blocks.
+    var thinkingContent: String? {
+        guard let blocks = contentBlocks else { return nil }
+        let texts = blocks.compactMap { $0.type == "thinking" ? $0.thinking : nil }
+        return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+    }
+
+    /// Whether any thinking blocks are present.
+    var hasThinking: Bool {
+        contentBlocks?.contains { $0.type == "thinking" } ?? false
     }
 }
 

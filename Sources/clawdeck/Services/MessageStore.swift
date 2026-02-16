@@ -28,6 +28,12 @@ final class MessageStore {
     /// Tracks which text segment index we're currently streaming into per runId.
     private var currentTextSegmentIndex: [String: Int] = [:]
 
+    /// Tracks the character count of the last thinking delta per runId.
+    private var lastThinkingDeltaLength: [String: Int] = [:]
+
+    /// Tracks which thinking segment index we're currently streaming into per runId.
+    private var currentThinkingSegmentIndex: [String: Int] = [:]
+
     /// Incremented on every streaming delta — observe this to trigger auto-scroll.
     private(set) var streamingContentVersion: Int = 0
 
@@ -109,8 +115,29 @@ final class MessageStore {
         switch event.state {
         case "delta":
             let newContent = event.message?.content ?? ""
+            let newThinking = event.message?.thinkingContent
 
             if let existing = streamingMessages[runId] {
+                // Handle thinking content
+                if let thinking = newThinking, !thinking.isEmpty {
+                    let prevThinkingLength = lastThinkingDeltaLength[runId] ?? 0
+
+                    if thinking.count < prevThinkingLength {
+                        // New thinking segment
+                        existing.segments.append(.thinking(id: "think-\(existing.segments.count)", content: thinking))
+                        currentThinkingSegmentIndex[runId] = existing.segments.count - 1
+                    } else if let segIdx = currentThinkingSegmentIndex[runId], segIdx < existing.segments.count {
+                        // Update current thinking segment
+                        existing.segments[segIdx] = .thinking(id: existing.segments[segIdx].id, content: thinking)
+                    } else {
+                        // First thinking segment
+                        existing.segments.append(.thinking(id: "think-\(existing.segments.count)", content: thinking))
+                        currentThinkingSegmentIndex[runId] = existing.segments.count - 1
+                    }
+                    lastThinkingDeltaLength[runId] = thinking.count
+                }
+
+                // Handle text content
                 let prevLength = lastDeltaLength[runId] ?? 0
 
                 if !newContent.isEmpty && newContent.count < prevLength {
@@ -130,7 +157,7 @@ final class MessageStore {
                     currentTextSegmentIndex[runId] = existing.segments.count - 1
 
                     lastDeltaLength[runId] = newContent.count
-                } else {
+                } else if !newContent.isEmpty {
                     // Same segment growing — replace from segment offset.
                     let candidate = String(existing.content.prefix(existing.segmentOffset)) + newContent
                     if candidate.count >= existing.content.count {
@@ -164,9 +191,26 @@ final class MessageStore {
                 message.content = newContent
                 message.segmentOffset = 0
 
-                // Initialize segments with the first text
-                message.segments = [.text(id: "seg-0", content: newContent)]
-                currentTextSegmentIndex[runId] = 0
+                // Initialize segments — thinking first if present, then text
+                var initialSegments: [MessageSegment] = []
+
+                if let thinking = newThinking, !thinking.isEmpty {
+                    initialSegments.append(.thinking(id: "think-0", content: thinking))
+                    currentThinkingSegmentIndex[runId] = 0
+                    lastThinkingDeltaLength[runId] = thinking.count
+                }
+
+                if !newContent.isEmpty {
+                    initialSegments.append(.text(id: "seg-\(initialSegments.count)", content: newContent))
+                    currentTextSegmentIndex[runId] = initialSegments.count - 1
+                }
+
+                if initialSegments.isEmpty {
+                    initialSegments.append(.text(id: "seg-0", content: newContent))
+                    currentTextSegmentIndex[runId] = 0
+                }
+
+                message.segments = initialSegments
 
                 lastDeltaLength[runId] = newContent.count
                 streamingMessages[runId] = message
@@ -194,6 +238,8 @@ final class MessageStore {
                 streamingMessages.removeValue(forKey: runId)
                 lastDeltaLength.removeValue(forKey: runId)
                 currentTextSegmentIndex.removeValue(forKey: runId)
+                lastThinkingDeltaLength.removeValue(forKey: runId)
+                currentThinkingSegmentIndex.removeValue(forKey: runId)
             } else {
                 let contentLength = event.message?.content?.count ?? 0
                 AppLogger.debug("Final without prior deltas for runId=\(runId): \(contentLength) chars", category: "Protocol")
@@ -218,6 +264,8 @@ final class MessageStore {
                 streamingMessages.removeValue(forKey: runId)
                 lastDeltaLength.removeValue(forKey: runId)
                 currentTextSegmentIndex.removeValue(forKey: runId)
+                lastThinkingDeltaLength.removeValue(forKey: runId)
+                currentThinkingSegmentIndex.removeValue(forKey: runId)
             }
 
         default:
@@ -238,6 +286,8 @@ final class MessageStore {
             streamingMessages.removeValue(forKey: key)
             lastDeltaLength.removeValue(forKey: key)
             currentTextSegmentIndex.removeValue(forKey: key)
+            lastThinkingDeltaLength.removeValue(forKey: key)
+            currentThinkingSegmentIndex.removeValue(forKey: key)
         }
     }
 
@@ -251,6 +301,8 @@ final class MessageStore {
         streamingMessages.removeAll()
         lastDeltaLength.removeAll()
         currentTextSegmentIndex.removeAll()
+        lastThinkingDeltaLength.removeAll()
+        currentThinkingSegmentIndex.removeAll()
     }
 
     // MARK: - Tool calls
@@ -311,6 +363,8 @@ final class MessageStore {
             streamingMessages.removeValue(forKey: key)
             lastDeltaLength.removeValue(forKey: key)
             currentTextSegmentIndex.removeValue(forKey: key)
+            lastThinkingDeltaLength.removeValue(forKey: key)
+            currentThinkingSegmentIndex.removeValue(forKey: key)
         }
     }
 
@@ -321,5 +375,7 @@ final class MessageStore {
         streamingMessages.removeAll()
         lastDeltaLength.removeAll()
         currentTextSegmentIndex.removeAll()
+        lastThinkingDeltaLength.removeAll()
+        currentThinkingSegmentIndex.removeAll()
     }
 }
