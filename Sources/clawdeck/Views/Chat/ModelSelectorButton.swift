@@ -233,11 +233,16 @@ private struct ModelSelectorPopover: View {
 
     // MARK: - Model Row
 
+    /// Qualified model ID for the gateway: "provider/id".
+    private func qualifiedId(_ model: GatewayModel) -> String {
+        "\(model.provider)/\(model.id)"
+    }
+
     private func modelRow(_ model: GatewayModel) -> some View {
-        let isSelected = activeModelId == model.id
+        let isSelected = activeModelId == qualifiedId(model)
 
         return Button {
-            onSelect(model.id)
+            onSelect(qualifiedId(model))
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -320,20 +325,35 @@ private struct BadgePill: View {
 
 /// Utility for abbreviating model IDs into human-friendly display names.
 enum ModelDisplayHelper {
+    /// Find a model by qualified ID ("provider/id") or bare ID.
+    private static func findModel(_ modelId: String, in models: [GatewayModel]) -> GatewayModel? {
+        // Try qualified match first: "provider/id"
+        let parts = modelId.split(separator: "/", maxSplits: 1)
+        if parts.count == 2 {
+            let provider = String(parts[0])
+            let bareId = String(parts[1])
+            if let match = models.first(where: { $0.provider == provider && $0.id == bareId }) {
+                return match
+            }
+        }
+        // Fall back to bare ID match
+        return models.first(where: { $0.id == modelId })
+    }
+
     /// Full display name for the popover (e.g., "Claude Sonnet 4").
     static func displayName(for modelId: String, models: [GatewayModel]) -> String {
-        if let model = models.first(where: { $0.id == modelId }), !model.name.isEmpty {
+        if let model = findModel(modelId, in: models), !model.name.isEmpty {
             return model.name
         }
-        // Strip provider prefix
+        // Strip provider prefix for display
         let parts = modelId.split(separator: "/", maxSplits: 1)
         return parts.count > 1 ? String(parts[1]) : modelId
     }
 
     /// Short name for the compact pill button (e.g., "Sonnet 4", "GPT-4o").
     static func pillName(for modelId: String, models: [GatewayModel]) -> String {
-        // First try the GatewayModel name and abbreviate it
-        if let model = models.first(where: { $0.id == modelId }), !model.name.isEmpty {
+        // First try finding the model and abbreviate its name
+        if let model = findModel(modelId, in: models), !model.name.isEmpty {
             return abbreviate(model.name)
         }
 

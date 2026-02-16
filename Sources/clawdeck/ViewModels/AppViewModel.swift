@@ -283,12 +283,20 @@ final class AppViewModel {
         let patchModel = modelId ?? "default"
         do {
             try await client.patchSession(key: sessionKey, model: patchModel)
-            // Update the local session
+            // Update the local session with the bare model ID and provider
             if let session = sessions.first(where: { $0.key == sessionKey }) {
-                session.model = modelId
-                if let modelId, let gatewayModel = availableModels.first(where: { $0.id == modelId }) {
-                    session.modelProvider = gatewayModel.provider
+                if let modelId {
+                    // modelId may be "provider/id" — split to store separately
+                    let parts = modelId.split(separator: "/", maxSplits: 1)
+                    if parts.count == 2 {
+                        session.modelProvider = String(parts[0])
+                        session.model = String(parts[1])
+                    } else {
+                        session.model = modelId
+                        session.modelProvider = availableModels.first(where: { $0.id == modelId })?.provider
+                    }
                 } else {
+                    session.model = nil
                     session.modelProvider = nil
                 }
             }

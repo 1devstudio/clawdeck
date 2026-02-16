@@ -117,14 +117,22 @@ final class ChatViewModel {
         appViewModel.availableModels
     }
 
-    /// The session's per-session model override (nil = using agent default).
+    /// The session's per-session model override as "provider/id" (nil = using agent default).
     var currentModelId: String? {
-        session?.model
+        guard let model = session?.model else { return nil }
+        if let provider = session?.modelProvider {
+            return "\(provider)/\(model)"
+        }
+        return model
     }
 
-    /// The agent-level default model ID.
+    /// The agent-level default model as "provider/id".
     var defaultModelId: String? {
-        appViewModel.defaultModelId
+        guard let model = appViewModel.defaultModelId else { return nil }
+        if let provider = appViewModel.defaultModelProvider {
+            return "\(provider)/\(model)"
+        }
+        return model
     }
 
     /// Set a model override for this session. Pass `nil` to reset to default.
