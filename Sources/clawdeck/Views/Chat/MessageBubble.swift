@@ -338,10 +338,23 @@ struct MessageBubble: View {
 
     // MARK: - Segment consolidation
 
-    /// Merge adjacent text segments into single entries so they render as
-    /// one continuous bubble instead of many separate ones.
-    /// Tool groups and thinking blocks act as boundaries between text runs.
+    /// Merge text segments into as few bubbles as possible.
+    ///
+    /// For completed messages, all text segments are joined into a single bubble
+    /// with tool groups collected separately. This prevents multi-step tool use
+    /// turns from rendering 20+ tiny narration bubbles.
+    ///
+    /// For streaming messages, we keep the interleaved order so the user can
+    /// see progress as it happens.
     private var consolidatedSegments: [ConsolidatedSegment] {
+        if message.state == .streaming {
+            return streamingConsolidatedSegments
+        }
+        return completedConsolidatedSegments
+    }
+
+    /// Streaming: preserve interleaved order but merge adjacent text.
+    private var streamingConsolidatedSegments: [ConsolidatedSegment] {
         var result: [ConsolidatedSegment] = []
         var pendingTexts: [String] = []
         var pendingId: String?
@@ -372,6 +385,46 @@ struct MessageBubble: View {
             }
         }
         flushText()
+        return result
+    }
+
+    /// Completed: collect all text into one bubble, all tool groups into one
+    /// collapsed section, and thinking blocks stay separate.
+    private var completedConsolidatedSegments: [ConsolidatedSegment] {
+        var result: [ConsolidatedSegment] = []
+        var allTexts: [String] = []
+        var allToolCalls: [ToolCall] = []
+        var firstTextId: String?
+        var firstToolGroupId: String?
+
+        for segment in message.segments {
+            switch segment {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
+
+            case .toolGroup(_, let toolCalls):
+                if firstToolGroupId == nil { firstToolGroupId = segment.id }
+                allToolCalls.append(contentsOf: toolCalls)
+
+            case .thinking(let id, let content):
+                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            }
+        }
+
+        // Emit: thinking blocks first (already added), then one text bubble,
+        // then one combined tool group.
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+        }
+
+        if !allToolCalls.isEmpty, let id = firstToolGroupId {
+            result.append(ConsolidatedSegment(id: id, kind: .toolGroup(allToolCalls)))
+        }
+
         return result
     }
 }
