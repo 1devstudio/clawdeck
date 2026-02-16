@@ -127,6 +127,7 @@ struct ChatView: View {
                 isSending: viewModel.isSending || viewModel.isAwaitingResponse,
                 isStreaming: viewModel.isStreaming,
                 pendingAttachments: viewModel.pendingAttachments,
+                focusTrigger: viewModel.focusComposerTrigger,
                 onSend: {
                     Task { await viewModel.sendMessage() }
                 },

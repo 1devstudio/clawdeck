@@ -149,16 +149,33 @@ struct ClawdDeckApp: App {
         .commands {
             TextEditingCommands()
 
+            // MARK: - File / New Item
+
             CommandGroup(after: .newItem) {
                 Button("New Session") {
-                    // TODO: Create new session via gateway
+                    Task { await appViewModel.createNewSession() }
                 }
                 .keyboardShortcut("n", modifiers: .command)
+
+                Button("New Session in New Window") {
+                    Task { await appViewModel.createNewSession() }
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Close Session") {
+                    appViewModel.closeCurrentSession()
+                }
+                .keyboardShortcut("w", modifiers: .command)
+                .disabled(appViewModel.selectedSessionKey == nil)
             }
+
+            // MARK: - View / Sidebar
 
             CommandGroup(replacing: .sidebar) {
                 Button("Toggle Sidebar") {
-                    // Handled by NavigationSplitView
+                    appViewModel.toggleSidebar()
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
 
@@ -166,13 +183,51 @@ struct ClawdDeckApp: App {
                     appViewModel.isInspectorVisible.toggle()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
-                
+
                 Divider()
-                
+
                 Button("Application Log") {
                     openWindow(id: "application-log")
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Quick Open") {
+                    appViewModel.focusSearchBar()
+                }
+                .keyboardShortcut("k", modifiers: .command)
+
+                Button("Focus Composer") {
+                    appViewModel.focusComposer()
+                }
+                .keyboardShortcut("l", modifiers: .command)
+                .disabled(appViewModel.selectedSessionKey == nil)
+
+                Divider()
+
+                Button("Previous Session") {
+                    appViewModel.selectPreviousSession()
+                }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+                .disabled(appViewModel.sidebarViewModel.filteredSessions.isEmpty)
+
+                Button("Next Session") {
+                    appViewModel.selectNextSession()
+                }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+                .disabled(appViewModel.sidebarViewModel.filteredSessions.isEmpty)
+            }
+
+            // MARK: - Agent Switching (⌘1-9)
+
+            CommandMenu("Agents") {
+                ForEach(Array(appViewModel.gatewayManager.sortedAgentBindings.prefix(9).enumerated()), id: \.offset) { index, binding in
+                    Button("Switch to \(binding.displayName(from: appViewModel.gatewayManager))") {
+                        appViewModel.switchToAgent(at: index + 1)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                }
             }
         }
 

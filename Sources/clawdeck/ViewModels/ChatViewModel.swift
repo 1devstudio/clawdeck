@@ -112,6 +112,11 @@ final class ChatViewModel {
         appViewModel.messageStore.streamingContentVersion
     }
 
+    /// Focus composer trigger — relays from AppViewModel.
+    var focusComposerTrigger: Int {
+        appViewModel.focusComposerTrigger
+    }
+
     /// Display name of the active agent (from the connection profile).
     var agentDisplayName: String {
         appViewModel.activeBinding?.displayName(from: appViewModel.gatewayManager) ?? "Assistant"
