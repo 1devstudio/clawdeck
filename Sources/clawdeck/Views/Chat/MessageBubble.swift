@@ -70,64 +70,24 @@ struct MessageBubble: View {
                     }
                 }
 
-                // Message content (hidden for image-only messages)
-                if hasTextContent {
-                    ZStack(alignment: .topTrailing) {
-                        Group {
-                            if message.role == .assistant && message.state != .error {
-                                Markdown(message.content)
-                                    .markdownTextStyle {
-                                        FontSize(messageTextSize)
-                                    }
-                                    .markdownTextStyle(\.code) {
-                                        FontFamilyVariant(.monospaced)
-                                        FontSize(.em(0.88))
-                                        ForegroundColor(inlineCodeColor)
-                                        BackgroundColor(inlineCodeColor.opacity(0.12))
-                                    }
-                                    .markdownBlockStyle(\.codeBlock) { configuration in
-                                        HighlightedCodeBlock(
-                                            code: configuration.content,
-                                            language: configuration.language
-                                        )
-                                        .markdownMargin(top: .em(0.4), bottom: .em(0.4))
-                                    }
-                                    .textSelection(.enabled)
-                            } else {
-                                Text(message.content)
-                                    .font(.system(size: messageTextSize))
-                                    .textSelection(.enabled)
+                // Message content — interleaved segments or plain text
+                if message.hasSegments && message.role == .assistant {
+                    // Render segments in order: text bubbles interleaved with tool groups
+                    ForEach(message.segments) { segment in
+                        switch segment {
+                        case .text(_, let text):
+                            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                textBubble(content: text)
                             }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.top, 8)
-                        .padding(.bottom, 10)
-                        .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
-                        .overlay {
-                            if message.state == .error {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                            } else if isCurrentMatch {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.yellow, lineWidth: 2)
-                            } else if isSearchMatch {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
-                            }
-                        }
-
-                        // Copy buttons — shown on hover for assistant messages
-                        if isHovered && message.role == .assistant && message.state != .streaming {
-                            MessageCopyButtons(
-                                copiedText: $copiedText,
-                                copiedMarkdown: $copiedMarkdown,
-                                onCopyText: { copyRenderedText() },
-                                onCopyMarkdown: { copyAsMarkdown() }
-                            )
-                            .padding(.top, 6)
-                            .padding(.trailing, 6)
+                        case .toolGroup(_, let toolCalls):
+                            ToolCallsView(toolCalls: toolCalls)
+                                .padding(.leading, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                } else if hasTextContent {
+                    // Non-assistant or no segments — render as single bubble
+                    textBubble(content: message.content)
                 }
 
                 // Error message
@@ -160,6 +120,68 @@ struct MessageBubble: View {
 
             if message.role != .user {
                 Spacer(minLength: 60)
+            }
+        }
+    }
+
+    // MARK: - Text bubble
+
+    @ViewBuilder
+    private func textBubble(content: String) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if message.role == .assistant && message.state != .error {
+                    Markdown(content)
+                        .markdownTextStyle {
+                            FontSize(messageTextSize)
+                        }
+                        .markdownTextStyle(\.code) {
+                            FontFamilyVariant(.monospaced)
+                            FontSize(.em(0.88))
+                            ForegroundColor(inlineCodeColor)
+                            BackgroundColor(inlineCodeColor.opacity(0.12))
+                        }
+                        .markdownBlockStyle(\.codeBlock) { configuration in
+                            HighlightedCodeBlock(
+                                code: configuration.content,
+                                language: configuration.language
+                            )
+                            .markdownMargin(top: .em(0.4), bottom: .em(0.4))
+                        }
+                        .textSelection(.enabled)
+                } else {
+                    Text(content)
+                        .font(.system(size: messageTextSize))
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+            .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
+            .overlay {
+                if message.state == .error {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                } else if isCurrentMatch {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.yellow, lineWidth: 2)
+                } else if isSearchMatch {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                }
+            }
+
+            // Copy buttons — shown on hover for assistant messages
+            if isHovered && message.role == .assistant && message.state != .streaming {
+                MessageCopyButtons(
+                    copiedText: $copiedText,
+                    copiedMarkdown: $copiedMarkdown,
+                    onCopyText: { copyRenderedText() },
+                    onCopyMarkdown: { copyAsMarkdown() }
+                )
+                .padding(.top, 6)
+                .padding(.trailing, 6)
             }
         }
     }

@@ -423,9 +423,16 @@ final class AppViewModel {
 
             AppLogger.debug("chat.history returned \(rawMessages.count) raw messages for \(sessionKey) (limit=\(limit))", category: "Session")
 
-            let allMessages = rawMessages.enumerated().compactMap { index, raw in
+            let allParsed = rawMessages.enumerated().compactMap { index, raw in
                 ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
-            }.filter { $0.isVisible }
+            }
+
+            // Match tool results back to their tool calls.
+            // The gateway stores: assistant (with toolCall blocks) → toolResult → assistant (next text).
+            // We enrich the assistant's ToolCall objects with the result content.
+            Self.enrichToolCallsWithResults(allParsed, rawMessages: rawMessages)
+
+            let allMessages = allParsed.filter { $0.isVisible }
 
             // Merge consecutive assistant messages into a single message.
             // The gateway stores separate messages for each text segment
@@ -532,6 +539,9 @@ final class AppViewModel {
         case GatewayEvent.chat:
             handleChatEvent(event, gatewayId: gatewayId)
 
+        case GatewayEvent.agent:
+            handleAgentEvent(event, gatewayId: gatewayId)
+
         case GatewayEvent.presence:
             handlePresenceEvent(event)
 
@@ -606,6 +616,58 @@ final class AppViewModel {
                 }
             }
         }
+    }
+
+    private func handleAgentEvent(_ event: EventFrame, gatewayId: String) {
+        // Only handle events from the active gateway
+        guard let activeBinding = activeBinding,
+              activeBinding.gatewayId == gatewayId else { return }
+
+        guard let payload = event.payload?.dictValue else { return }
+
+        let stream = payload["stream"] as? String
+        guard stream == "tool" else { return }  // Only handle tool stream events
+
+        guard let data = payload["data"] as? [String: Any],
+              let phase = data["phase"] as? String,
+              let toolCallId = data["toolCallId"] as? String else { return }
+
+        let runId = payload["runId"] as? String ?? ""
+        let sessionKey = payload["sessionKey"] as? String ?? ""
+        let toolName = data["name"] as? String ?? "tool"
+
+        // Extract args (start phase) or result (result phase)
+        let args = data["args"] as? [String: Any]
+        let resultValue = data["result"]
+        let resultText: String?
+        if let resultStr = resultValue as? String {
+            resultText = resultStr
+        } else if let resultDict = resultValue as? [String: Any] {
+            // Try to get a compact JSON representation
+            if let jsonData = try? JSONSerialization.data(withJSONObject: resultDict, options: [.fragmentsAllowed]),
+               let jsonStr = String(data: jsonData, encoding: .utf8) {
+                resultText = String(jsonStr.prefix(2000))
+            } else {
+                resultText = String(describing: resultDict).prefix(2000).description
+            }
+        } else if resultValue != nil {
+            resultText = String(describing: resultValue!).prefix(2000).description
+        } else {
+            resultText = nil
+        }
+
+        let isError = data["isError"] as? Bool ?? false
+
+        messageStore.handleToolEvent(
+            runId: runId,
+            sessionKey: sessionKey,
+            phase: phase,
+            toolCallId: toolCallId,
+            toolName: toolName,
+            args: args,
+            result: resultText,
+            isError: isError
+        )
     }
 
     private func handlePresenceEvent(_ event: EventFrame) {
@@ -693,6 +755,53 @@ final class AppViewModel {
     /// appear as multiple small bubbles for what was a single assistant turn.
     /// This method joins them so the UI shows one cohesive reply that can be
     /// selected and copied as a whole.
+    /// Match tool result messages to their corresponding tool calls.
+    /// The gateway transcript follows the pattern:
+    ///   assistant (content: [text, toolCall, toolCall, ...])
+    ///   toolResult (for each tool call)
+    ///   assistant (next text segment)
+    static func enrichToolCallsWithResults(_ messages: [ChatMessage], rawMessages: [[String: Any]]) {
+        // Build a lookup of tool call IDs to ToolCall objects
+        var toolCallLookup: [String: ToolCall] = [:]
+        for message in messages where message.role == .assistant {
+            for tc in message.toolCalls {
+                toolCallLookup[tc.id] = tc
+            }
+        }
+
+        guard !toolCallLookup.isEmpty else { return }
+
+        // Scan raw messages for toolResult entries and match them
+        for raw in rawMessages {
+            guard let role = raw["role"] as? String, role == "toolResult" else { continue }
+
+            // Try to find the tool call ID this result belongs to
+            let toolCallId = raw["toolCallId"] as? String ?? raw["tool_call_id"] as? String
+
+            // Extract the result content
+            let resultText: String?
+            if let content = raw["content"] as? String {
+                resultText = content
+            } else if let contentBlocks = raw["content"] as? [[String: Any]] {
+                let texts = contentBlocks.compactMap { block -> String? in
+                    guard let type = block["type"] as? String, type == "text" else { return nil }
+                    return block["text"] as? String
+                }
+                resultText = texts.joined(separator: "\n")
+            } else {
+                resultText = nil
+            }
+
+            let isError = raw["isError"] as? Bool ?? false
+
+            if let id = toolCallId, let toolCall = toolCallLookup[id] {
+                toolCall.result = resultText.map { String($0.prefix(2000)) }
+                toolCall.isError = isError
+                toolCall.phase = isError ? .error : .completed
+            }
+        }
+    }
+
     static func mergeConsecutiveAssistantMessages(_ messages: [ChatMessage]) -> [ChatMessage] {
         guard !messages.isEmpty else { return [] }
 
@@ -702,10 +811,23 @@ final class AppViewModel {
             if message.role == .assistant,
                let last = merged.last,
                last.role == .assistant {
-                // Append to the previous assistant message
-                let separator = last.content.isEmpty || message.content.isEmpty ? "" : "\n\n"
-                last.content += separator + message.content
-                // Keep the earlier timestamp (start of the reply)
+                // Merge segments, but deduplicate text segments.
+                // The gateway may repeat the same text in each assistant
+                // continuation turn during multi-step tool use.
+                let existingTexts = Set(last.segments.compactMap(\.textContent))
+
+                for segment in message.segments {
+                    if case .text(_, let content) = segment {
+                        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty || existingTexts.contains(content) {
+                            continue  // Skip duplicate or empty text
+                        }
+                    }
+                    last.segments.append(segment)
+                }
+
+                // Rebuild content from merged segments
+                last.syncContentFromSegments()
             } else {
                 merged.append(message)
             }
