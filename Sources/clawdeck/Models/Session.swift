@@ -20,6 +20,7 @@ final class Session: Identifiable, Hashable {
     var updatedAt: Date
     var isActive: Bool
     var totalTokens: Int?
+    var contextTokens: Int?
 
     /// Display title: explicit label > display name > derived title > session key
     var displayTitle: String {
@@ -66,7 +67,8 @@ final class Session: Identifiable, Hashable {
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         isActive: Bool = true,
-        totalTokens: Int? = nil
+        totalTokens: Int? = nil,
+        contextTokens: Int? = nil
     ) {
         self.id = id
         self.key = key
@@ -84,6 +86,7 @@ final class Session: Identifiable, Hashable {
         self.updatedAt = updatedAt
         self.isActive = isActive
         self.totalTokens = totalTokens
+        self.contextTokens = contextTokens
     }
 
     static func == (lhs: Session, rhs: Session) -> Bool {
@@ -139,7 +142,8 @@ extension Session {
             createdAt: updatedDate,  // Best proxy; stable after first load
             updatedAt: updatedDate,
             isActive: true,
-            totalTokens: summary.totalTokens
+            totalTokens: summary.totalTokens,
+            contextTokens: summary.contextTokens
         )
     }
 }

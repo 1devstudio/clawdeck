@@ -372,7 +372,7 @@ extension ChatEventMessage: Codable {
             // Not an array — try plain string before giving up
             do {
                 if let plainText = try container.decodeIfPresent(String.self, forKey: .content) {
-                    contentBlocks = plainText.isEmpty ? nil : [ContentBlock(type: "text", text: plainText)]
+                    contentBlocks = plainText.isEmpty ? nil : [ContentBlock(type: "text", text: plainText, thinking: nil)]
                 } else {
                     contentBlocks = nil
                 }
