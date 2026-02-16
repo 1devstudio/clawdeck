@@ -18,6 +18,18 @@ struct ChatView: View {
     var body: some View {
         HStack(spacing: 0) {
         ZStack(alignment: .bottom) {
+            // Loading indicator — shown while history is being fetched
+            if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading messages…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
             // Message list — fills the entire area, with bottom padding
             // so content can scroll up above the floating composer.
             ScrollViewReader { proxy in
@@ -107,6 +119,14 @@ struct ChatView: View {
                     guard now.timeIntervalSince(lastStreamingScroll) > 0.15 else { return }
                     lastStreamingScroll = now
                     scrollToBottom(proxy: proxy, animated: false)
+                }
+                .onChange(of: viewModel.isLoadingHistory) { wasLoading, isLoading in
+                    if wasLoading && !isLoading {
+                        // History just finished loading — scroll to the most recent message
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            scrollToBottom(proxy: proxy, animated: false)
+                        }
+                    }
                 }
                 .onChange(of: viewModel.focusedMatchId) { _, matchId in
                     if let matchId {
