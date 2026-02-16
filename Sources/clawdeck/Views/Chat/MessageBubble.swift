@@ -199,6 +199,7 @@ struct MessageBubble: View {
                     .padding(.bottom, 6)
                 }
             }
+            .bubbleWidth(role: message.role)
             .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
             .overlay {
                 if message.state == .error {
@@ -684,5 +685,42 @@ struct MessageCopyButtons: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
         .glassEffect(in: .rect(cornerRadius: 6))
+    }
+}
+
+// MARK: - Bubble Width
+
+/// Environment key for the chat scroll view's available width.
+private struct ChatWidthEnvironmentKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 600
+}
+
+extension EnvironmentValues {
+    var chatWidth: CGFloat {
+        get { self[ChatWidthEnvironmentKey.self] }
+        set { self[ChatWidthEnvironmentKey.self] = newValue }
+    }
+}
+
+/// Constrains a bubble to a max of 75% of the chat width,
+/// with a minimum of 200pt.
+private struct BubbleWidthModifier: ViewModifier {
+    let role: MessageRole
+
+    @Environment(\.chatWidth) private var chatWidth
+
+    func body(content: Content) -> some View {
+        content
+            .frame(
+                minWidth: 200,
+                maxWidth: max(200, chatWidth * 0.75),
+                alignment: .leading
+            )
+    }
+}
+
+extension View {
+    func bubbleWidth(role: MessageRole) -> some View {
+        modifier(BubbleWidthModifier(role: role))
     }
 }
