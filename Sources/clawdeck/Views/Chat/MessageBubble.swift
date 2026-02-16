@@ -97,6 +97,11 @@ struct MessageBubble: View {
                         .foregroundStyle(.red)
                 }
 
+                // Usage badge (for assistant messages)
+                if message.role == .assistant, let usage = message.usage {
+                    UsageBadgeView(usage: usage)
+                }
+
                 // Timestamp
                 Text(message.timestamp, style: .time)
                     .font(.system(size: messageTextSize - 3))
@@ -319,6 +324,108 @@ struct MessageBubble: View {
         case .toolCall, .toolResult:
             return .regular.tint(.gray)
         }
+    }
+}
+
+// MARK: - Usage Badge View
+
+/// A subtle badge showing token usage and cost for an assistant message.
+struct UsageBadgeView: View {
+    let usage: MessageUsage
+    @Environment(\.messageTextSize) private var messageTextSize
+    @State private var showPopover = false
+
+    var body: some View {
+        if !usage.compactSummary.isEmpty {
+            Button(action: { showPopover.toggle() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "gauge.with.dots.needle.33percent")
+                        .font(.system(size: messageTextSize - 5))
+                    Text(usage.compactSummary)
+                        .font(.system(size: messageTextSize - 4, design: .monospaced))
+                }
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+                UsageDetailPopover(usage: usage)
+            }
+        }
+    }
+}
+
+/// Detailed usage breakdown shown in a popover.
+struct UsageDetailPopover: View {
+    let usage: MessageUsage
+    @Environment(\.messageTextSize) private var messageTextSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Token Usage")
+                .font(.system(size: messageTextSize - 1, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Divider()
+
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                usageRow(label: "Input", tokens: usage.inputTokens, cost: usage.cost?.input)
+                usageRow(label: "Output", tokens: usage.outputTokens, cost: usage.cost?.output)
+
+                if usage.cacheReadTokens > 0 {
+                    usageRow(label: "Cache Read", tokens: usage.cacheReadTokens, cost: usage.cost?.cacheRead)
+                }
+                if usage.cacheWriteTokens > 0 {
+                    usageRow(label: "Cache Write", tokens: usage.cacheWriteTokens, cost: usage.cost?.cacheWrite)
+                }
+
+                Divider()
+                    .gridCellColumns(3)
+
+                GridRow {
+                    Text("Total")
+                        .fontWeight(.semibold)
+                    Text(formatTokens(usage.totalTokens))
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                    if let total = usage.cost?.total, total > 0 {
+                        Text(String(format: "$%.4f", total))
+                            .fontWeight(.semibold)
+                            .monospacedDigit()
+                    } else {
+                        Text("")
+                    }
+                }
+            }
+            .font(.system(size: messageTextSize - 2))
+        }
+        .padding(12)
+        .frame(minWidth: 240)
+    }
+
+    @ViewBuilder
+    private func usageRow(label: String, tokens: Int, cost: Double?) -> some View {
+        GridRow {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Text(formatTokens(tokens))
+                .monospacedDigit()
+            if let cost, cost > 0 {
+                Text(String(format: "$%.4f", cost))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            } else {
+                Text("—")
+                    .foregroundStyle(.quaternary)
+            }
+        }
+    }
+
+    private func formatTokens(_ count: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
     }
 }
 

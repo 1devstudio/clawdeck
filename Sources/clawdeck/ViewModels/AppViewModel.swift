@@ -826,6 +826,30 @@ final class AppViewModel {
                     last.segments.append(segment)
                 }
 
+                // Merge usage: sum tokens and costs from consecutive messages
+                if let messageUsage = message.usage {
+                    if last.usage == nil {
+                        last.usage = messageUsage
+                    } else {
+                        last.usage!.inputTokens += messageUsage.inputTokens
+                        last.usage!.outputTokens += messageUsage.outputTokens
+                        last.usage!.cacheReadTokens += messageUsage.cacheReadTokens
+                        last.usage!.cacheWriteTokens += messageUsage.cacheWriteTokens
+                        last.usage!.totalTokens += messageUsage.totalTokens
+                        if let msgCost = messageUsage.cost {
+                            if last.usage!.cost == nil {
+                                last.usage!.cost = msgCost
+                            } else {
+                                last.usage!.cost!.input += msgCost.input
+                                last.usage!.cost!.output += msgCost.output
+                                last.usage!.cost!.cacheRead += msgCost.cacheRead
+                                last.usage!.cost!.cacheWrite += msgCost.cacheWrite
+                                last.usage!.cost!.total += msgCost.total
+                            }
+                        }
+                    }
+                }
+
                 // Rebuild content from merged segments
                 last.syncContentFromSegments()
             } else {

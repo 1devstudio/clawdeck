@@ -176,6 +176,9 @@ final class MessageStore {
             }
 
         case "final":
+            // Extract usage from the final event
+            let parsedUsage = Self.parseUsage(from: event.usage)
+
             if let existing = streamingMessages[runId] {
                 if let content = event.message?.content, !content.isEmpty {
                     if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -191,6 +194,7 @@ final class MessageStore {
                     AppLogger.debug("Final for runId=\(runId): no final content, keeping accumulated (\(existing.content.count) chars)", category: "Protocol")
                 }
                 existing.state = .complete
+                existing.usage = parsedUsage
                 streamingMessages.removeValue(forKey: runId)
                 lastDeltaLength.removeValue(forKey: runId)
                 currentTextSegmentIndex.removeValue(forKey: runId)
@@ -205,6 +209,7 @@ final class MessageStore {
                     agentId: event.message?.agentId,
                     runId: runId
                 )
+                message.usage = parsedUsage
                 allMessagesBySession[sessionKey, default: []].append(message)
                 let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
                 visibleCountBySession[sessionKey] = currentVisible + 1
@@ -298,6 +303,34 @@ final class MessageStore {
         }
 
         streamingContentVersion += 1
+    }
+
+    // MARK: - Usage parsing
+
+    /// Parse usage data from a ChatEventPayload's usage field.
+    private static func parseUsage(from usageAnyCodable: AnyCodable?) -> MessageUsage? {
+        guard let usageDict = usageAnyCodable?.dictValue else { return nil }
+
+        var usage = MessageUsage()
+        usage.inputTokens = usageDict["input"] as? Int ?? 0
+        usage.outputTokens = usageDict["output"] as? Int ?? 0
+        usage.cacheReadTokens = usageDict["cacheRead"] as? Int ?? 0
+        usage.cacheWriteTokens = usageDict["cacheWrite"] as? Int ?? 0
+        usage.totalTokens = usageDict["totalTokens"] as? Int
+            ?? (usage.inputTokens + usage.outputTokens)
+
+        if let costDict = usageDict["cost"] as? [String: Any] {
+            var cost = MessageCost()
+            cost.input = (costDict["input"] as? Double) ?? 0
+            cost.output = (costDict["output"] as? Double) ?? 0
+            cost.cacheRead = (costDict["cacheRead"] as? Double) ?? 0
+            cost.cacheWrite = (costDict["cacheWrite"] as? Double) ?? 0
+            cost.total = (costDict["total"] as? Double) ?? 0
+            usage.cost = cost
+        }
+
+        guard usage.totalTokens > 0 else { return nil }
+        return usage
     }
 
     // MARK: - Cleanup
