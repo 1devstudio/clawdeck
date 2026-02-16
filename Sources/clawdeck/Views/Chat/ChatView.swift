@@ -67,20 +67,35 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    // Scroll to bottom when the view first appears (session switch).
-                    // Dispatch async so the LazyVStack has laid out the bottom anchor.
-                    DispatchQueue.main.async {
-                        scrollToBottom(proxy: proxy, animated: false)
+                    // If messages are already cached (no history load needed),
+                    // jump to bottom immediately without animation.
+                    if !viewModel.messages.isEmpty && !viewModel.isLoadingHistory {
+                        DispatchQueue.main.async {
+                            scrollToBottom(proxy: proxy, animated: false)
+                        }
                     }
                 }
-                .onChange(of: viewModel.messages.count) { _, _ in
+                .onChange(of: viewModel.isLoadingHistory) { wasLoading, isLoading in
+                    // History just finished loading — jump to bottom instantly
+                    // (no animation so the user sees the latest messages immediately).
+                    if wasLoading && !isLoading {
+                        DispatchQueue.main.async {
+                            scrollToBottom(proxy: proxy, animated: false)
+                        }
+                    }
+                }
+                .onChange(of: viewModel.messages.count) { oldCount, newCount in
                     // A new message arrived — if it's from the assistant, we're no longer awaiting
                     if viewModel.isAwaitingResponse,
                        let last = viewModel.messages.last,
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-                    scrollToBottom(proxy: proxy)
+                    // Only animate scroll for incremental changes (new messages),
+                    // not for bulk history loads.
+                    if oldCount > 0 {
+                        scrollToBottom(proxy: proxy)
+                    }
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     if isSending { scrollToBottom(proxy: proxy) }
