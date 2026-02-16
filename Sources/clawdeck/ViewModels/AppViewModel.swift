@@ -811,11 +811,10 @@ final class AppViewModel {
             if message.role == .assistant,
                let last = merged.last,
                last.role == .assistant {
-                // Append to the previous assistant message
-                let separator = last.content.isEmpty || message.content.isEmpty ? "" : "\n\n"
-                last.content += separator + message.content
-                // Merge tool calls too
-                last.toolCalls.append(contentsOf: message.toolCalls)
+                // Merge segments from the next message into the previous one
+                last.segments.append(contentsOf: message.segments)
+                // Rebuild content from merged segments
+                last.syncContentFromSegments()
                 // Keep the earlier timestamp (start of the reply)
             } else {
                 merged.append(message)

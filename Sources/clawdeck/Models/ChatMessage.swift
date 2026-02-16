@@ -27,6 +27,31 @@ struct MessageImage: Identifiable {
     let fileName: String?
 }
 
+/// A segment of a message — either text content or a group of tool calls.
+/// Messages are rendered as an ordered sequence of segments, preserving
+/// the interleaving of text and tool calls as they actually occurred.
+enum MessageSegment: Identifiable {
+    case text(id: String, content: String)
+    case toolGroup(id: String, toolCalls: [ToolCall])
+
+    var id: String {
+        switch self {
+        case .text(let id, _): return id
+        case .toolGroup(let id, _): return id
+        }
+    }
+
+    var isText: Bool {
+        if case .text = self { return true }
+        return false
+    }
+
+    var textContent: String? {
+        if case .text(_, let content) = self { return content }
+        return nil
+    }
+}
+
 /// A single message within a chat session.
 @Observable
 final class ChatMessage: Identifiable {
@@ -44,8 +69,18 @@ final class ChatMessage: Identifiable {
     /// Image attachments sent with this message.
     var images: [MessageImage] = []
 
-    /// Tool calls made during this assistant response (in order of invocation).
-    var toolCalls: [ToolCall] = []
+    /// Ordered segments — interleaved text and tool call groups.
+    /// This is the primary data for rendering. `content` is kept in sync
+    /// as the joined text (for search, copy, etc.)
+    var segments: [MessageSegment] = []
+
+    /// Flat list of all tool calls (convenience accessor for search/merge).
+    var toolCalls: [ToolCall] {
+        segments.flatMap { segment in
+            if case .toolGroup(_, let calls) = segment { return calls }
+            return []
+        }
+    }
 
     /// Tracks where the current streaming segment starts within `content`.
     /// Used by MessageStore to detect new segments vs cumulative growth.
@@ -55,10 +90,15 @@ final class ChatMessage: Identifiable {
     var isVisible: Bool {
         switch role {
         case .user, .assistant, .system:
-            return !content.isEmpty
+            return !content.isEmpty || !segments.isEmpty
         case .toolResult, .toolCall:
             return false  // Hide tool interactions
         }
+    }
+
+    /// Whether this message has any segments to render (vs. just a plain content string).
+    var hasSegments: Bool {
+        !segments.isEmpty
     }
 
     init(
@@ -83,6 +123,54 @@ final class ChatMessage: Identifiable {
         self.runId = runId
         self.errorMessage = errorMessage
         self.model = model
+    }
+
+    // MARK: - Segment helpers
+
+    /// Append a tool call to the segments. If the last segment is already a tool group,
+    /// add to it. Otherwise start a new tool group.
+    func appendToolCall(_ toolCall: ToolCall) {
+        if case .toolGroup(let groupId, var calls) = segments.last {
+            calls.append(toolCall)
+            segments[segments.count - 1] = .toolGroup(id: groupId, toolCalls: calls)
+        } else {
+            segments.append(.toolGroup(id: "tg-\(toolCall.id)", toolCalls: [toolCall]))
+        }
+    }
+
+    /// Find a tool call by ID across all segments.
+    func findToolCall(id: String) -> ToolCall? {
+        for segment in segments {
+            if case .toolGroup(_, let calls) = segment {
+                if let tc = calls.first(where: { $0.id == id }) {
+                    return tc
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Ensure there's a text segment at the end (for streaming text after tool calls).
+    func ensureTrailingTextSegment() {
+        if case .text = segments.last {
+            return  // Already have a trailing text segment
+        }
+        segments.append(.text(id: "seg-\(segments.count)", content: ""))
+    }
+
+    /// Update the last text segment's content.
+    func updateLastTextSegment(_ text: String) {
+        guard let lastIndex = segments.lastIndex(where: { $0.isText }) else {
+            segments.append(.text(id: "seg-\(segments.count)", content: text))
+            return
+        }
+        segments[lastIndex] = .text(id: segments[lastIndex].id, content: text)
+    }
+
+    /// Rebuild `content` from all text segments (for search, copy, etc.)
+    func syncContentFromSegments() {
+        let texts = segments.compactMap(\.textContent).filter { !$0.isEmpty }
+        content = texts.joined(separator: "\n\n")
     }
 }
 
@@ -121,7 +209,7 @@ extension ChatMessage {
     /// - A plain string (user messages sometimes)
     /// - An array of content blocks: `[{type: "text", text: "..."}, {type: "toolCall", ...}, ...]`
     ///
-    /// We extract all `text` blocks and join them, skipping tool calls and tool results.
+    /// We parse content blocks in order, building interleaved segments of text and tool calls.
     static func fromHistory(_ raw: [String: Any], sessionKey: String, index: Int) -> ChatMessage? {
         guard let role = raw["role"] as? String else { return nil }
 
@@ -136,29 +224,42 @@ extension ChatMessage {
         default: return nil
         }
 
-        // Extract text content and tool calls
-        let textContent: String
-        var historyToolCalls: [ToolCall] = []
+        // Parse content blocks into ordered segments
+        var segments: [MessageSegment] = []
+        var allTextParts: [String] = []
+
         if let content = raw["content"] as? String {
             // Plain string content
-            textContent = content
+            segments.append(.text(id: "seg-0", content: content))
+            allTextParts.append(content)
         } else if let contentBlocks = raw["content"] as? [[String: Any]] {
-            // Array of content blocks — extract text blocks and tool calls
-            let textParts = contentBlocks.compactMap { block -> String? in
-                guard let type = block["type"] as? String else { return nil }
+            // Array of content blocks — preserve ordering
+            var segIndex = 0
+            var pendingToolCalls: [ToolCall] = []
+
+            func flushToolCalls() {
+                if !pendingToolCalls.isEmpty {
+                    segments.append(.toolGroup(id: "tg-\(segIndex)", toolCalls: pendingToolCalls))
+                    segIndex += 1
+                    pendingToolCalls = []
+                }
+            }
+
+            for block in contentBlocks {
+                guard let type = block["type"] as? String else { continue }
                 switch type {
                 case "text":
-                    let text = block["text"] as? String
-                    if text == nil {
-                        AppLogger.warning("History text block has nil text at index \(index)", category: "Protocol")
+                    guard let text = block["text"] as? String, !text.isEmpty else {
+                        AppLogger.warning("History text block has nil/empty text at index \(index)", category: "Protocol")
+                        continue
                     }
-                    return text
-                case "thinking":
-                    return nil  // Skip thinking blocks
+                    // Flush any pending tool calls before this text segment
+                    flushToolCalls()
+                    segments.append(.text(id: "seg-\(segIndex)", content: text))
+                    segIndex += 1
+                    allTextParts.append(text)
+
                 case "toolCall", "tool_use":
-                    // Extract tool call info for visualization.
-                    // Gateway stores: { type: "toolCall", id, name, arguments: {...} }
-                    // Anthropic raw: { type: "tool_use", id, name, input: {...} }
                     let toolCallId = block["id"] as? String ?? block["toolCallId"] as? String ?? UUID().uuidString
                     let toolName = block["name"] as? String ?? block["toolName"] as? String ?? "tool"
                     let args = block["arguments"] as? [String: Any]
@@ -170,16 +271,21 @@ extension ChatMessage {
                         phase: .completed,
                         args: args
                     )
-                    historyToolCalls.append(toolCall)
-                    return nil
+                    pendingToolCalls.append(toolCall)
+
+                case "thinking":
+                    continue  // Skip thinking blocks
+
                 default:
-                    return nil
+                    continue
                 }
             }
-            textContent = textParts.joined(separator: "\n\n")
-        } else {
-            textContent = ""
+
+            // Flush any trailing tool calls
+            flushToolCalls()
         }
+
+        let textContent = allTextParts.joined(separator: "\n\n")
 
         // Parse timestamp (epoch ms)
         let timestamp: Date
@@ -202,7 +308,7 @@ extension ChatMessage {
             state: .complete,
             model: model
         )
-        message.toolCalls = historyToolCalls
+        message.segments = segments
         return message
     }
 }
