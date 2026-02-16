@@ -238,7 +238,7 @@ struct ChatView: View {
 
 /// Preference key to measure the floating bottom bar height dynamically.
 private struct BottomBarHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 60
+    nonisolated(unsafe) static var defaultValue: CGFloat = 60
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
