@@ -8,16 +8,12 @@ struct ChatView: View {
     /// Throttle streaming scroll — don't fire on every single delta.
     @State private var lastStreamingScroll: Date = .distantPast
 
-    /// Height of the bottom bar (model selector + composer) for scroll inset.
-    @State private var bottomBarHeight: CGFloat = 60
-
     /// Message whose steps are shown in the right sidebar (nil = sidebar hidden).
     /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
     @State private var sidebarMessage: ChatMessage? = nil
 
     var body: some View {
         HStack(spacing: 0) {
-        ZStack(alignment: .bottom) {
             // Message list
             ScrollViewReader { proxy in
                 ScrollView {
@@ -70,17 +66,99 @@ struct ChatView: View {
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
-
-                        // Bottom spacer — ensures last message can scroll above the composer.
-                        // This is real content height so LazyVStack accounts for it.
-                        Spacer()
-                            .frame(height: bottomBarHeight + 24)
-                            .id("bottom-spacer")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 }
                 .defaultScrollAnchor(.bottom)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    // Bottom bar: error banner + model selector + composer
+                    VStack(spacing: 0) {
+                        // Error banner
+                        if let error = viewModel.errorMessage {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.yellow)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Dismiss") {
+                                    viewModel.clearError()
+                                }
+                                .buttonStyle(.plain)
+                                .font(.caption)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(.yellow.opacity(0.1))
+                        }
+
+                        // Model selector + context usage — right-aligned
+                        if !viewModel.availableModels.isEmpty {
+                            HStack(spacing: 8) {
+                                Spacer()
+
+                                if let total = viewModel.totalTokens, total > 0 {
+                                    ContextUsageView(
+                                        totalTokens: total,
+                                        contextTokens: viewModel.contextTokens
+                                    )
+                                }
+
+                                ModelSelectorButton(
+                                    currentModel: viewModel.currentModelId,
+                                    defaultModel: viewModel.defaultModelId,
+                                    models: viewModel.availableModels,
+                                    onSelect: { modelId in
+                                        Task { await viewModel.selectModel(modelId) }
+                                    }
+                                )
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
+                        }
+
+                        // Composer
+                        MessageComposer(
+                            text: $viewModel.draftText,
+                            isSending: viewModel.isSending || viewModel.isAwaitingResponse,
+                            isStreaming: viewModel.isStreaming,
+                            pendingAttachments: viewModel.pendingAttachments,
+                            focusTrigger: viewModel.focusComposerTrigger,
+                            onSend: {
+                                Task { await viewModel.sendMessage() }
+                            },
+                            onAbort: {
+                                Task { await viewModel.abortGeneration() }
+                            },
+                            onAddAttachment: { url in
+                                viewModel.addAttachment(from: url)
+                            },
+                            onPasteImage: { image in
+                                viewModel.addAttachment(image: image)
+                            },
+                            onRemoveAttachment: { attachment in
+                                viewModel.removeAttachment(attachment)
+                            }
+                        )
+                    }
+                    .background(.clear)
+                }
+                .overlay {
+                    // Loading overlay — shown while history is being fetched
+                    if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .controlSize(.large)
+                            Text("Loading messages…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.regularMaterial)
+                    }
+                }
                 .onAppear {
                     scrollProxy = proxy
                 }
@@ -114,111 +192,16 @@ struct ChatView: View {
                 }
             }
 
-            // Loading overlay — shown while history is being fetched
-            if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading messages…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.regularMaterial)
-            }
-
-            // Floating bottom bar: error banner + model selector + composer
-            VStack(spacing: 0) {
-                // Error banner
-                if let error = viewModel.errorMessage {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Dismiss") {
-                            viewModel.clearError()
-                        }
-                        .buttonStyle(.plain)
-                        .font(.caption)
+            // Steps sidebar — slides in from the right, reactive to message changes
+            if let msg = sidebarMessage {
+                Divider()
+                ToolStepsSidebar(steps: msg.sidebarSteps) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        sidebarMessage = nil
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(.yellow.opacity(0.1))
                 }
-
-                // Model selector + context usage — right-aligned
-                if !viewModel.availableModels.isEmpty {
-                    HStack(spacing: 8) {
-                        Spacer()
-
-                        if let total = viewModel.totalTokens, total > 0 {
-                            ContextUsageView(
-                                totalTokens: total,
-                                contextTokens: viewModel.contextTokens
-                            )
-                        }
-
-                        ModelSelectorButton(
-                            currentModel: viewModel.currentModelId,
-                            defaultModel: viewModel.defaultModelId,
-                            models: viewModel.availableModels,
-                            onSelect: { modelId in
-                                Task { await viewModel.selectModel(modelId) }
-                            }
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                }
-
-                // Composer
-                MessageComposer(
-                    text: $viewModel.draftText,
-                    isSending: viewModel.isSending || viewModel.isAwaitingResponse,
-                    isStreaming: viewModel.isStreaming,
-                    pendingAttachments: viewModel.pendingAttachments,
-                    focusTrigger: viewModel.focusComposerTrigger,
-                    onSend: {
-                        Task { await viewModel.sendMessage() }
-                    },
-                    onAbort: {
-                        Task { await viewModel.abortGeneration() }
-                    },
-                    onAddAttachment: { url in
-                        viewModel.addAttachment(from: url)
-                    },
-                    onPasteImage: { image in
-                        viewModel.addAttachment(image: image)
-                    },
-                    onRemoveAttachment: { attachment in
-                        viewModel.removeAttachment(attachment)
-                    }
-                )
+                .transition(.move(edge: .trailing))
             }
-            .background(.ultraThinMaterial.opacity(0))
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: BottomBarHeightKey.self, value: geo.size.height)
-                }
-            )
-            .onPreferenceChange(BottomBarHeightKey.self) { height in
-                bottomBarHeight = height
-            }
-        } // end ZStack
-
-        // Steps sidebar — slides in from the right, reactive to message changes
-        if let msg = sidebarMessage {
-            Divider()
-            ToolStepsSidebar(steps: msg.sidebarSteps) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    sidebarMessage = nil
-                }
-            }
-            .transition(.move(edge: .trailing))
-        }
         } // end HStack
     }
 
@@ -238,15 +221,5 @@ struct ChatView: View {
         } else {
             proxy.scrollTo(targetId, anchor: .bottom)
         }
-    }
-}
-
-// MARK: - Layout preference keys
-
-/// Preference key to measure the floating bottom bar height dynamically.
-private struct BottomBarHeightKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 60
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
