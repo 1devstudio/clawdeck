@@ -415,7 +415,7 @@ struct CopyCodeButton: View {
         } label: {
             Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
                 .font(.system(size: fontSize - 5, weight: .medium))
-                .foregroundStyle(isCopied ? .green : .tertiary)
+                .foregroundStyle(isCopied ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
         }
         .buttonStyle(.plain)
     }
