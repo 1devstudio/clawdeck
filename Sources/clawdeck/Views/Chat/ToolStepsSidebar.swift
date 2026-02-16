@@ -141,7 +141,7 @@ struct ThinkingStepRow: View {
     @Environment(\.themeColor) private var themeColor
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var isExpanded: Bool = false
+    @State private var isExpanded: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
