@@ -81,6 +81,7 @@ struct MessageBubble: View {
                             }
                         case .toolGroup(_, let toolCalls):
                             ToolCallsView(toolCalls: toolCalls)
+                                .padding(.leading, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
