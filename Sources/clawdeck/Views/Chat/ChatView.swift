@@ -93,15 +93,11 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    // Bottom padding so messages sit above the floating composer
-                    .padding(.bottom, bottomBarHeight + 24)
                 }
+                .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
+                .defaultScrollAnchor(.bottom)
                 .onAppear {
                     scrollProxy = proxy
-                    // Scroll to bottom on initial appear
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        scrollToBottom(proxy: proxy, animated: false)
-                    }
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     if viewModel.isAwaitingResponse,
