@@ -379,39 +379,35 @@ struct MessageBubble: View {
         return completedConsolidatedSegments
     }
 
-    /// Streaming: merge adjacent text, keep thinking inline for live feedback,
-    /// skip tool groups (shown via the pill + sidebar in real time).
+    /// Streaming: collect all text into one bubble, keep thinking inline
+    /// for live feedback, skip tool groups (shown via the pill + sidebar).
     private var streamingConsolidatedSegments: [ConsolidatedSegment] {
         var result: [ConsolidatedSegment] = []
-        var pendingTexts: [String] = []
-        var pendingId: String?
-
-        func flushText() {
-            guard !pendingTexts.isEmpty, let id = pendingId else { return }
-            let joined = pendingTexts.joined(separator: "\n\n")
-            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
-            pendingTexts = []
-            pendingId = nil
-        }
+        var allTexts: [String] = []
+        var firstTextId: String?
 
         for segment in message.segments {
             switch segment {
-            case .text(let id, let content):
+            case .text(_, let content):
                 let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { continue }
-                if pendingId == nil { pendingId = id }
-                pendingTexts.append(content)
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
 
             case .toolGroup:
-                // Tool groups shown in the pill + sidebar, not inline
-                flushText()
+                // Shown in the pill + sidebar, not inline
+                break
 
             case .thinking(let id, let content):
-                flushText()
                 result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
             }
         }
-        flushText()
+
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+        }
+
         return result
     }
 
