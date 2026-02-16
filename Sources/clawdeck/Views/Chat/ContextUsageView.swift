@@ -21,14 +21,9 @@ struct ContextUsageView: View {
     }
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: usageIcon)
-                .font(.system(size: 9, weight: .medium))
-
-            Text(usageLabel)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .lineLimit(1)
-        }
+        Text(usageLabel)
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .lineLimit(1)
         .foregroundStyle(usageColor)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -41,16 +36,6 @@ struct ContextUsageView: View {
                 .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
         )
         .help(tooltipText)
-    }
-
-    /// Icon reflecting usage level.
-    private var usageIcon: String {
-        guard let pct = usagePercent else {
-            return "chart.bar"
-        }
-        if pct >= 90 { return "exclamationmark.triangle" }
-        if pct >= 75 { return "chart.bar.fill" }
-        return "chart.bar"
     }
 
     /// Compact label (e.g. "189k/200k (94%)" or "189k tokens").
