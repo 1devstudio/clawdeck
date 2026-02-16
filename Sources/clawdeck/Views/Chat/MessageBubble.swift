@@ -72,18 +72,19 @@ struct MessageBubble: View {
 
                 // Message content — interleaved segments or plain text
                 if message.hasSegments && message.role == .assistant {
-                    // Render segments in order: text bubbles interleaved with tool groups
-                    ForEach(message.segments) { segment in
-                        switch segment {
-                        case .text(_, let text):
+                    // Render consolidated segments: merge adjacent text segments
+                    // into a single bubble so they don't appear as separate messages.
+                    ForEach(consolidatedSegments, id: \.id) { group in
+                        switch group.kind {
+                        case .text(let text):
                             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 textBubble(content: text)
                             }
-                        case .toolGroup(_, let toolCalls):
+                        case .toolGroup(let toolCalls):
                             ToolCallsView(toolCalls: toolCalls)
                                 .padding(.leading, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                        case .thinking(_, let content):
+                        case .thinking(let content):
                             ThinkingBlockView(
                                 content: content,
                                 isStreaming: message.state == .streaming
@@ -333,6 +334,57 @@ struct MessageBubble: View {
         case .toolCall, .toolResult:
             return .regular.tint(.gray)
         }
+    }
+
+    // MARK: - Segment consolidation
+
+    /// Merge adjacent text segments into single entries so they render as
+    /// one continuous bubble instead of many separate ones.
+    /// Tool groups and thinking blocks act as boundaries between text runs.
+    private var consolidatedSegments: [ConsolidatedSegment] {
+        var result: [ConsolidatedSegment] = []
+        var pendingTexts: [String] = []
+        var pendingId: String?
+
+        func flushText() {
+            guard !pendingTexts.isEmpty, let id = pendingId else { return }
+            let joined = pendingTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+            pendingTexts = []
+            pendingId = nil
+        }
+
+        for segment in message.segments {
+            switch segment {
+            case .text(let id, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if pendingId == nil { pendingId = id }
+                pendingTexts.append(content)
+
+            case .toolGroup(let id, let toolCalls):
+                flushText()
+                result.append(ConsolidatedSegment(id: id, kind: .toolGroup(toolCalls)))
+
+            case .thinking(let id, let content):
+                flushText()
+                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            }
+        }
+        flushText()
+        return result
+    }
+}
+
+/// A consolidated rendering segment — adjacent text segments merged into one.
+private struct ConsolidatedSegment: Identifiable {
+    let id: String
+    let kind: Kind
+
+    enum Kind {
+        case text(String)
+        case toolGroup([ToolCall])
+        case thinking(String)
     }
 }
 
