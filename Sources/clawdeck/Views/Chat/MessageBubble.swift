@@ -149,12 +149,26 @@ struct MessageBubble: View {
 
     // MARK: - Text bubble
 
+    /// Whether content needs full Markdown rendering (has formatting syntax).
+    private func needsMarkdown(_ content: String) -> Bool {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Short plain text doesn't need Markdown block layout
+        if trimmed.count < 200 && !trimmed.contains("```") && !trimmed.contains("[") {
+            // Check for common markdown patterns
+            let patterns: [String] = ["**", "__", "~~", "# ", "- ", "* ", "> ", "| ", "1. "]
+            return patterns.contains { trimmed.contains($0) }
+        }
+        return true
+    }
+
     @ViewBuilder
     private func textBubble(content: String, showMeta: Bool = true) -> some View {
+        let useMarkdown = message.role == .assistant && message.state != .error && needsMarkdown(content)
+
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 Group {
-                    if message.role == .assistant && message.state != .error {
+                    if useMarkdown {
                         Markdown(content)
                             .markdownTextStyle {
                                 FontSize(messageTextSize)
@@ -191,7 +205,12 @@ struct MessageBubble: View {
                             .foregroundStyle(.tertiary)
 
                         if message.role == .assistant, let usage = message.usage {
-                            Spacer()
+                            if useMarkdown {
+                                Spacer()
+                            } else {
+                                Spacer()
+                                    .frame(minWidth: 12)
+                            }
                             UsageBadgeView(usage: usage)
                         }
                     }
@@ -199,6 +218,7 @@ struct MessageBubble: View {
                     .padding(.bottom, 6)
                 }
             }
+            .fixedSize(horizontal: !useMarkdown, vertical: false)
             .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
             .overlay {
                 if message.state == .error {
