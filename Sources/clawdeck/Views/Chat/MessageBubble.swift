@@ -15,6 +15,9 @@ struct MessageBubble: View {
     @Environment(\.codeHighlightTheme) private var codeHighlightTheme
     var isCurrentMatch: Bool = false
 
+    /// Callback when the user taps the tool steps pill.
+    var onToolStepsTapped: (([ToolCall]) -> Void)? = nil
+
     @State private var isHovered = false
     @State private var copiedText = false
     @State private var copiedMarkdown = false
@@ -26,7 +29,7 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                // Role label
+                // Role label + tool steps pill
                 HStack(spacing: 4) {
                     if message.role == .assistant {
                         if let emoji = agentAvatarEmoji {
@@ -46,6 +49,17 @@ struct MessageBubble: View {
                     if message.state == .streaming {
                         ProgressView()
                             .controlSize(.mini)
+                    }
+
+                    // Tool steps pill — for completed messages with tool calls
+                    if message.role == .assistant && message.state != .streaming {
+                        let allToolCalls = message.toolCalls
+                        if !allToolCalls.isEmpty {
+                            Spacer()
+                            ToolStepsPill(toolCalls: allToolCalls) {
+                                onToolStepsTapped?(allToolCalls)
+                            }
+                        }
                     }
                 }
 
@@ -388,14 +402,12 @@ struct MessageBubble: View {
         return result
     }
 
-    /// Completed: collect all text into one bubble, all tool groups into one
-    /// collapsed section, and thinking blocks stay separate.
+    /// Completed: collect all text into one bubble, thinking blocks stay
+    /// separate, and tool groups are omitted (shown via the pill + sidebar).
     private var completedConsolidatedSegments: [ConsolidatedSegment] {
         var result: [ConsolidatedSegment] = []
         var allTexts: [String] = []
-        var allToolCalls: [ToolCall] = []
         var firstTextId: String?
-        var firstToolGroupId: String?
 
         for segment in message.segments {
             switch segment {
@@ -405,24 +417,19 @@ struct MessageBubble: View {
                 if firstTextId == nil { firstTextId = segment.id }
                 allTexts.append(content)
 
-            case .toolGroup(_, let toolCalls):
-                if firstToolGroupId == nil { firstToolGroupId = segment.id }
-                allToolCalls.append(contentsOf: toolCalls)
+            case .toolGroup:
+                // Tool groups are shown in the sidebar, not inline
+                break
 
             case .thinking(let id, let content):
                 result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
             }
         }
 
-        // Emit: thinking blocks first (already added), then one text bubble,
-        // then one combined tool group.
+        // Emit: thinking blocks first (already added), then one text bubble.
         if !allTexts.isEmpty, let id = firstTextId {
             let joined = allTexts.joined(separator: "\n\n")
             result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
-        }
-
-        if !allToolCalls.isEmpty, let id = firstToolGroupId {
-            result.append(ConsolidatedSegment(id: id, kind: .toolGroup(allToolCalls)))
         }
 
         return result
