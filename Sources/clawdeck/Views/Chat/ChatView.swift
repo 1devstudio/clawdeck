@@ -11,7 +11,11 @@ struct ChatView: View {
     /// Height of the bottom bar (model selector + composer) for scroll inset.
     @State private var bottomBarHeight: CGFloat = 60
 
+    /// Tool calls currently shown in the right sidebar (nil = sidebar hidden).
+    @State private var toolStepsSidebarCalls: [ToolCall]? = nil
+
     var body: some View {
+        HStack(spacing: 0) {
         ZStack(alignment: .bottom) {
             // Message list — fills the entire area, with bottom padding
             // so content can scroll up above the floating composer.
@@ -48,7 +52,16 @@ struct ChatView: View {
                                 agentDisplayName: viewModel.agentDisplayName,
                                 agentAvatarEmoji: viewModel.agentAvatarEmoji,
                                 searchQuery: viewModel.searchQuery,
-                                isCurrentMatch: message.id == viewModel.focusedMatchId
+                                isCurrentMatch: message.id == viewModel.focusedMatchId,
+                                onToolStepsTapped: { toolCalls in
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        if toolStepsSidebarCalls != nil {
+                                            toolStepsSidebarCalls = nil
+                                        } else {
+                                            toolStepsSidebarCalls = toolCalls
+                                        }
+                                    }
+                                }
                             )
                             .id(message.id)
                         }
@@ -184,7 +197,19 @@ struct ChatView: View {
             .onPreferenceChange(BottomBarHeightKey.self) { height in
                 bottomBarHeight = height
             }
+        } // end ZStack
+
+        // Tool steps sidebar — slides in from the right
+        if let toolCalls = toolStepsSidebarCalls {
+            Divider()
+            ToolStepsSidebar(toolCalls: toolCalls) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    toolStepsSidebarCalls = nil
+                }
+            }
+            .transition(.move(edge: .trailing))
         }
+        } // end HStack
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
