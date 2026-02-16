@@ -15,26 +15,16 @@ struct ChatView: View {
     /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
     @State private var sidebarMessage: ChatMessage? = nil
 
+    /// Whether messages have been rendered and initial scroll completed.
+    @State private var hasScrolledToBottom = false
+
     var body: some View {
         HStack(spacing: 0) {
         ZStack(alignment: .bottom) {
-            // Loading indicator — shown while history is being fetched
-            if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading messages…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-
-            // Message list — fills the entire area, with bottom padding
-            // so content can scroll up above the floating composer.
+            // Message list
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    VStack(spacing: 12) {
                         // "Load earlier messages" button
                         if viewModel.hasMoreMessages {
                             Button {
@@ -83,29 +73,28 @@ struct ChatView: View {
                             TypingIndicator()
                                 .id("typing-indicator")
                         }
-
-                        // Invisible anchor at the very bottom — always rendered
-                        // even when LazyVStack hasn't materialised the last
-                        // message yet, so scrollTo has a reliable target.
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom-anchor")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 }
                 .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
-                .defaultScrollAnchor(.bottom)
+                .opacity(hasScrolledToBottom || viewModel.messages.isEmpty ? 1 : 0)
                 .onAppear {
                     scrollProxy = proxy
                 }
-                .onChange(of: viewModel.messages.count) { _, _ in
+                .onChange(of: viewModel.messages.count) { oldCount, newCount in
                     if viewModel.isAwaitingResponse,
                        let last = viewModel.messages.last,
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-                    scrollToBottom(proxy: proxy)
+
+                    if !hasScrolledToBottom && newCount > 0 {
+                        // First batch of messages arrived — do initial scroll
+                        initialScrollToBottom(proxy: proxy)
+                    } else {
+                        scrollToBottom(proxy: proxy)
+                    }
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     if isSending { scrollToBottom(proxy: proxy) }
@@ -120,14 +109,6 @@ struct ChatView: View {
                     lastStreamingScroll = now
                     scrollToBottom(proxy: proxy, animated: false)
                 }
-                .onChange(of: viewModel.isLoadingHistory) { wasLoading, isLoading in
-                    if wasLoading && !isLoading {
-                        // History just finished loading — scroll to the most recent message
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            scrollToBottom(proxy: proxy, animated: false)
-                        }
-                    }
-                }
                 .onChange(of: viewModel.focusedMatchId) { _, matchId in
                     if let matchId {
                         withAnimation(.easeOut(duration: 0.2)) {
@@ -135,6 +116,19 @@ struct ChatView: View {
                         }
                     }
                 }
+            }
+
+            // Loading overlay — shown while history is being fetched
+            if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading messages…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.ultraThinMaterial)
             }
 
             // Floating bottom bar: error banner + model selector + composer
@@ -232,24 +226,37 @@ struct ChatView: View {
         } // end HStack
     }
 
+    /// Scroll to the last message.
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
-        // Scroll to the last real message instead of a detached anchor.
-        // LazyVStack may not have laid out cells near an invisible anchor,
-        // causing the view to appear empty. Using the actual message id
-        // forces the lazy stack to materialise that cell first.
         let targetId: String = {
             if viewModel.showTypingIndicator { return "typing-indicator" }
             if let last = viewModel.messages.last { return last.id }
-            return "bottom-anchor"
+            return ""
         }()
+        guard !targetId.isEmpty else { return }
 
-        let scroll = {
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(targetId, anchor: .bottom)
+            }
+        } else {
             proxy.scrollTo(targetId, anchor: .bottom)
         }
-        if animated {
-            withAnimation(.easeOut(duration: 0.2)) { scroll() }
-        } else {
-            scroll()
+    }
+
+    /// Initial scroll after history loads — waits for layout then reveals content.
+    private func initialScrollToBottom(proxy: ScrollViewProxy) {
+        guard let lastId = viewModel.messages.last?.id else { return }
+
+        // Give VStack time to lay out, then scroll and reveal.
+        // Multiple attempts ensure it works even on slower machines.
+        for delay in [0.05, 0.15, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo(lastId, anchor: .bottom)
+                if !self.hasScrolledToBottom {
+                    self.hasScrolledToBottom = true
+                }
+            }
         }
     }
 }
