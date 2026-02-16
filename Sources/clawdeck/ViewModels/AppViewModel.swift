@@ -811,11 +811,23 @@ final class AppViewModel {
             if message.role == .assistant,
                let last = merged.last,
                last.role == .assistant {
-                // Merge segments from the next message into the previous one
-                last.segments.append(contentsOf: message.segments)
+                // Merge segments, but deduplicate text segments.
+                // The gateway may repeat the same text in each assistant
+                // continuation turn during multi-step tool use.
+                let existingTexts = Set(last.segments.compactMap(\.textContent))
+
+                for segment in message.segments {
+                    if case .text(_, let content) = segment {
+                        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty || existingTexts.contains(content) {
+                            continue  // Skip duplicate or empty text
+                        }
+                    }
+                    last.segments.append(segment)
+                }
+
                 // Rebuild content from merged segments
                 last.syncContentFromSegments()
-                // Keep the earlier timestamp (start of the reply)
             } else {
                 merged.append(message)
             }
