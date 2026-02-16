@@ -21,17 +21,25 @@ struct ToolCallBlock: View {
                     // Tool icon
                     Image(systemName: toolCall.iconName)
                         .font(.system(size: messageTextSize - 3, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(toolIconColor)
                         .frame(width: 16)
 
                     // Tool name
                     Text(toolCall.name)
-                        .font(.system(size: messageTextSize - 2, weight: .medium, design: .monospaced))
+                        .font(.system(size: messageTextSize - 2, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.primary)
 
                     // Meta — inline code pill
                     if let meta = toolCall.meta {
-                        InlineCodePill(text: meta, fontSize: messageTextSize - 3, color: themeColor)
+                        Text(meta)
+                            .font(.system(size: messageTextSize - 3, design: .monospaced))
+                            .foregroundStyle(.primary.opacity(0.7))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.fill.tertiary)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
 
                     Spacer()
@@ -39,7 +47,7 @@ struct ToolCallBlock: View {
                     // Expand chevron
                     Image(systemName: "chevron.right")
                         .font(.system(size: messageTextSize - 4, weight: .semibold))
-                        .foregroundStyle(.quaternary)
+                        .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(.horizontal, 10)
@@ -51,21 +59,25 @@ struct ToolCallBlock: View {
             // Expanded content
             if isExpanded {
                 Divider()
-                    .padding(.horizontal, 10)
+                    .opacity(0.5)
 
                 expandedContent
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(8)
             }
         }
-        .glassEffect(.regular.tint(blockTint), in: .rect(cornerRadius: 8))
+        .background(.fill.quaternary)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(.separator, lineWidth: 0.5)
+        )
     }
 
     // MARK: - Expanded content
 
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             // Input section — smart formatting per tool type
             if let args = toolCall.args, !args.isEmpty {
                 expandedInput(args: args)
@@ -84,41 +96,20 @@ struct ToolCallBlock: View {
 
         switch toolName {
         case "exec", "bash":
-            // Show command as a shell code block
             if let command = args["command"] as? String {
-                ToolCodeBlock(
-                    label: "Command",
-                    code: command,
-                    language: "bash",
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "Command", code: command, language: "bash")
 
-                // Show other params (workdir, timeout, etc.) if present
                 let otherArgs = args.filter { $0.key != "command" }
                 if !otherArgs.isEmpty {
                     ToolParamsView(params: otherArgs, fontSize: messageTextSize)
                 }
             } else {
-                ToolCodeBlock(
-                    label: "Input",
-                    code: formatArgsJSON(args),
-                    language: "json",
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "Input", code: formatArgsJSON(args), language: "json")
             }
 
         case "read":
-            // Show file path prominently
             if let path = args["path"] as? String ?? args["file_path"] as? String {
-                ToolCodeBlock(
-                    label: "File",
-                    code: path,
-                    language: nil,
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "File", code: path, language: nil)
                 let otherArgs = args.filter { $0.key != "path" && $0.key != "file_path" }
                 if !otherArgs.isEmpty {
                     ToolParamsView(params: otherArgs, fontSize: messageTextSize)
@@ -127,105 +118,62 @@ struct ToolCallBlock: View {
 
         case "write":
             if let path = args["path"] as? String ?? args["file_path"] as? String {
-                ToolCodeBlock(
-                    label: "File",
-                    code: path,
-                    language: nil,
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
-                // Show content being written (truncated)
+                LabeledCodeBlock(label: "File", code: path, language: nil)
                 if let content = args["content"] as? String {
-                    ToolCodeBlock(
+                    LabeledCodeBlock(
                         label: "Content",
                         code: String(content.prefix(800)),
-                        language: inferLanguage(from: path),
-                        fontSize: messageTextSize,
-                        colorScheme: colorScheme
+                        language: inferLanguage(from: path)
                     )
                 }
             }
 
         case "edit":
             if let path = args["path"] as? String ?? args["file_path"] as? String {
-                ToolCodeBlock(
-                    label: "File",
-                    code: path,
-                    language: nil,
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "File", code: path, language: nil)
                 let lang = inferLanguage(from: path)
                 if let oldText = args["oldText"] as? String ?? args["old_string"] as? String {
-                    ToolCodeBlock(
+                    LabeledCodeBlock(
                         label: "Find",
                         code: String(oldText.prefix(500)),
                         language: lang,
-                        fontSize: messageTextSize,
-                        colorScheme: colorScheme,
-                        tint: .red.opacity(0.08)
+                        tintColor: .red
                     )
                 }
                 if let newText = args["newText"] as? String ?? args["new_string"] as? String {
-                    ToolCodeBlock(
+                    LabeledCodeBlock(
                         label: "Replace",
                         code: String(newText.prefix(500)),
                         language: lang,
-                        fontSize: messageTextSize,
-                        colorScheme: colorScheme,
-                        tint: .green.opacity(0.08)
+                        tintColor: .green
                     )
                 }
             }
 
         case "web_search":
             if let query = args["query"] as? String {
-                ToolCodeBlock(
-                    label: "Query",
-                    code: query,
-                    language: nil,
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "Query", code: query, language: nil)
             }
 
         case "web_fetch":
             if let url = args["url"] as? String {
-                ToolCodeBlock(
-                    label: "URL",
-                    code: url,
-                    language: nil,
-                    fontSize: messageTextSize,
-                    colorScheme: colorScheme
-                )
+                LabeledCodeBlock(label: "URL", code: url, language: nil)
             }
 
         default:
-            // Generic: show as formatted JSON
-            ToolCodeBlock(
-                label: "Input",
-                code: formatArgsJSON(args),
-                language: "json",
-                fontSize: messageTextSize,
-                colorScheme: colorScheme
-            )
+            LabeledCodeBlock(label: "Input", code: formatArgsJSON(args), language: "json")
         }
     }
 
     @ViewBuilder
     private func expandedOutput(result: String) -> some View {
-        let toolName = toolCall.name.lowercased()
-        let isCodeOutput = ["exec", "bash", "read", "write", "edit"].contains(toolName)
         let truncated = truncateResult(result)
 
-        ToolCodeBlock(
+        LabeledCodeBlock(
             label: toolCall.isError ? "Error" : "Output",
             code: truncated,
-            language: isCodeOutput ? nil : nil,
-            fontSize: messageTextSize,
-            colorScheme: colorScheme,
-            tint: toolCall.isError ? .red.opacity(0.08) : nil,
-            isError: toolCall.isError
+            language: nil,
+            tintColor: toolCall.isError ? .red : nil
         )
     }
 
@@ -250,11 +198,11 @@ struct ToolCallBlock: View {
 
     // MARK: - Styling
 
-    private var blockTint: Color {
+    private var toolIconColor: Color {
         switch toolCall.phase {
-        case .running: return themeColor.opacity(0.3)
-        case .completed: return .gray.opacity(0.2)
-        case .error: return .red.opacity(0.2)
+        case .running: return themeColor
+        case .completed: return .secondary
+        case .error: return .red
         }
     }
 
@@ -277,7 +225,6 @@ struct ToolCallBlock: View {
         return String(result.prefix(1500)) + "\n… (\(result.count) chars total)"
     }
 
-    /// Infer a syntax highlighting language from a file extension.
     private func inferLanguage(from path: String) -> String? {
         let ext = (path as NSString).pathExtension.lowercased()
         let map: [String: String] = [
@@ -293,131 +240,74 @@ struct ToolCallBlock: View {
     }
 }
 
-// MARK: - Inline Code Pill
+// MARK: - Labeled Code Block
 
-/// A small inline code chip with monospace font and subtle background.
-/// Used in the tool call header for file paths, commands, queries, etc.
-struct InlineCodePill: View {
-    let text: String
-    let fontSize: Double
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: fontSize, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-}
-
-// MARK: - Tool Code Block
-
-/// A compact code block for displaying tool inputs/outputs.
-/// Simpler than HighlightedCodeBlock — no syntax highlighting, just clean monospace.
-struct ToolCodeBlock: View {
+/// A code block with a label header, using HighlightedCodeBlock for syntax highlighting.
+/// Reuses the same theming as message code blocks for consistent appearance.
+struct LabeledCodeBlock: View {
     let label: String
     let code: String
     let language: String?
-    let fontSize: Double
-    let colorScheme: ColorScheme
-    var tint: Color? = nil
-    var isError: Bool = false
+    var tintColor: Color? = nil
+
+    @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Label header
-            HStack {
-                Text(label)
-                    .font(.system(size: fontSize - 4, weight: .semibold))
-                    .foregroundStyle(isError ? .red : .secondary)
-                    .textCase(.uppercase)
-
-                if let language {
-                    Text(language)
-                        .font(.system(size: fontSize - 5, weight: .medium))
-                        .foregroundStyle(.tertiary)
+            // Label pill
+            HStack(spacing: 4) {
+                if let tint = tintColor {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 6, height: 6)
                 }
-
-                Spacer()
-
-                // Copy button
-                CopyCodeButton(code: code, fontSize: fontSize)
+                Text(label.uppercased())
+                    .font(.system(size: messageTextSize - 4, weight: .bold))
+                    .foregroundStyle(tintColor ?? .secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(headerBackground)
+            .padding(.bottom, 4)
 
-            // Code content
-            ScrollView(.horizontal, showsIndicators: false) {
+            // Code block — reuse HighlightedCodeBlock for proper theming
+            if isMultilineOrCode {
+                HighlightedCodeBlock(
+                    code: code,
+                    language: language
+                )
+            } else {
+                // Short single-line content — inline styled
                 Text(code)
-                    .font(.system(size: fontSize - 2, design: .monospaced))
-                    .foregroundStyle(isError ? .red.opacity(0.85) : .primary.opacity(0.85))
+                    .font(.system(size: messageTextSize - 2, design: .monospaced))
+                    .foregroundStyle(.primary)
                     .textSelection(.enabled)
-                    .padding(8)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(inlineBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(inlineBorder, lineWidth: 0.5)
+                    )
             }
-            .frame(maxHeight: 300)
         }
-        .background(codeBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(borderColor, lineWidth: 0.5)
-        )
     }
 
-    private var codeBackground: Color {
-        if let tint {
-            return tint
-        }
-        return colorScheme == .dark
-            ? Color(red: 0.06, green: 0.07, blue: 0.08)
-            : Color(red: 0.96, green: 0.96, blue: 0.97)
+    /// Use HighlightedCodeBlock for multiline content or when a language is specified.
+    private var isMultilineOrCode: Bool {
+        language != nil || code.contains("\n") || code.count > 120
     }
 
-    private var headerBackground: Color {
-        if let tint {
-            return tint.opacity(1.5)  // Slightly stronger for header
-        }
-        return colorScheme == .dark
-            ? Color(red: 0.10, green: 0.11, blue: 0.13)
-            : Color(red: 0.92, green: 0.92, blue: 0.94)
-    }
-
-    private var borderColor: Color {
+    private var inlineBackground: Color {
         colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color.black.opacity(0.08)
+            ? Color(red: 0.08, green: 0.09, blue: 0.10)
+            : Color(red: 0.97, green: 0.97, blue: 0.98)
     }
-}
 
-// MARK: - Copy Code Button
-
-/// Small copy button for code blocks inside tool calls.
-struct CopyCodeButton: View {
-    let code: String
-    let fontSize: Double
-    @State private var isCopied = false
-
-    var body: some View {
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(code, forType: .string)
-            isCopied = true
-            Task {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                isCopied = false
-            }
-        } label: {
-            Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: fontSize - 5, weight: .medium))
-                .foregroundStyle(isCopied ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
-        }
-        .buttonStyle(.plain)
+    private var inlineBorder: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.1)
+            : Color.black.opacity(0.1)
     }
 }
 
@@ -431,14 +321,13 @@ struct ToolParamsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(Array(params.keys.sorted()), id: \.self) { key in
-                HStack(alignment: .top, spacing: 4) {
+                HStack(alignment: .top, spacing: 6) {
                     Text(key)
-                        .font(.system(size: fontSize - 4, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-
-                    Text(formatValue(params[key]))
-                        .font(.system(size: fontSize - 4, design: .monospaced))
+                        .font(.system(size: fontSize - 3, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
+                    Text(formatValue(params[key]))
+                        .font(.system(size: fontSize - 3, design: .monospaced))
+                        .foregroundStyle(.primary.opacity(0.8))
                         .lineLimit(2)
                 }
             }
