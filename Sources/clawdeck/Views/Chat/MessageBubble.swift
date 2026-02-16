@@ -15,8 +15,8 @@ struct MessageBubble: View {
     @Environment(\.codeHighlightTheme) private var codeHighlightTheme
     var isCurrentMatch: Bool = false
 
-    /// Callback when the user taps the tool steps pill.
-    var onToolStepsTapped: (([ToolCall]) -> Void)? = nil
+    /// Callback when the user taps the steps pill (tool calls + thinking).
+    var onStepsTapped: (([SidebarStep]) -> Void)? = nil
 
     @State private var isHovered = false
     @State private var copiedText = false
@@ -51,13 +51,13 @@ struct MessageBubble: View {
                             .controlSize(.mini)
                     }
 
-                    // Tool steps pill — for completed messages with tool calls
+                    // Steps pill — for completed messages with tool calls or thinking
                     if message.role == .assistant && message.state != .streaming {
-                        let allToolCalls = message.toolCalls
-                        if !allToolCalls.isEmpty {
+                        let allSteps = message.sidebarSteps
+                        if !allSteps.isEmpty {
                             Spacer()
-                            ToolStepsPill(toolCalls: allToolCalls) {
-                                onToolStepsTapped?(allToolCalls)
+                            ToolStepsPill(steps: allSteps) {
+                                onStepsTapped?(allSteps)
                             }
                         }
                     }
@@ -402,10 +402,9 @@ struct MessageBubble: View {
         return result
     }
 
-    /// Completed: collect all text into one bubble, thinking blocks stay
-    /// separate, and tool groups are omitted (shown via the pill + sidebar).
+    /// Completed: collect all text into one bubble. Tool groups and thinking
+    /// blocks are omitted (shown via the pill + sidebar).
     private var completedConsolidatedSegments: [ConsolidatedSegment] {
-        var result: [ConsolidatedSegment] = []
         var allTexts: [String] = []
         var firstTextId: String?
 
@@ -418,15 +417,16 @@ struct MessageBubble: View {
                 allTexts.append(content)
 
             case .toolGroup:
-                // Tool groups are shown in the sidebar, not inline
+                // Shown in the sidebar, not inline
                 break
 
-            case .thinking(let id, let content):
-                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            case .thinking:
+                // Shown in the sidebar, not inline
+                break
             }
         }
 
-        // Emit: thinking blocks first (already added), then one text bubble.
+        var result: [ConsolidatedSegment] = []
         if !allTexts.isEmpty, let id = firstTextId {
             let joined = allTexts.joined(separator: "\n\n")
             result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
