@@ -141,6 +141,27 @@ final class ChatMessage: Identifiable {
         }
     }
 
+    /// Ordered list of sidebar steps (thinking + tool calls) preserving segment order.
+    var sidebarSteps: [SidebarStep] {
+        var steps: [SidebarStep] = []
+        for segment in segments {
+            switch segment {
+            case .thinking(let id, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    steps.append(.thinking(id: id, content: content))
+                }
+            case .toolGroup(_, let calls):
+                for call in calls {
+                    steps.append(.tool(call))
+                }
+            case .text:
+                break
+            }
+        }
+        return steps
+    }
+
     /// Tracks where the current streaming segment starts within `content`.
     /// Used by MessageStore to detect new segments vs cumulative growth.
     var segmentOffset: Int = 0

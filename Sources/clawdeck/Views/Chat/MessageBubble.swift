@@ -15,6 +15,9 @@ struct MessageBubble: View {
     @Environment(\.codeHighlightTheme) private var codeHighlightTheme
     var isCurrentMatch: Bool = false
 
+    /// Callback when the user taps the steps pill (tool calls + thinking).
+    var onStepsTapped: (([SidebarStep]) -> Void)? = nil
+
     @State private var isHovered = false
     @State private var copiedText = false
     @State private var copiedMarkdown = false
@@ -26,7 +29,7 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                // Role label
+                // Role label + tool steps pill
                 HStack(spacing: 4) {
                     if message.role == .assistant {
                         if let emoji = agentAvatarEmoji {
@@ -46,6 +49,17 @@ struct MessageBubble: View {
                     if message.state == .streaming {
                         ProgressView()
                             .controlSize(.mini)
+                    }
+
+                    // Steps pill — shown for messages with tool calls or thinking
+                    if message.role == .assistant {
+                        let allSteps = message.sidebarSteps
+                        if !allSteps.isEmpty {
+                            Spacer()
+                            ToolStepsPill(steps: allSteps) {
+                                onStepsTapped?(allSteps)
+                            }
+                        }
                     }
                 }
 
@@ -74,11 +88,17 @@ struct MessageBubble: View {
                 if message.hasSegments && message.role == .assistant {
                     // Render consolidated segments: merge adjacent text segments
                     // into a single bubble so they don't appear as separate messages.
-                    ForEach(consolidatedSegments, id: \.id) { group in
+                    let segments = consolidatedSegments
+                    let lastTextId = segments.last(where: {
+                        if case .text = $0.kind { return true }
+                        return false
+                    })?.id
+
+                    ForEach(segments, id: \.id) { group in
                         switch group.kind {
                         case .text(let text):
                             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                textBubble(content: text)
+                                textBubble(content: text, showMeta: group.id == lastTextId)
                             }
                         case .toolGroup(let toolCalls):
                             ToolCallsView(toolCalls: toolCalls)
@@ -105,18 +125,6 @@ struct MessageBubble: View {
                         .foregroundStyle(.red)
                 }
 
-                // Timestamp + usage badge on the same line
-                HStack(spacing: 6) {
-                    Text(message.timestamp, style: .time)
-                        .font(.system(size: messageTextSize - 3))
-                        .foregroundStyle(.tertiary)
-
-                    if message.role == .assistant, let usage = message.usage {
-                        Spacer()
-                        UsageBadgeView(usage: usage)
-                    }
-                }
-
                 // Sending indicator
                 if message.state == .sending {
                     HStack(spacing: 4) {
@@ -141,38 +149,76 @@ struct MessageBubble: View {
 
     // MARK: - Text bubble
 
+    /// Whether content needs full Markdown rendering (has formatting syntax).
+    private func needsMarkdown(_ content: String) -> Bool {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Short plain text doesn't need Markdown block layout
+        if trimmed.count < 200 && !trimmed.contains("```") && !trimmed.contains("[") {
+            // Check for common markdown patterns
+            let patterns: [String] = ["**", "__", "~~", "# ", "- ", "* ", "> ", "| ", "1. "]
+            return patterns.contains { trimmed.contains($0) }
+        }
+        return true
+    }
+
     @ViewBuilder
-    private func textBubble(content: String) -> some View {
+    private func textBubble(content: String, showMeta: Bool = true) -> some View {
+        let useMarkdown = message.role == .assistant && message.state != .error && needsMarkdown(content)
+
         ZStack(alignment: .topTrailing) {
-            Group {
-                if message.role == .assistant && message.state != .error {
-                    Markdown(content)
-                        .markdownTextStyle {
-                            FontSize(messageTextSize)
+            VStack(alignment: .leading, spacing: 0) {
+                Group {
+                    if useMarkdown {
+                        Markdown(content)
+                            .markdownTextStyle {
+                                FontSize(messageTextSize)
+                            }
+                            .markdownTextStyle(\.code) {
+                                FontFamilyVariant(.monospaced)
+                                FontSize(.em(0.88))
+                                ForegroundColor(inlineCodeColor)
+                                BackgroundColor(inlineCodeColor.opacity(0.12))
+                            }
+                            .markdownBlockStyle(\.codeBlock) { configuration in
+                                HighlightedCodeBlock(
+                                    code: configuration.content,
+                                    language: configuration.language
+                                )
+                                .markdownMargin(top: .em(0.4), bottom: .em(0.4))
+                            }
+                            .textSelection(.enabled)
+                    } else {
+                        Text(content)
+                            .font(.system(size: messageTextSize))
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, showMeta ? 8 : 10)
+
+                // Timestamp + usage inside the bubble
+                if showMeta {
+                    HStack(spacing: 6) {
+                        Text(message.timestamp, style: .time)
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.tertiary)
+
+                        if message.role == .assistant, let usage = message.usage {
+                            if useMarkdown {
+                                Spacer()
+                            } else {
+                                Spacer()
+                                    .frame(minWidth: 12)
+                            }
+                            UsageBadgeView(usage: usage)
                         }
-                        .markdownTextStyle(\.code) {
-                            FontFamilyVariant(.monospaced)
-                            FontSize(.em(0.88))
-                            ForegroundColor(inlineCodeColor)
-                            BackgroundColor(inlineCodeColor.opacity(0.12))
-                        }
-                        .markdownBlockStyle(\.codeBlock) { configuration in
-                            HighlightedCodeBlock(
-                                code: configuration.content,
-                                language: configuration.language
-                            )
-                            .markdownMargin(top: .em(0.4), bottom: .em(0.4))
-                        }
-                        .textSelection(.enabled)
-                } else {
-                    Text(content)
-                        .font(.system(size: messageTextSize))
-                        .textSelection(.enabled)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .fixedSize(horizontal: !useMarkdown, vertical: false)
             .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
             .overlay {
                 if message.state == .error {
@@ -353,49 +399,12 @@ struct MessageBubble: View {
         return completedConsolidatedSegments
     }
 
-    /// Streaming: preserve interleaved order but merge adjacent text.
+    /// Streaming: collect all text into one bubble, keep thinking inline
+    /// for live feedback, skip tool groups (shown via the pill + sidebar).
     private var streamingConsolidatedSegments: [ConsolidatedSegment] {
         var result: [ConsolidatedSegment] = []
-        var pendingTexts: [String] = []
-        var pendingId: String?
-
-        func flushText() {
-            guard !pendingTexts.isEmpty, let id = pendingId else { return }
-            let joined = pendingTexts.joined(separator: "\n\n")
-            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
-            pendingTexts = []
-            pendingId = nil
-        }
-
-        for segment in message.segments {
-            switch segment {
-            case .text(let id, let content):
-                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { continue }
-                if pendingId == nil { pendingId = id }
-                pendingTexts.append(content)
-
-            case .toolGroup(let id, let toolCalls):
-                flushText()
-                result.append(ConsolidatedSegment(id: id, kind: .toolGroup(toolCalls)))
-
-            case .thinking(let id, let content):
-                flushText()
-                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
-            }
-        }
-        flushText()
-        return result
-    }
-
-    /// Completed: collect all text into one bubble, all tool groups into one
-    /// collapsed section, and thinking blocks stay separate.
-    private var completedConsolidatedSegments: [ConsolidatedSegment] {
-        var result: [ConsolidatedSegment] = []
         var allTexts: [String] = []
-        var allToolCalls: [ToolCall] = []
         var firstTextId: String?
-        var firstToolGroupId: String?
 
         for segment in message.segments {
             switch segment {
@@ -405,24 +414,51 @@ struct MessageBubble: View {
                 if firstTextId == nil { firstTextId = segment.id }
                 allTexts.append(content)
 
-            case .toolGroup(_, let toolCalls):
-                if firstToolGroupId == nil { firstToolGroupId = segment.id }
-                allToolCalls.append(contentsOf: toolCalls)
+            case .toolGroup:
+                // Shown in the pill + sidebar, not inline
+                break
 
             case .thinking(let id, let content):
                 result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
             }
         }
 
-        // Emit: thinking blocks first (already added), then one text bubble,
-        // then one combined tool group.
         if !allTexts.isEmpty, let id = firstTextId {
             let joined = allTexts.joined(separator: "\n\n")
             result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
         }
 
-        if !allToolCalls.isEmpty, let id = firstToolGroupId {
-            result.append(ConsolidatedSegment(id: id, kind: .toolGroup(allToolCalls)))
+        return result
+    }
+
+    /// Completed: collect all text into one bubble. Tool groups and thinking
+    /// blocks are omitted (shown via the pill + sidebar).
+    private var completedConsolidatedSegments: [ConsolidatedSegment] {
+        var allTexts: [String] = []
+        var firstTextId: String?
+
+        for segment in message.segments {
+            switch segment {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
+
+            case .toolGroup:
+                // Shown in the sidebar, not inline
+                break
+
+            case .thinking:
+                // Shown in the sidebar, not inline
+                break
+            }
+        }
+
+        var result: [ConsolidatedSegment] = []
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
         }
 
         return result
@@ -670,3 +706,4 @@ struct MessageCopyButtons: View {
         .glassEffect(in: .rect(cornerRadius: 6))
     }
 }
+// (bubble width removed — bubbles size to content naturally)
