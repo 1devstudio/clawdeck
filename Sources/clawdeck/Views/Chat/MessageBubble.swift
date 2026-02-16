@@ -181,7 +181,7 @@ struct MessageBubble: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-                .padding(.bottom, showMeta ? 4 : 10)
+                .padding(.bottom, showMeta ? 8 : 10)
 
                 // Timestamp + usage inside the bubble
                 if showMeta {
