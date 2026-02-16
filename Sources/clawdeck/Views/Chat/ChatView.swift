@@ -11,10 +11,14 @@ struct ChatView: View {
     /// Height of the bottom bar (model selector + composer) for scroll inset.
     @State private var bottomBarHeight: CGFloat = 60
 
+    /// Message whose steps are shown in the right sidebar (nil = sidebar hidden).
+    /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
+    @State private var sidebarMessage: ChatMessage? = nil
+
     var body: some View {
+        HStack(spacing: 0) {
         ZStack(alignment: .bottom) {
-            // Message list — fills the entire area, with bottom padding
-            // so content can scroll up above the floating composer.
+            // Message list
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -48,7 +52,16 @@ struct ChatView: View {
                                 agentDisplayName: viewModel.agentDisplayName,
                                 agentAvatarEmoji: viewModel.agentAvatarEmoji,
                                 searchQuery: viewModel.searchQuery,
-                                isCurrentMatch: message.id == viewModel.focusedMatchId
+                                isCurrentMatch: message.id == viewModel.focusedMatchId,
+                                onStepsTapped: { _ in
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        if sidebarMessage != nil {
+                                            sidebarMessage = nil
+                                        } else {
+                                            sidebarMessage = message
+                                        }
+                                    }
+                                }
                             )
                             .id(message.id)
                         }
@@ -58,17 +71,14 @@ struct ChatView: View {
                                 .id("typing-indicator")
                         }
 
-                        // Invisible anchor at the very bottom — always rendered
-                        // even when LazyVStack hasn't materialised the last
-                        // message yet, so scrollTo has a reliable target.
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom-anchor")
+                        // Bottom spacer — ensures last message can scroll above the composer.
+                        // This is real content height so LazyVStack accounts for it.
+                        Spacer()
+                            .frame(height: bottomBarHeight + 24)
+                            .id("bottom-spacer")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    // Extra bottom padding so messages can scroll above the composer
-                    .padding(.bottom, bottomBarHeight + 8)
                 }
                 .defaultScrollAnchor(.bottom)
                 .onAppear {
@@ -102,6 +112,19 @@ struct ChatView: View {
                         }
                     }
                 }
+            }
+
+            // Loading overlay — shown while history is being fetched
+            if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading messages…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.regularMaterial)
             }
 
             // Floating bottom bar: error banner + model selector + composer
@@ -184,36 +207,45 @@ struct ChatView: View {
             .onPreferenceChange(BottomBarHeightKey.self) { height in
                 bottomBarHeight = height
             }
+        } // end ZStack
+
+        // Steps sidebar — slides in from the right, reactive to message changes
+        if let msg = sidebarMessage {
+            Divider()
+            ToolStepsSidebar(steps: msg.sidebarSteps) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    sidebarMessage = nil
+                }
+            }
+            .transition(.move(edge: .trailing))
         }
+        } // end HStack
     }
 
+    /// Scroll to the last message, targeting it above the composer.
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
-        // Scroll to the last real message instead of a detached anchor.
-        // LazyVStack may not have laid out cells near an invisible anchor,
-        // causing the view to appear empty. Using the actual message id
-        // forces the lazy stack to materialise that cell first.
         let targetId: String = {
             if viewModel.showTypingIndicator { return "typing-indicator" }
             if let last = viewModel.messages.last { return last.id }
-            return "bottom-anchor"
+            return ""
         }()
+        guard !targetId.isEmpty else { return }
 
-        let scroll = {
-            proxy.scrollTo(targetId, anchor: .bottom)
-        }
         if animated {
-            withAnimation(.easeOut(duration: 0.2)) { scroll() }
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(targetId, anchor: .bottom)
+            }
         } else {
-            scroll()
+            proxy.scrollTo(targetId, anchor: .bottom)
         }
     }
 }
 
-// MARK: - Bottom bar height tracking
+// MARK: - Layout preference keys
 
 /// Preference key to measure the floating bottom bar height dynamically.
 private struct BottomBarHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 60
+    nonisolated(unsafe) static var defaultValue: CGFloat = 60
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
