@@ -25,6 +25,9 @@ final class MessageStore {
     /// A shorter delta definitively signals a new segment started.
     private var lastDeltaLength: [String: Int] = [:]
 
+    /// Tracks which text segment index we're currently streaming into per runId.
+    private var currentTextSegmentIndex: [String: Int] = [:]
+
     /// Incremented on every streaming delta — observe this to trigger auto-scroll.
     private(set) var streamingContentVersion: Int = 0
 
@@ -108,34 +111,42 @@ final class MessageStore {
             let newContent = event.message?.content ?? ""
 
             if let existing = streamingMessages[runId] {
-                // The gateway sends cumulative text within each text segment,
-                // but resets to a short string when a new segment begins
-                // (e.g. after tool calls).
-                //
-                // Detection: within a segment, each cumulative delta is strictly
-                // longer than the previous. A shorter delta means a new segment.
-                // This is more reliable than the previous hasPrefix heuristic,
-                // which could false-positive when a new segment starts with the
-                // same characters as the current one.
                 let prevLength = lastDeltaLength[runId] ?? 0
 
                 if !newContent.isEmpty && newContent.count < prevLength {
                     // New segment — delta is shorter than the last one, meaning
                     // the gateway reset for a new text block (after a tool call).
                     AppLogger.debug("New segment for runId=\(runId): delta \(newContent.count) < prev \(prevLength)", category: "Protocol")
+
+                    // Legacy content tracking
                     if !existing.content.isEmpty {
                         existing.content += "\n\n"
                     }
                     existing.segmentOffset = existing.content.count
                     existing.content += newContent
+
+                    // Segments: start a new text segment
+                    existing.segments.append(.text(id: "seg-\(existing.segments.count)", content: newContent))
+                    currentTextSegmentIndex[runId] = existing.segments.count - 1
+
                     lastDeltaLength[runId] = newContent.count
                 } else {
-                    // Same segment growing (or equal) — replace from segment offset.
-                    // Guard: only apply if the resulting content is at least as long
-                    // as what we already have, preventing accidental truncation.
+                    // Same segment growing — replace from segment offset.
                     let candidate = String(existing.content.prefix(existing.segmentOffset)) + newContent
                     if candidate.count >= existing.content.count {
                         existing.content = candidate
+
+                        // Update the current text segment
+                        if let segIdx = currentTextSegmentIndex[runId], segIdx < existing.segments.count {
+                            existing.segments[segIdx] = .text(id: existing.segments[segIdx].id, content: newContent)
+                        } else {
+                            // No segment yet — create first one
+                            if existing.segments.isEmpty || !existing.segments.last!.isText {
+                                existing.segments.append(.text(id: "seg-\(existing.segments.count)", content: newContent))
+                                currentTextSegmentIndex[runId] = existing.segments.count - 1
+                            }
+                        }
+
                         lastDeltaLength[runId] = newContent.count
                     } else {
                         AppLogger.debug("Stale delta skipped for runId=\(runId): candidate \(candidate.count) < existing \(existing.content.count)", category: "Protocol")
@@ -152,22 +163,20 @@ final class MessageStore {
                 )
                 message.content = newContent
                 message.segmentOffset = 0
+
+                // Initialize segments with the first text
+                message.segments = [.text(id: "seg-0", content: newContent)]
+                currentTextSegmentIndex[runId] = 0
+
                 lastDeltaLength[runId] = newContent.count
                 streamingMessages[runId] = message
                 allMessagesBySession[sessionKey, default: []].append(message)
-                // Expand visible window so streaming message is visible
                 let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
                 visibleCountBySession[sessionKey] = currentVisible + 1
             }
 
         case "final":
             if let existing = streamingMessages[runId] {
-                // Finalize the streaming message.
-                //
-                // The final event's content may only contain the *last* text
-                // segment (after the last tool call), not the full accumulated
-                // response. We must never let it shrink what we already have
-                // from streaming deltas — that causes visible truncation.
                 if let content = event.message?.content, !content.isEmpty {
                     if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         AppLogger.debug("Final for runId=\(runId): no delta content, using final (\(content.count) chars)", category: "Protocol")
@@ -184,8 +193,8 @@ final class MessageStore {
                 existing.state = .complete
                 streamingMessages.removeValue(forKey: runId)
                 lastDeltaLength.removeValue(forKey: runId)
+                currentTextSegmentIndex.removeValue(forKey: runId)
             } else {
-                // Final without prior deltas — create complete message
                 let contentLength = event.message?.content?.count ?? 0
                 AppLogger.debug("Final without prior deltas for runId=\(runId): \(contentLength) chars", category: "Protocol")
                 let message = ChatMessage(
@@ -197,7 +206,6 @@ final class MessageStore {
                     runId: runId
                 )
                 allMessagesBySession[sessionKey, default: []].append(message)
-                // Expand visible window
                 let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
                 visibleCountBySession[sessionKey] = currentVisible + 1
             }
@@ -209,6 +217,7 @@ final class MessageStore {
                 existing.errorMessage = event.errorMessage ?? "Unknown error"
                 streamingMessages.removeValue(forKey: runId)
                 lastDeltaLength.removeValue(forKey: runId)
+                currentTextSegmentIndex.removeValue(forKey: runId)
             }
 
         default:
@@ -222,18 +231,17 @@ final class MessageStore {
     }
 
     /// Finalize all active streaming messages for a session (e.g. after abort).
-    /// Marks them as complete so the UI stops showing the typing indicator.
     func finalizeStreaming(for sessionKey: String) {
         let keys = streamingMessages.filter { $0.value.sessionKey == sessionKey }.map(\.key)
         for key in keys {
             streamingMessages[key]?.state = .complete
             streamingMessages.removeValue(forKey: key)
             lastDeltaLength.removeValue(forKey: key)
+            currentTextSegmentIndex.removeValue(forKey: key)
         }
     }
 
     /// Finalize all active streaming messages across all sessions.
-    /// Called when the gateway connection drops to prevent orphaned typing indicators.
     func finalizeAllStreaming() {
         guard !streamingMessages.isEmpty else { return }
         AppLogger.warning("Finalizing \(streamingMessages.count) orphaned streaming message(s) due to connection loss", category: "Protocol")
@@ -242,6 +250,54 @@ final class MessageStore {
         }
         streamingMessages.removeAll()
         lastDeltaLength.removeAll()
+        currentTextSegmentIndex.removeAll()
+    }
+
+    // MARK: - Tool calls
+
+    /// Handle a tool call event from the agent stream.
+    func handleToolEvent(runId: String, sessionKey: String, phase: String, toolCallId: String, toolName: String, args: [String: Any]?, result: String?, isError: Bool) {
+        let message = streamingMessages[runId]
+            ?? allMessagesBySession[sessionKey]?.last(where: { $0.role == .assistant && $0.runId == runId })
+
+        guard let message else {
+            AppLogger.debug("Tool event for unknown runId=\(runId), creating placeholder", category: "Protocol")
+            let placeholder = ChatMessage.streamPlaceholder(runId: runId, sessionKey: sessionKey)
+            streamingMessages[runId] = placeholder
+            allMessagesBySession[sessionKey, default: []].append(placeholder)
+            let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
+            visibleCountBySession[sessionKey] = currentVisible + 1
+            handleToolEvent(runId: runId, sessionKey: sessionKey, phase: phase, toolCallId: toolCallId, toolName: toolName, args: args, result: result, isError: isError)
+            return
+        }
+
+        switch phase {
+        case "start":
+            let toolCall = ToolCall(id: toolCallId, name: toolName, args: args)
+            // Append to segments — this inserts tool calls between text segments
+            message.appendToolCall(toolCall)
+            // Clear the text segment index so next text delta creates a new segment
+            currentTextSegmentIndex.removeValue(forKey: runId)
+            AppLogger.debug("Tool start: \(toolName) (\(toolCallId)) for runId=\(runId)", category: "Protocol")
+
+        case "update":
+            if let existing = message.findToolCall(id: toolCallId) {
+                existing.result = result
+            }
+
+        case "result":
+            if let existing = message.findToolCall(id: toolCallId) {
+                existing.result = result
+                existing.isError = isError
+                existing.phase = isError ? .error : .completed
+                AppLogger.debug("Tool \(isError ? "error" : "result"): \(toolName) (\(toolCallId))", category: "Protocol")
+            }
+
+        default:
+            break
+        }
+
+        streamingContentVersion += 1
     }
 
     // MARK: - Cleanup
@@ -254,6 +310,7 @@ final class MessageStore {
         for key in keysToRemove {
             streamingMessages.removeValue(forKey: key)
             lastDeltaLength.removeValue(forKey: key)
+            currentTextSegmentIndex.removeValue(forKey: key)
         }
     }
 
@@ -263,5 +320,6 @@ final class MessageStore {
         visibleCountBySession.removeAll()
         streamingMessages.removeAll()
         lastDeltaLength.removeAll()
+        currentTextSegmentIndex.removeAll()
     }
 }

@@ -5,6 +5,8 @@ import MarkdownUI
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
     @State private var scrollProxy: ScrollViewProxy?
+    /// Throttle streaming scroll — don't fire on every single delta.
+    @State private var lastStreamingScroll: Date = .distantPast
 
     var body: some View {
         VStack(spacing: 0) {
@@ -86,6 +88,11 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: viewModel.streamingContentVersion) { _, _ in
+                    // Throttle: scroll at most every 150ms during streaming
+                    // to avoid layout thrashing with Markdown height changes.
+                    let now = Date()
+                    guard now.timeIntervalSince(lastStreamingScroll) > 0.15 else { return }
+                    lastStreamingScroll = now
                     scrollToBottom(proxy: proxy, animated: false)
                 }
                 .onChange(of: viewModel.focusedMatchId) { _, matchId in
@@ -164,8 +171,18 @@ struct ChatView: View {
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        // Scroll to the last real message instead of a detached anchor.
+        // LazyVStack may not have laid out cells near an invisible anchor,
+        // causing the view to appear empty. Using the actual message id
+        // forces the lazy stack to materialise that cell first.
+        let targetId: String = {
+            if viewModel.showTypingIndicator { return "typing-indicator" }
+            if let last = viewModel.messages.last { return last.id }
+            return "bottom-anchor"
+        }()
+
         let scroll = {
-            proxy.scrollTo("bottom-anchor", anchor: .bottom)
+            proxy.scrollTo(targetId, anchor: .bottom)
         }
         if animated {
             withAnimation(.easeOut(duration: 0.2)) { scroll() }

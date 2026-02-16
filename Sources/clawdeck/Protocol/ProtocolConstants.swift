@@ -40,6 +40,7 @@ enum GatewayMethod {
 enum GatewayEvent {
     static let connectChallenge = "connect.challenge"
     static let chat = "chat"
+    static let agent = "agent"
     static let tick = "tick"
     static let presence = "presence"
     static let shutdown = "shutdown"
