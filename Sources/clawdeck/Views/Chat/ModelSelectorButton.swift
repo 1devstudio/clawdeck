@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Compact pill button showing the active model name, with a popover for switching models.
 ///
-/// Placed in the `MessageComposer` between the paperclip and text field.
+/// Placed above the composer, right-aligned.
 /// When the session has a per-session model override, a small dot indicator
 /// distinguishes it from the agent's default.
 struct ModelSelectorButton: View {
@@ -62,13 +62,20 @@ struct ModelSelectorButton: View {
         .buttonStyle(.plain)
         .help("Change model")
         .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
+            // Snapshot models at popover open time so parent re-renders
+            // (e.g. from session.model mutation) don't rebuild the popover
+            // while it's animating closed — which causes a hang with 600+ models.
             ModelSelectorPopover(
                 currentModel: currentModel,
                 defaultModel: defaultModel,
                 models: models,
                 onSelect: { modelId in
                     isPopoverPresented = false
-                    onSelect(modelId)
+                    // Defer the callback so the popover dismissal animation
+                    // completes before we mutate observable state.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        onSelect(modelId)
+                    }
                 }
             )
         }
@@ -90,9 +97,23 @@ private struct ModelSelectorPopover: View {
     let models: [GatewayModel]
     let onSelect: (String?) -> Void
 
-    /// Models grouped by provider, sorted alphabetically.
+    @State private var searchText = ""
+
+    /// Models filtered by search, then grouped by provider.
     private var groupedModels: [(provider: String, models: [GatewayModel])] {
-        let grouped = Dictionary(grouping: models, by: { $0.provider })
+        let filtered: [GatewayModel]
+        let query = searchText.lowercased().trimmingCharacters(in: .whitespaces)
+        if query.isEmpty {
+            filtered = models
+        } else {
+            filtered = models.filter {
+                $0.id.localizedCaseInsensitiveContains(query) ||
+                $0.name.localizedCaseInsensitiveContains(query) ||
+                $0.provider.localizedCaseInsensitiveContains(query)
+            }
+        }
+
+        let grouped = Dictionary(grouping: filtered, by: { $0.provider })
         return grouped
             .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
             .map { (provider: $0.key, models: $0.value) }
@@ -104,21 +125,57 @@ private struct ModelSelectorPopover: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Default option
-                defaultRow
-                Divider()
-                    .padding(.vertical, 4)
-
-                // Grouped models
-                ForEach(groupedModels, id: \.provider) { group in
-                    providerSection(group.provider, models: group.models)
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                TextField("Search models…", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // Default option (always visible)
+                    if searchText.isEmpty {
+                        defaultRow
+                        Divider()
+                            .padding(.vertical, 4)
+                    }
+
+                    // Grouped models
+                    ForEach(groupedModels, id: \.provider) { group in
+                        providerSection(group.provider, models: group.models)
+                    }
+
+                    if groupedModels.isEmpty && !searchText.isEmpty {
+                        Text("No models match "\(searchText)"")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(12)
+                    }
+                }
+                .padding(8)
+            }
         }
-        .frame(maxWidth: 280, maxHeight: 400)
+        .frame(width: 280, height: 400)
     }
 
     // MARK: - Default Row
