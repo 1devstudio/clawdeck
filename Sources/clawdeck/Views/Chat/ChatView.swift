@@ -96,6 +96,8 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                    // Bottom padding so short conversations can scroll above the composer
+                    .padding(.bottom, bottomBarHeight + 24)
                     .environment(\.chatWidth, chatWidth)
                 }
                 .contentMargins(.bottom, bottomBarHeight + 24, for: .scrollContent)
