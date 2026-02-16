@@ -65,12 +65,7 @@ struct ToolCallBlock: View {
                     .padding(8)
             }
         }
-        .background(.fill.quaternary)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 0.5)
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
     }
 
     // MARK: - Expanded content
