@@ -10,6 +10,8 @@ struct MessageComposer: View {
     let isSending: Bool
     let isStreaming: Bool
     let pendingAttachments: [PendingAttachment]
+    /// Incremented to programmatically focus the composer (e.g. via ⌘L).
+    var focusTrigger: Int = 0
     var onSend: () -> Void
     var onAbort: () -> Void
     var onAddAttachment: (URL) -> Void
@@ -109,6 +111,9 @@ struct MessageComposer: View {
             handleDrop(providers)
         }
         .onAppear { isFocused = true }
+        .onChange(of: focusTrigger) { _, _ in
+            isFocused = true
+        }
     }
 
     private var canSend: Bool {

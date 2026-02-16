@@ -21,6 +21,12 @@ struct MainView: View {
     @State private var sidebarWidth: CGFloat = 260
     @State private var searchText: String = ""
 
+    /// Tracks the last sidebar width before collapsing, so we can restore it.
+    @State private var sidebarWidthBeforeCollapse: CGFloat = 260
+
+    /// Focus state for the toolbar search bar.
+    @FocusState private var isSearchBarFocused: Bool
+
     /// The active chat view model (if a session is selected).
     private var activeChatVM: ChatViewModel? {
         guard let key = appViewModel.selectedSessionKey else { return nil }
@@ -77,6 +83,7 @@ struct MainView: View {
                     TextField("Search messages…", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        .focused($isSearchBarFocused)
                         .onSubmit {
                             activeChatVM?.nextMatch()
                         }
@@ -161,6 +168,22 @@ struct MainView: View {
                 }
             }
         }
+        // Sidebar collapse/expand driven by AppViewModel
+        .onChange(of: appViewModel.isSidebarCollapsed) { _, collapsed in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if collapsed {
+                    // Remember the current width so we can restore it later.
+                    sidebarWidthBeforeCollapse = sidebarWidth
+                } else {
+                    // Restore the previous width when expanding.
+                    sidebarWidth = sidebarWidthBeforeCollapse
+                }
+            }
+        }
+        // Focus search bar when triggered via ⌘K
+        .onChange(of: appViewModel.focusSearchBarTrigger) { _, _ in
+            isSearchBarFocused = true
+        }
         .sheet(isPresented: $appViewModel.showAgentSettings, onDismiss: {
             appViewModel.editingAgentProfileId = nil
         }) {
@@ -175,34 +198,37 @@ struct MainView: View {
 
     private var innerPanel: some View {
         HStack(spacing: 0) {
-            // Sidebar — Liquid Glass panel
-            SidebarView(viewModel: appViewModel.sidebarViewModel)
-                .frame(width: sidebarWidth)
-                .background {
-                    VisualEffectBlur(material: .sidebar)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(alignment: .trailing) {
-                    // Invisible trailing-edge drag handle for resizing
-                    Color.clear
-                        .frame(width: 6)
-                        .contentShape(Rectangle())
-                        .onHover { hovering in
-                            if hovering {
-                                NSCursor.resizeLeftRight.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
-                        .gesture(
-                            DragGesture(coordinateSpace: .global)
-                                .onChanged { value in
-                                    let newWidth = value.location.x - railWidth - 1
-                                    sidebarWidth = min(max(newWidth, sidebarMinWidth), sidebarMaxWidth)
+            // Sidebar — Liquid Glass panel (hidden when collapsed)
+            if !appViewModel.isSidebarCollapsed {
+                SidebarView(viewModel: appViewModel.sidebarViewModel)
+                    .frame(width: sidebarWidth)
+                    .background {
+                        VisualEffectBlur(material: .sidebar)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(alignment: .trailing) {
+                        // Invisible trailing-edge drag handle for resizing
+                        Color.clear
+                            .frame(width: 6)
+                            .contentShape(Rectangle())
+                            .onHover { hovering in
+                                if hovering {
+                                    NSCursor.resizeLeftRight.push()
+                                } else {
+                                    NSCursor.pop()
                                 }
-                        )
-                }
-                .padding(12)
+                            }
+                            .gesture(
+                                DragGesture(coordinateSpace: .global)
+                                    .onChanged { value in
+                                        let newWidth = value.location.x - railWidth - 1
+                                        sidebarWidth = min(max(newWidth, sidebarMinWidth), sidebarMaxWidth)
+                                    }
+                            )
+                    }
+                    .padding(12)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
 
             // Chat area
             if let sessionKey = appViewModel.selectedSessionKey {

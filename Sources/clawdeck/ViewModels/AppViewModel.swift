@@ -58,6 +58,15 @@ final class AppViewModel {
     /// Whether the inspector panel is visible.
     var isInspectorVisible = false
 
+    /// Whether the sidebar is collapsed.
+    var isSidebarCollapsed = false
+
+    /// Trigger to focus the composer text field. Incremented to signal focus.
+    var focusComposerTrigger: Int = 0
+
+    /// Trigger to focus the search bar. Incremented to signal focus.
+    var focusSearchBarTrigger: Int = 0
+
     /// Whether the onboarding/connection setup is shown.
     var showConnectionSetup = false
 
@@ -574,6 +583,70 @@ final class AppViewModel {
             // Failed to decode presence
         }
     }
+    // MARK: - Keyboard Shortcut Actions
+
+    /// Toggle sidebar collapsed state.
+    func toggleSidebar() {
+        isSidebarCollapsed.toggle()
+    }
+
+    /// Focus the composer text field.
+    func focusComposer() {
+        focusComposerTrigger += 1
+    }
+
+    /// Focus the search bar (Quick Open).
+    func focusSearchBar() {
+        focusSearchBarTrigger += 1
+    }
+
+    /// Close/deselect the current session.
+    func closeCurrentSession() {
+        selectedSessionKey = nil
+    }
+
+    /// Navigate to the previous session in the sidebar list.
+    func selectPreviousSession() {
+        let sessionList = sidebarViewModel.filteredSessions
+        guard !sessionList.isEmpty else { return }
+
+        if let currentKey = selectedSessionKey,
+           let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
+            let previousIndex = currentIndex - 1
+            if previousIndex >= 0 {
+                Task { await selectSession(sessionList[previousIndex].key) }
+            }
+        } else {
+            // No session selected — select the last one
+            Task { await selectSession(sessionList.last!.key) }
+        }
+    }
+
+    /// Navigate to the next session in the sidebar list.
+    func selectNextSession() {
+        let sessionList = sidebarViewModel.filteredSessions
+        guard !sessionList.isEmpty else { return }
+
+        if let currentKey = selectedSessionKey,
+           let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
+            let nextIndex = currentIndex + 1
+            if nextIndex < sessionList.count {
+                Task { await selectSession(sessionList[nextIndex].key) }
+            }
+        } else {
+            // No session selected — select the first one
+            Task { await selectSession(sessionList.first!.key) }
+        }
+    }
+
+    /// Switch to an agent by its 1-based index in the rail.
+    func switchToAgent(at index: Int) {
+        let bindings = gatewayManager.sortedAgentBindings
+        guard index >= 1, index <= bindings.count else { return }
+        let binding = bindings[index - 1]
+        Task { await switchAgent(binding) }
+    }
+
     // MARK: - Message merging
 
     /// Merge consecutive assistant messages into single messages.
