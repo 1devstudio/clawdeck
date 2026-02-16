@@ -349,6 +349,76 @@ final class AppViewModel {
         }
     }
 
+    /// Force-reload a session's history from the gateway, clearing the cached messages.
+    func reloadSession(_ sessionKey: String) async {
+        messageStore.clearSession(sessionKey)
+        historyLoadTask?.cancel()
+        historyLoadingKey = sessionKey
+
+        AppLogger.info("reloadSession(\(sessionKey)): force-reloading history", category: "Session")
+        let task = Task { await loadHistory(for: sessionKey) }
+        historyLoadTask = task
+        await task.value
+
+        if historyLoadingKey == sessionKey {
+            historyLoadingKey = nil
+        }
+    }
+
+    /// Backfill usage data for a streaming message that just completed.
+    ///
+    /// The gateway's WebSocket chat events don't include `usage` in the final payload,
+    /// so streaming messages always arrive without token/cost data. This method
+    /// re-fetches the last few messages from history to extract the usage info
+    /// and patches the in-memory message.
+    func backfillUsage(for sessionKey: String, runId: String) async {
+        guard let client = activeClient else { return }
+        do {
+            let response = try await client.send(
+                method: GatewayMethod.chatHistory,
+                params: ChatHistoryParams(sessionKey: sessionKey, limit: 5)
+            )
+            guard response.ok, let payload = response.payload else { return }
+
+            let payloadData = try JSONSerialization.data(withJSONObject: payload.value as Any)
+            let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+            let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
+
+            // Find the latest assistant message with usage data
+            for raw in rawMessages.reversed() {
+                guard let role = raw["role"] as? String, role == "assistant",
+                      let usageDict = raw["usage"] as? [String: Any] else { continue }
+
+                var usage = MessageUsage()
+                usage.inputTokens = usageDict["input"] as? Int ?? 0
+                usage.outputTokens = usageDict["output"] as? Int ?? 0
+                usage.cacheReadTokens = usageDict["cacheRead"] as? Int ?? 0
+                usage.cacheWriteTokens = usageDict["cacheWrite"] as? Int ?? 0
+                usage.totalTokens = usageDict["totalTokens"] as? Int
+                    ?? (usage.inputTokens + usage.outputTokens)
+
+                if let costDict = usageDict["cost"] as? [String: Any] {
+                    var cost = MessageCost()
+                    cost.input = (costDict["input"] as? Double) ?? 0
+                    cost.output = (costDict["output"] as? Double) ?? 0
+                    cost.cacheRead = (costDict["cacheRead"] as? Double) ?? 0
+                    cost.cacheWrite = (costDict["cacheWrite"] as? Double) ?? 0
+                    cost.total = (costDict["total"] as? Double) ?? 0
+                    usage.cost = cost
+                }
+
+                guard usage.totalTokens > 0 else { continue }
+
+                // Patch the in-memory message
+                messageStore.patchUsage(for: sessionKey, runId: runId, usage: usage)
+                AppLogger.debug("Backfilled usage for runId=\(runId): \(usage.totalTokens) tokens", category: "Session")
+                return
+            }
+        } catch {
+            AppLogger.debug("Usage backfill failed for \(sessionKey): \(error)", category: "Session")
+        }
+    }
+
     /// Maximum number of messages to request in chat.history.
     /// The gateway has a per-connection send buffer limit (~1.5 MB). Large sessions
     /// with many tool calls can exceed this, causing the connection to drop.
@@ -595,14 +665,28 @@ final class AppViewModel {
 
             // Update session's last message preview (but don't change updatedAt
             // to avoid re-sorting the sidebar and disrupting the user's selection).
-            if chatEvent.state == "final", let content = chatEvent.message?.content {
-                if let session = sessions.first(where: { $0.key == chatEvent.sessionKey }) {
-                    session.lastMessage = String(content.prefix(100))
-                    session.lastMessageAt = Date()
-                    // Note: updatedAt is intentionally NOT updated here.
-                    // Session order refreshes on next full sessions.list call,
-                    // not on every streaming event. This prevents the sidebar
-                    // from re-sorting under the user and stealing selection.
+            if chatEvent.state == "final" {
+                if let content = chatEvent.message?.content {
+                    if let session = sessions.first(where: { $0.key == chatEvent.sessionKey }) {
+                        session.lastMessage = String(content.prefix(100))
+                        session.lastMessageAt = Date()
+                        // Note: updatedAt is intentionally NOT updated here.
+                        // Session order refreshes on next full sessions.list call,
+                        // not on every streaming event. This prevents the sidebar
+                        // from re-sorting under the user and stealing selection.
+                    }
+                }
+
+                // Backfill usage data if the final event didn't include it.
+                // The gateway's WebSocket broadcast omits usage; fetch it from history.
+                if chatEvent.usage == nil || chatEvent.usage?.dictValue == nil {
+                    let sessionKey = chatEvent.sessionKey
+                    let runId = chatEvent.runId
+                    Task {
+                        // Brief delay to let the gateway finalize the transcript
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        await backfillUsage(for: sessionKey, runId: runId)
+                    }
                 }
             }
         } catch {

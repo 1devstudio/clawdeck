@@ -104,15 +104,17 @@ struct MessageBubble: View {
                         .foregroundStyle(.red)
                 }
 
-                // Usage badge (for assistant messages)
-                if message.role == .assistant, let usage = message.usage {
-                    UsageBadgeView(usage: usage)
-                }
+                // Timestamp + usage badge on the same line
+                HStack(spacing: 6) {
+                    Text(message.timestamp, style: .time)
+                        .font(.system(size: messageTextSize - 3))
+                        .foregroundStyle(.tertiary)
 
-                // Timestamp
-                Text(message.timestamp, style: .time)
-                    .font(.system(size: messageTextSize - 3))
-                    .foregroundStyle(.tertiary)
+                    if message.role == .assistant, let usage = message.usage {
+                        Spacer()
+                        UsageBadgeView(usage: usage)
+                    }
+                }
 
                 // Sending indicator
                 if message.state == .sending {

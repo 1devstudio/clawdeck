@@ -283,6 +283,19 @@ final class MessageStore {
         streamingMessages.values.contains { $0.sessionKey == sessionKey }
     }
 
+    /// Patch usage data onto a completed message identified by runId.
+    /// Used to backfill usage from history after streaming completes.
+    func patchUsage(for sessionKey: String, runId: String, usage: MessageUsage) {
+        guard let messages = allMessagesBySession[sessionKey] else { return }
+        // Search from the end — the target message is usually the most recent.
+        for message in messages.reversed() {
+            if message.runId == runId && message.role == .assistant {
+                message.usage = usage
+                return
+            }
+        }
+    }
+
     /// Finalize all active streaming messages for a session (e.g. after abort).
     func finalizeStreaming(for sessionKey: String) {
         let keys = streamingMessages.filter { $0.value.sessionKey == sessionKey }.map(\.key)
