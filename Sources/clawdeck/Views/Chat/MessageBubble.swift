@@ -242,7 +242,7 @@ struct MessageBubble: View {
                 }
             }
             .fixedSize(horizontal: !useMarkdown, vertical: false)
-            .glassEffect(bubbleGlassStyle, in: .rect(cornerRadius: 12))
+            .themedBubble(for: message.role)
             .overlay {
                 if message.state == .error {
                     RoundedRectangle(cornerRadius: 12)
@@ -393,20 +393,6 @@ struct MessageBubble: View {
 
     private var inlineCodeColor: Color {
         codeHighlightTheme.keywordColor(for: colorScheme)
-    }
-
-    /// Liquid Glass style per message role.
-    private var bubbleGlassStyle: Glass {
-        switch message.role {
-        case .user:
-            return .regular
-        case .assistant:
-            return .regular
-        case .system:
-            return .regular.tint(.yellow)
-        case .toolCall, .toolResult:
-            return .regular.tint(.gray)
-        }
     }
 
     // MARK: - Segment consolidation
@@ -671,7 +657,7 @@ struct ThinkingBlockView: View {
                 .frame(maxHeight: 300)
             }
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        .themedToolBlock()
         .onAppear {
             if isStreaming { isExpanded = true }
         }

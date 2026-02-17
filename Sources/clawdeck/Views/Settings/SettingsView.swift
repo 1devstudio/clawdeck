@@ -4,10 +4,12 @@ import HighlightSwift
 
 /// Application preferences window.
 struct SettingsView: View {
+    let appViewModel: AppViewModel
     @State private var selectedTab: SettingsTab = .appearance
 
     enum SettingsTab: String, CaseIterable {
         case appearance = "Appearance"
+        case theme = "Theme"
         case shortcuts = "Shortcuts"
         case advanced = "Advanced"
     }
@@ -19,6 +21,12 @@ struct SettingsView: View {
                     Label("Appearance", systemImage: "paintbrush")
                 }
                 .tag(SettingsTab.appearance)
+
+            ThemeSettingsView(appViewModel: appViewModel)
+                .tabItem {
+                    Label("Theme", systemImage: "paintpalette")
+                }
+                .tag(SettingsTab.theme)
 
             ShortcutSettingsView()
                 .tabItem {
@@ -32,7 +40,7 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.advanced)
         }
-        .frame(width: 500, height: 500)
+        .frame(width: 520, height: 580)
     }
 }
 

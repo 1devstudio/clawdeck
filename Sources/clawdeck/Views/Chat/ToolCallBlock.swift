@@ -65,7 +65,7 @@ struct ToolCallBlock: View {
                     .padding(8)
             }
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        .themedToolBlock()
     }
 
     // MARK: - Expanded content

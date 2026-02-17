@@ -53,7 +53,9 @@ struct ToolStepsSidebar: View {
             }
         }
         .frame(width: 380)
-        .background(.ultraThinMaterial)
+        .background {
+            ThemedToolsPanelBackground()
+        }
     }
 
     // MARK: - Header

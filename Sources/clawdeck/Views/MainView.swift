@@ -68,9 +68,10 @@ struct MainView: View {
                 .padding(.trailing, 12)
                 .padding(.bottom, 12)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(appViewModel.themeConfig.chromeColor)
         .tint(appViewModel.customAccentColor)
         .environment(\.themeColor, appViewModel.customAccentColor ?? .accentColor)
+        .environment(\.themeConfig, appViewModel.themeConfig)
         .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
             // Search bar — searches messages in the active session
@@ -203,7 +204,7 @@ struct MainView: View {
                 SidebarView(viewModel: appViewModel.sidebarViewModel)
                     .frame(width: sidebarWidth)
                     .background {
-                        VisualEffectBlur(material: .sidebar)
+                        ThemedSidebarBackground()
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(alignment: .trailing) {

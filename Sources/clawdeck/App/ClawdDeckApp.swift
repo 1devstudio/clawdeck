@@ -232,10 +232,11 @@ struct ClawdDeckApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(appViewModel: appViewModel)
                 .environment(\.messageTextSize, messageTextSize)
                 .environment(\.codeHighlightTheme, codeHighlightTheme)
                 .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
+                .environment(\.themeConfig, appViewModel.themeConfig)
         }
         
         Window("Application Log", id: "application-log") {

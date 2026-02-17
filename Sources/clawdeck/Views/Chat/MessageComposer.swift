@@ -18,6 +18,7 @@ struct MessageComposer: View {
     var onAddAttachment: (URL) -> Void
     @Environment(\.themeColor) private var themeColor
     @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.themeConfig) private var themeConfig
     var onPasteImage: (NSImage) -> Void
     var onRemoveAttachment: (PendingAttachment) -> Void
 
@@ -64,14 +65,14 @@ struct MessageComposer: View {
                 .padding(.horizontal, 12)
                 .background(
                     RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
-                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                        .fill(themeConfig.composerFieldColor.opacity(0.5))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
                         .stroke(
                             isDropTargeted
                                 ? themeColor
-                                : Color(nsColor: .separatorColor).opacity(0.6),
+                                : themeConfig.composerFieldBorderColor.opacity(0.6),
                             lineWidth: isDropTargeted ? 2 : 1
                         )
                 )
