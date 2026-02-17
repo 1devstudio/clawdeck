@@ -88,6 +88,9 @@ final class AppViewModel {
     /// The agent-level default context window size in tokens.
     var defaultContextTokens: Int?
 
+    /// Connection state of the active gateway, kept in sync for reactive UI updates.
+    var activeConnectionState: ConnectionState = .disconnected
+
     /// Custom accent color set from Agent Settings. Applied app-wide.
     var customAccentColor: Color?
 
@@ -150,6 +153,12 @@ final class AppViewModel {
             activeBinding = firstBinding
         }
 
+        // Sync connection state — the state change callback may have fired
+        // before activeBinding was set, so pull the current state now.
+        if let binding = activeBinding {
+            activeConnectionState = gatewayManager.connectionState(for: binding.gatewayId)
+        }
+
         await loadInitialData()
     }
 
@@ -157,7 +166,10 @@ final class AppViewModel {
     func switchAgent(_ binding: AgentBinding) async {
         let previousGatewayId = activeBinding?.gatewayId
         activeBinding = binding
-        
+
+        // Sync connection state to the new gateway
+        activeConnectionState = gatewayManager.connectionState(for: binding.gatewayId)
+
         if previousGatewayId != binding.gatewayId {
             // Different gateway — reload sessions and models from the new gateway
             allGatewaySessions.removeAll()
@@ -653,6 +665,8 @@ final class AppViewModel {
         // Only act on the active gateway's state changes
         guard let binding = activeBinding, binding.gatewayId == gatewayId else { return }
 
+        activeConnectionState = newState
+
         switch newState {
         case .disconnected, .reconnecting:
             // Finalize orphaned streaming messages to clear typing indicators
@@ -663,7 +677,15 @@ final class AppViewModel {
                 vm.isSending = false
                 vm.isAwaitingResponse = false
             }
-        case .connecting, .connected:
+        case .connected:
+            // Clear disconnection-related errors when reconnected
+            for (_, vm) in chatViewModels {
+                if let err = vm.errorMessage,
+                   err.contains("Connection lost") || err.contains("Not connected") {
+                    vm.errorMessage = nil
+                }
+            }
+        case .connecting:
             break
         }
     }

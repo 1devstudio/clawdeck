@@ -76,6 +76,16 @@ final class ChatViewModel {
     /// Error message to display.
     var errorMessage: String?
 
+    /// Connection state of the active gateway.
+    var activeConnectionState: ConnectionState {
+        appViewModel.activeConnectionState
+    }
+
+    /// Whether the active gateway is connected and ready to send messages.
+    var isConnected: Bool {
+        activeConnectionState == .connected
+    }
+
     /// Messages for this session.
     var messages: [ChatMessage] {
         appViewModel.messageStore.messages(for: sessionKey)
@@ -231,12 +241,13 @@ final class ChatViewModel {
             // RPC succeeded — now wait for the agent's first streaming delta
             isAwaitingResponse = true
         } catch {
+            let message = Self.userFriendlyError(error)
             appViewModel.messageStore.markError(
                 messageId: outgoing.id,
                 sessionKey: sessionKey,
-                error: error.localizedDescription
+                error: message
             )
-            errorMessage = error.localizedDescription
+            errorMessage = message
         }
 
         isSending = false
@@ -266,6 +277,12 @@ final class ChatViewModel {
     /// Clear the error message.
     func clearError() {
         errorMessage = nil
+    }
+
+    /// Manually trigger a reconnection to the active gateway.
+    func reconnect() async {
+        guard let binding = appViewModel.activeBinding else { return }
+        await appViewModel.gatewayManager.reconnect(gatewayId: binding.gatewayId)
     }
 
     // MARK: - Attachments
@@ -383,5 +400,27 @@ final class ChatViewModel {
         NSGraphicsContext.restoreGraphicsState()
 
         return resized
+    }
+
+    // MARK: - Error mapping
+
+    /// Map gateway errors to user-friendly messages.
+    private static func userFriendlyError(_ error: Error) -> String {
+        if let gwError = error as? GatewayClientError {
+            switch gwError {
+            case .cancelled:
+                return "Connection lost — message not sent"
+            case .notConnected:
+                return "Not connected to gateway"
+            case .timeout:
+                return "Request timed out"
+            default:
+                return gwError.localizedDescription
+            }
+        }
+        if error is CancellationError {
+            return "Request was cancelled"
+        }
+        return error.localizedDescription
     }
 }

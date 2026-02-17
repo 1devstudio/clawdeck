@@ -9,6 +9,7 @@ struct MessageComposer: View {
     @Binding var text: String
     let isSending: Bool
     let isStreaming: Bool
+    var isDisabled: Bool = false
     let pendingAttachments: [PendingAttachment]
     /// Incremented to programmatically focus the composer (e.g. via ⌘L).
     var focusTrigger: Int = 0
@@ -46,6 +47,7 @@ struct MessageComposer: View {
                 .glassEffect(in: .circle)
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(isDisabled)
 
                 // Text field — pill-shaped like iMessage
                 ComposerTextEditor(
@@ -73,8 +75,20 @@ struct MessageComposer: View {
                             lineWidth: isDropTargeted ? 2 : 1
                         )
                 )
+                .overlay {
+                    if isDisabled && text.isEmpty {
+                        Text("Reconnect to send messages")
+                            .font(.system(size: messageTextSize))
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .opacity(isDisabled ? 0.5 : 1.0)
                 .animation(.easeOut(duration: 0.15), value: editorHeight)
                 .focused($isFocused)
+                .disabled(isDisabled)
 
                 // Abort button (visible while waiting for or receiving a response)
                 if isSending || isStreaming {
@@ -103,7 +117,7 @@ struct MessageComposer: View {
     private var canSend: Bool {
         let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasAttachments = !pendingAttachments.isEmpty
-        return (hasText || hasAttachments) && !isSending
+        return (hasText || hasAttachments) && !isSending && !isDisabled
     }
 
     // MARK: - File picker

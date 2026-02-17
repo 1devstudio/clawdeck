@@ -71,6 +71,17 @@ struct ChatView: View {
                     .padding(.top, 12)
                 }
                 .defaultScrollAnchor(.bottom)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    // Connection banner at top — non-dismissible
+                    if !viewModel.isConnected {
+                        ConnectionBanner(
+                            state: viewModel.activeConnectionState,
+                            onReconnect: {
+                                Task { await viewModel.reconnect() }
+                            }
+                        )
+                    }
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     // Bottom bar: error banner + model selector + composer
                     VStack(spacing: 0) {
@@ -124,6 +135,7 @@ struct ChatView: View {
                             text: $viewModel.draftText,
                             isSending: viewModel.isSending || viewModel.isAwaitingResponse,
                             isStreaming: viewModel.isStreaming,
+                            isDisabled: !viewModel.isConnected,
                             pendingAttachments: viewModel.pendingAttachments,
                             focusTrigger: viewModel.focusComposerTrigger,
                             onSend: {
