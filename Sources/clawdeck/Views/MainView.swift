@@ -90,17 +90,26 @@ struct MainView: View {
             )
 
             // Inner panel (sidebar + content) — inset with border like Slack
-            innerPanel
-                .background {
-                    InnerPanelBackground()
+            // Inspector sits outside the inner panel, in the chrome area.
+            HStack(spacing: 0) {
+                innerPanel
+                    .background {
+                        InnerPanelBackground()
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+                    )
+
+                if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
+                    InspectorView(session: session, appViewModel: appViewModel)
+                        .frame(width: 280)
+                        .environment(\.colorScheme, chromeScheme)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
-                )
-                .padding(.trailing, 12)
-                .padding(.bottom, 12)
+            }
+            .padding(.trailing, 12)
+            .padding(.bottom, 12)
         }
         .background(appViewModel.themeConfig.chromeColor)
         .chromeColorScheme(appViewModel.themeConfig, systemScheme: systemColorScheme)
@@ -294,19 +303,10 @@ struct MainView: View {
 
     @ViewBuilder
     private func chatArea(sessionKey: String) -> some View {
-        HStack(spacing: 0) {
-            ChatView(viewModel: appViewModel.chatViewModel(for: sessionKey))
-                .frame(maxWidth: .infinity)
-                .id(sessionKey)
-                .environment(\.colorScheme, systemColorScheme)
-
-            if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
-                Divider()
-                InspectorView(session: session, appViewModel: appViewModel)
-                    .frame(width: 280)
-                    .environment(\.colorScheme, chromeScheme)
-            }
-        }
+        ChatView(viewModel: appViewModel.chatViewModel(for: sessionKey))
+            .frame(maxWidth: .infinity)
+            .id(sessionKey)
+            .environment(\.colorScheme, systemColorScheme)
     }
 
     private var connectionStatusColor: Color {
