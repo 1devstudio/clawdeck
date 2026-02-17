@@ -32,45 +32,7 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                // Role label + tool steps pill
-                HStack(spacing: 4) {
-                    if message.role == .assistant {
-                        if let emoji = agentAvatarEmoji {
-                            Text(emoji)
-                                .font(.system(size: messageTextSize - 3))
-                        } else {
-                            Image(systemName: "sparkle")
-                                .font(.system(size: messageTextSize - 3))
-                                .foregroundStyle(themeColor)
-                        }
-                    }
-                    Text(roleLabel)
-                        .font(.system(size: messageTextSize - 2))
-                        .foregroundStyle(.secondary)
-                        .fontWeight(.medium)
-
-                    if message.state == .streaming {
-                        ProgressView()
-                            .controlSize(.mini)
-                    }
-
-                    // Steps pill — shown for messages with tool calls or thinking
-                    if message.role == .assistant {
-                        let allSteps = message.sidebarSteps
-                        if !allSteps.isEmpty {
-                            Spacer()
-                            ToolStepsPill(steps: allSteps) {
-                                onStepsTapped?(allSteps)
-                            }
-                        }
-                    }
-                }
-                .frame(
-                    maxWidth: message.role == .assistant ? .infinity : nil,
-                    alignment: .leading
-                )
-
-                // Image attachments (above message bubble)
+                // Image attachments (above message content)
                 if !message.images.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(message.images) { img in
@@ -91,38 +53,76 @@ struct MessageBubble: View {
                     }
                 }
 
-                // Message content — interleaved segments or plain text
-                if message.hasSegments && message.role == .assistant {
-                    // Render consolidated segments: merge adjacent text segments
-                    // into a single bubble so they don't appear as separate messages.
-                    let segments = consolidatedSegments
-                    let lastTextId = segments.last(where: {
-                        if case .text = $0.kind { return true }
-                        return false
-                    })?.id
+                // Message content
+                if message.role == .assistant {
+                    // Container groups header + bubble so steps pill aligns to bubble width
+                    if message.hasSegments {
+                        let segments = consolidatedSegments
+                        let textContent = segments.compactMap { seg -> String? in
+                            if case .text(let t) = seg.kind { return t }
+                            return nil
+                        }.joined(separator: "\n\n")
+                        let useMarkdown = needsMarkdown(textContent)
+                        let lastTextId = segments.last(where: {
+                            if case .text = $0.kind { return true }
+                            return false
+                        })?.id
 
-                    ForEach(segments, id: \.id) { group in
-                        switch group.kind {
-                        case .text(let text):
-                            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                textBubble(content: text, showMeta: group.id == lastTextId)
+                        VStack(alignment: .leading, spacing: 4) {
+                            assistantHeaderRow()
+
+                            ForEach(segments, id: \.id) { group in
+                                switch group.kind {
+                                case .text(let text):
+                                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        textBubble(content: text, showMeta: group.id == lastTextId)
+                                    }
+                                case .toolGroup(let toolCalls):
+                                    ToolCallsView(toolCalls: toolCalls)
+                                        .padding(.leading, 12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                case .thinking(let content):
+                                    ThinkingBlockView(
+                                        content: content,
+                                        isStreaming: message.state == .streaming
+                                    )
+                                    .padding(.leading, 12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
-                        case .toolGroup(let toolCalls):
-                            ToolCallsView(toolCalls: toolCalls)
-                                .padding(.leading, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        case .thinking(let content):
-                            ThinkingBlockView(
-                                content: content,
-                                isStreaming: message.state == .streaming
-                            )
-                            .padding(.leading, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fixedSize(horizontal: message.state != .streaming && !useMarkdown, vertical: false)
+
+                    } else if hasTextContent {
+                        let useMarkdown = needsMarkdown(message.content)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            assistantHeaderRow()
+                            textBubble(content: message.content)
+                        }
+                        .fixedSize(horizontal: message.state != .streaming && !useMarkdown, vertical: false)
+
+                    } else {
+                        // No text content — just header (pill sits beside name)
+                        assistantHeaderRow()
+                    }
+                } else {
+                    // Non-assistant: header + bubble
+                    HStack(spacing: 4) {
+                        Text(roleLabel)
+                            .font(.system(size: messageTextSize - 2))
+                            .foregroundStyle(.secondary)
+                            .fontWeight(.medium)
+
+                        if message.state == .streaming {
+                            ProgressView()
+                                .controlSize(.mini)
                         }
                     }
-                } else if hasTextContent {
-                    // Non-assistant or no segments — render as single bubble
-                    textBubble(content: message.content)
+
+                    if hasTextContent {
+                        textBubble(content: message.content)
+                    }
                 }
 
                 // Error message + retry button
@@ -166,6 +166,42 @@ struct MessageBubble: View {
 
             if message.role != .user {
                 Spacer(minLength: 60)
+            }
+        }
+    }
+
+    // MARK: - Assistant header row
+
+    /// Role label + steps pill for assistant messages.
+    /// Placed inside a container VStack so the Spacer expands to the bubble width,
+    /// keeping the pill aligned to the bubble's trailing edge.
+    @ViewBuilder
+    private func assistantHeaderRow() -> some View {
+        HStack(spacing: 4) {
+            if let emoji = agentAvatarEmoji {
+                Text(emoji)
+                    .font(.system(size: messageTextSize - 3))
+            } else {
+                Image(systemName: "sparkle")
+                    .font(.system(size: messageTextSize - 3))
+                    .foregroundStyle(themeColor)
+            }
+            Text(roleLabel)
+                .font(.system(size: messageTextSize - 2))
+                .foregroundStyle(.secondary)
+                .fontWeight(.medium)
+
+            if message.state == .streaming {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+
+            let allSteps = message.sidebarSteps
+            if !allSteps.isEmpty {
+                Spacer()
+                ToolStepsPill(steps: allSteps) {
+                    onStepsTapped?(allSteps)
+                }
             }
         }
     }
@@ -231,17 +267,16 @@ struct MessageBubble: View {
                             if useMarkdown {
                                 Spacer()
                             } else {
-                                Spacer()
-                                    .frame(minWidth: 12)
+                                Spacer(minLength: 12)
                             }
                             UsageBadgeView(usage: usage)
                         }
                     }
+                    .frame(minWidth: message.role == .assistant && message.usage != nil ? 180 : nil, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 6)
                 }
             }
-            .fixedSize(horizontal: !useMarkdown, vertical: false)
             .themedBubble(for: message.role)
             .overlay {
                 if message.state == .error {
