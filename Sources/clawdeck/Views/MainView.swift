@@ -141,7 +141,7 @@ struct MainView: View {
                     Circle()
                         .fill(connectionStatusColor)
                         .frame(width: 7, height: 7)
-                    Text(activeGatewayConnectionState.rawValue.capitalized)
+                    Text(appViewModel.activeConnectionState.rawValue.capitalized)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -256,14 +256,8 @@ struct MainView: View {
         }
     }
 
-    /// Connection state for the active binding's gateway.
-    private var activeGatewayConnectionState: ConnectionState {
-        guard let binding = appViewModel.activeBinding else { return .disconnected }
-        return appViewModel.gatewayManager.connectionState(for: binding.gatewayId)
-    }
-    
     private var connectionStatusColor: Color {
-        switch activeGatewayConnectionState {
+        switch appViewModel.activeConnectionState {
         case .connected: return .green
         case .connecting, .reconnecting: return .orange
         case .disconnected: return .red
