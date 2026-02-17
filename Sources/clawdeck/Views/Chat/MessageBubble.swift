@@ -18,6 +18,9 @@ struct MessageBubble: View {
     /// Callback when the user taps the steps pill (tool calls + thinking).
     var onStepsTapped: (([SidebarStep]) -> Void)? = nil
 
+    /// Callback when the user taps the retry button on a failed message.
+    var onRetry: (() -> Void)? = nil
+
     @State private var isHovered = false
     @State private var copiedText = false
     @State private var copiedMarkdown = false
@@ -122,11 +125,31 @@ struct MessageBubble: View {
                     textBubble(content: message.content)
                 }
 
-                // Error message
+                // Error message + retry button
                 if message.state == .error, let error = message.errorMessage {
-                    Text(error)
-                        .font(.system(size: messageTextSize - 3))
-                        .foregroundStyle(.red)
+                    HStack(spacing: 6) {
+                        Text(error)
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.red)
+
+                        if let onRetry {
+                            Button(action: onRetry) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: messageTextSize - 4, weight: .semibold))
+                                    Text("Retry")
+                                        .font(.system(size: messageTextSize - 3, weight: .medium))
+                                }
+                                .foregroundStyle(themeColor)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(themeColor.opacity(0.12))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Retry sending this message")
+                        }
+                    }
                 }
 
                 // Sending indicator

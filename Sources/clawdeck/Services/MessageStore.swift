@@ -96,6 +96,15 @@ final class MessageStore {
         allMessagesBySession[sessionKey]?[index].state = .sent
     }
 
+    /// Reset a failed message to sending state (for retry).
+    func markSending(messageId: String, sessionKey: String) {
+        guard let messages = allMessagesBySession[sessionKey],
+              let index = messages.firstIndex(where: { $0.id == messageId })
+        else { return }
+        allMessagesBySession[sessionKey]?[index].state = .sending
+        allMessagesBySession[sessionKey]?[index].errorMessage = nil
+    }
+
     /// Mark a user message as failed.
     func markError(messageId: String, sessionKey: String, error: String) {
         guard let messages = allMessagesBySession[sessionKey],

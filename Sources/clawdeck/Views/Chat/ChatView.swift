@@ -57,7 +57,10 @@ struct ChatView: View {
                                             sidebarMessage = message
                                         }
                                     }
-                                }
+                                },
+                                onRetry: (message.role == .user && message.state == .error) ? {
+                                    Task { await viewModel.retryMessage(id: message.id) }
+                                } : nil
                             )
                             .id(message.id)
                         }

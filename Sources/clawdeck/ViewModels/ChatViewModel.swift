@@ -253,6 +253,61 @@ final class ChatViewModel {
         isSending = false
     }
 
+    /// Retry sending a failed message.
+    func retryMessage(id messageId: String) async {
+        guard !isSending else { return }
+
+        guard let message = messages.first(where: { $0.id == messageId }),
+              message.state == .error,
+              message.role == .user else {
+            return
+        }
+
+        guard let client = appViewModel.activeClient else {
+            appViewModel.messageStore.markError(
+                messageId: messageId,
+                sessionKey: sessionKey,
+                error: "Not connected"
+            )
+            return
+        }
+
+        appViewModel.messageStore.markSending(messageId: messageId, sessionKey: sessionKey)
+        isSending = true
+        errorMessage = nil
+
+        // Re-compress image attachments from stored NSImages
+        let chatAttachments: [ChatAttachment]? = message.images.isEmpty ? nil : message.images.compactMap { img in
+            guard let data = compressForUpload(image: img.image) else { return nil }
+            return ChatAttachment(
+                content: data.base64EncodedString(),
+                mimeType: img.mimeType,
+                fileName: img.fileName,
+                type: "image"
+            )
+        }
+
+        do {
+            let _ = try await client.chatSend(
+                sessionKey: sessionKey,
+                message: message.content,
+                attachments: chatAttachments
+            )
+            appViewModel.messageStore.markSent(messageId: messageId, sessionKey: sessionKey)
+            isAwaitingResponse = true
+        } catch {
+            let friendlyError = Self.userFriendlyError(error)
+            appViewModel.messageStore.markError(
+                messageId: messageId,
+                sessionKey: sessionKey,
+                error: friendlyError
+            )
+            errorMessage = friendlyError
+        }
+
+        isSending = false
+    }
+
     /// Abort the current generation.
     func abortGeneration() async {
         guard let client = appViewModel.activeClient else { return }
