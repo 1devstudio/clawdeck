@@ -71,7 +71,7 @@ struct MainView: View {
                 .padding(.bottom, 12)
         }
         .background(appViewModel.themeConfig.chromeColor)
-        .chromeColorScheme(appViewModel.themeConfig)
+        .chromeColorScheme(appViewModel.themeConfig, systemScheme: systemColorScheme)
         .tint(appViewModel.customAccentColor)
         .environment(\.themeColor, appViewModel.customAccentColor ?? .accentColor)
         .environment(\.themeConfig, appViewModel.themeConfig)
