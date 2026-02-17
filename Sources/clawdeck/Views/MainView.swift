@@ -55,10 +55,10 @@ struct MainView: View {
                     appViewModel.showGatewayConnectionSheet = true
                 }
             )
-            .environment(\.colorScheme, appViewModel.themeConfig.chromeColor.preferredColorScheme)
 
             // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
+                .environment(\.colorScheme, systemColorScheme)
                 .background {
                     InnerPanelBackground()
                 }
@@ -71,6 +71,7 @@ struct MainView: View {
                 .padding(.bottom, 12)
         }
         .background(appViewModel.themeConfig.chromeColor)
+        .environment(\.colorScheme, appViewModel.themeConfig.chromeColor.preferredColorScheme)
         .tint(appViewModel.customAccentColor)
         .environment(\.themeColor, appViewModel.customAccentColor ?? .accentColor)
         .environment(\.themeConfig, appViewModel.themeConfig)
