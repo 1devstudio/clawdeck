@@ -18,6 +18,7 @@ import SwiftUI
 /// The **sidebar + content** sit inside an inset panel with a lighter background.
 struct MainView: View {
     @Bindable var appViewModel: AppViewModel
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var sidebarWidth: CGFloat = 260
     @State private var searchText: String = ""
 
@@ -54,6 +55,7 @@ struct MainView: View {
                     appViewModel.showGatewayConnectionSheet = true
                 }
             )
+            .environment(\.colorScheme, appViewModel.themeConfig.chromeColor.preferredColorScheme)
 
             // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
@@ -207,6 +209,11 @@ struct MainView: View {
                         ThemedSidebarBackground()
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .adaptiveColorScheme(
+                        style: appViewModel.themeConfig.sidebarStyle,
+                        background: appViewModel.themeConfig.sidebarColor,
+                        systemScheme: systemColorScheme
+                    )
                     .overlay(alignment: .trailing) {
                         // Invisible trailing-edge drag handle for resizing
                         Color.clear

@@ -639,6 +639,8 @@ final class AppViewModel {
         d.set(t.systemBubbleColorHex, forKey: "theme.systemBubbleColor")
         d.set(t.sidebarStyle.rawValue, forKey: "theme.sidebarStyle")
         d.set(t.sidebarColorHex, forKey: "theme.sidebarColor")
+        d.set(t.composerStyle.rawValue, forKey: "theme.composerStyle")
+        d.set(t.composerColorHex, forKey: "theme.composerColor")
         d.set(t.composerFieldColorHex, forKey: "theme.composerFieldColor")
         d.set(t.composerFieldBorderColorHex, forKey: "theme.composerFieldBorderColor")
         d.set(t.toolsPanelStyle.rawValue, forKey: "theme.toolsPanelStyle")
@@ -657,6 +659,8 @@ final class AppViewModel {
         if let v = d.string(forKey: "theme.systemBubbleColor"), !v.isEmpty { t.systemBubbleColorHex = v }
         if let v = d.string(forKey: "theme.sidebarStyle"), let s = SurfaceStyle(rawValue: v) { t.sidebarStyle = s }
         if let v = d.string(forKey: "theme.sidebarColor"), !v.isEmpty { t.sidebarColorHex = v }
+        if let v = d.string(forKey: "theme.composerStyle"), let s = SurfaceStyle(rawValue: v) { t.composerStyle = s }
+        if let v = d.string(forKey: "theme.composerColor"), !v.isEmpty { t.composerColorHex = v }
         if let v = d.string(forKey: "theme.composerFieldColor"), !v.isEmpty { t.composerFieldColorHex = v }
         if let v = d.string(forKey: "theme.composerFieldBorderColor"), !v.isEmpty { t.composerFieldBorderColorHex = v }
         if let v = d.string(forKey: "theme.toolsPanelStyle"), let s = SurfaceStyle(rawValue: v) { t.toolsPanelStyle = s }

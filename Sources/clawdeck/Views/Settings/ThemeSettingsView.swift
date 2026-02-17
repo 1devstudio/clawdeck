@@ -9,6 +9,7 @@ struct ThemeSettingsView: View {
     @State private var assistantBubbleColor: Color = .gray
     @State private var systemBubbleColor: Color = .yellow
     @State private var sidebarColor: Color = .gray
+    @State private var composerColor: Color = .gray
     @State private var composerFieldColor: Color = .gray
     @State private var composerFieldBorderColor: Color = .gray
     @State private var toolsPanelColor: Color = .gray
@@ -18,6 +19,7 @@ struct ThemeSettingsView: View {
     // Local style pickers
     @State private var bubbleStyle: SurfaceStyle = .glass
     @State private var sidebarStyle: SurfaceStyle = .glass
+    @State private var composerStyle: SurfaceStyle = .glass
     @State private var toolsPanelStyle: SurfaceStyle = .glass
 
     var body: some View {
@@ -56,6 +58,16 @@ struct ThemeSettingsView: View {
 
             // ── 3. Composer ─────────────────────────────────────────
             Section {
+                Picker("Surface Style", selection: $composerStyle) {
+                    ForEach(SurfaceStyle.allCases) { style in
+                        Text(style.label).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if composerStyle != .glass {
+                    ColorPicker("Background", selection: $composerColor, supportsOpacity: false)
+                }
                 ColorPicker("Field Background", selection: $composerFieldColor, supportsOpacity: false)
                 ColorPicker("Field Border", selection: $composerFieldBorderColor, supportsOpacity: false)
             } header: {
@@ -108,6 +120,8 @@ struct ThemeSettingsView: View {
         .onChange(of: systemBubbleColor) { _, _ in syncToViewModel() }
         .onChange(of: sidebarStyle) { _, _ in syncToViewModel() }
         .onChange(of: sidebarColor) { _, _ in syncToViewModel() }
+        .onChange(of: composerStyle) { _, _ in syncToViewModel() }
+        .onChange(of: composerColor) { _, _ in syncToViewModel() }
         .onChange(of: composerFieldColor) { _, _ in syncToViewModel() }
         .onChange(of: composerFieldBorderColor) { _, _ in syncToViewModel() }
         .onChange(of: toolsPanelStyle) { _, _ in syncToViewModel() }
@@ -126,6 +140,8 @@ struct ThemeSettingsView: View {
         systemBubbleColor = Color(hex: config.systemBubbleColorHex)
         sidebarStyle = config.sidebarStyle
         sidebarColor = Color(hex: config.sidebarColorHex)
+        composerStyle = config.composerStyle
+        composerColor = Color(hex: config.composerColorHex)
         composerFieldColor = Color(hex: config.composerFieldColorHex)
         composerFieldBorderColor = Color(hex: config.composerFieldBorderColorHex)
         toolsPanelStyle = config.toolsPanelStyle
@@ -143,6 +159,8 @@ struct ThemeSettingsView: View {
         config.systemBubbleColorHex = hexFromColor(systemBubbleColor)
         config.sidebarStyle = sidebarStyle
         config.sidebarColorHex = hexFromColor(sidebarColor)
+        config.composerStyle = composerStyle
+        config.composerColorHex = hexFromColor(composerColor)
         config.composerFieldColorHex = hexFromColor(composerFieldColor)
         config.composerFieldBorderColorHex = hexFromColor(composerFieldBorderColor)
         config.toolsPanelStyle = toolsPanelStyle

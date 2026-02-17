@@ -36,6 +36,8 @@ struct ThemeConfig: Equatable {
     var sidebarColorHex: String = "#2C2C2E"
 
     // ── 3. Composer ──────────────────────────────────────────────────
+    var composerStyle: SurfaceStyle = .glass
+    var composerColorHex: String = "#2C2C2E"
     var composerFieldColorHex: String = "#1C1C1E"
     var composerFieldBorderColorHex: String = "#3A3A3C"
 
@@ -70,9 +72,31 @@ extension EnvironmentValues {
 extension ThemeConfig {
 
     var sidebarColor: Color { Color(hex: sidebarColorHex) }
+    var composerColor: Color { Color(hex: composerColorHex) }
     var composerFieldColor: Color { Color(hex: composerFieldColorHex) }
     var composerFieldBorderColor: Color { Color(hex: composerFieldBorderColorHex) }
     var toolsPanelColor: Color { Color(hex: toolsPanelColorHex) }
     var toolBlockColor: Color { Color(hex: toolBlockColorHex) }
     var chromeColor: Color { Color(hex: chromeColorHex) }
+}
+
+// MARK: - Luminance-based Color Scheme
+
+extension Color {
+    /// Perceived luminance (0 = black, 1 = white) using the standard formula.
+    /// Returns `nil` if the color can't be resolved to sRGB components.
+    var luminance: Double? {
+        let nsColor = NSColor(self).usingColorSpace(.sRGB)
+        guard let c = nsColor else { return nil }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        // Relative luminance (ITU-R BT.709)
+        return 0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)
+    }
+
+    /// Returns `.light` if this color is bright (needs dark text),
+    /// `.dark` if this color is dark (needs light text).
+    var preferredColorScheme: ColorScheme {
+        (luminance ?? 0) > 0.5 ? .light : .dark
+    }
 }

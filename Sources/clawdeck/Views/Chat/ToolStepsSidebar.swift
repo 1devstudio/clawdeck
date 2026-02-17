@@ -20,6 +20,8 @@ struct ToolStepsSidebar: View {
 
     @Environment(\.messageTextSize) private var messageTextSize
     @Environment(\.themeColor) private var themeColor
+    @Environment(\.themeConfig) private var themeConfig
+    @Environment(\.colorScheme) private var systemColorScheme
 
     /// Convenience: just the tool calls from steps.
     private var toolCalls: [ToolCall] {
@@ -56,6 +58,11 @@ struct ToolStepsSidebar: View {
         .background {
             ThemedToolsPanelBackground()
         }
+        .adaptiveColorScheme(
+            style: themeConfig.toolsPanelStyle,
+            background: themeConfig.toolsPanelColor,
+            systemScheme: systemColorScheme
+        )
     }
 
     // MARK: - Header

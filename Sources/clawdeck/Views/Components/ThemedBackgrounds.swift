@@ -21,6 +21,27 @@ struct ThemedSidebarBackground: View {
     }
 }
 
+// MARK: - Composer Background
+
+/// Renders the composer area background based on the current theme config.
+struct ThemedComposerBackground: View {
+    @Environment(\.themeConfig) private var theme
+
+    var body: some View {
+        switch theme.composerStyle {
+        case .glass:
+            Rectangle().fill(.ultraThinMaterial)
+        case .solid:
+            Rectangle().fill(theme.composerColor)
+        case .translucent:
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial).opacity(0.3)
+                Rectangle().fill(theme.composerColor.opacity(0.6))
+            }
+        }
+    }
+}
+
 // MARK: - Tools Panel Background
 
 /// Renders the tools panel background based on the current theme config.
@@ -121,5 +142,23 @@ extension View {
     /// Apply themed tool block background.
     func themedToolBlock() -> some View {
         modifier(ThemedToolBlockModifier())
+    }
+}
+
+// MARK: - Adaptive Color Scheme
+
+extension View {
+    /// Override the color scheme for this view subtree based on background luminance.
+    /// Glass surfaces keep the system scheme; solid/translucent derive from the color's brightness.
+    func adaptiveColorScheme(style: SurfaceStyle, background: Color, systemScheme: ColorScheme) -> some View {
+        let scheme: ColorScheme = {
+            switch style {
+            case .glass:
+                return systemScheme
+            case .solid, .translucent:
+                return background.preferredColorScheme
+            }
+        }()
+        return self.environment(\.colorScheme, scheme)
     }
 }
