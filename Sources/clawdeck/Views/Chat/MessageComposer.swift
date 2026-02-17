@@ -259,7 +259,9 @@ struct ComposerTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = NSFont.systemFont(ofSize: fontSize)
-        textView.textColor = NSColor.labelColor
+        let isDark = context.environment.colorScheme == .dark
+        textView.textColor = isDark ? .white : .black
+        textView.insertionPointColor = isDark ? .white : .black
         textView.backgroundColor = .clear
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -294,6 +296,13 @@ struct ComposerTextEditor: NSViewRepresentable {
         if textView.font?.pointSize != CGFloat(fontSize) {
             textView.font = NSFont.systemFont(ofSize: fontSize)
             context.coordinator.recalcHeight(textView)
+        }
+        // Adapt text color to the environment's color scheme (set by ThemedComposerFieldModifier)
+        let isDark = context.environment.colorScheme == .dark
+        let expectedColor: NSColor = isDark ? .white : .black
+        if textView.textColor != expectedColor {
+            textView.textColor = expectedColor
+            textView.insertionPointColor = expectedColor
         }
     }
 

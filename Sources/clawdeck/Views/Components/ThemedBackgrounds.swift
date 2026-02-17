@@ -30,11 +30,13 @@ struct ThemedComposerFieldModifier: ViewModifier {
     let isDropTargeted: Bool
     @Environment(\.themeConfig) private var theme
     @Environment(\.themeColor) private var themeColor
+    @Environment(\.colorScheme) private var systemScheme
 
     func body(content: Content) -> some View {
+        let adapted = content.environment(\.colorScheme, composerScheme)
         switch theme.composerStyle {
         case .glass:
-            content
+            adapted
                 .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius)
@@ -44,7 +46,7 @@ struct ThemedComposerFieldModifier: ViewModifier {
                         )
                 )
         case .solid:
-            content
+            adapted
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(theme.composerFieldColor)
@@ -57,7 +59,7 @@ struct ThemedComposerFieldModifier: ViewModifier {
                         )
                 )
         case .translucent:
-            content
+            adapted
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(theme.composerFieldColor.opacity(0.5))
@@ -71,20 +73,36 @@ struct ThemedComposerFieldModifier: ViewModifier {
                 )
         }
     }
+
+    private var composerScheme: ColorScheme {
+        switch theme.composerStyle {
+        case .glass: return systemScheme
+        case .solid, .translucent: return theme.composerFieldColor.preferredColorScheme
+        }
+    }
 }
 
 /// Applies themed background to the composer attach button.
 struct ThemedComposerButtonModifier: ViewModifier {
     @Environment(\.themeConfig) private var theme
+    @Environment(\.colorScheme) private var systemScheme
 
     func body(content: Content) -> some View {
+        let adapted = content.environment(\.colorScheme, composerScheme)
         switch theme.composerStyle {
         case .glass:
-            content.glassEffect(in: .circle)
+            adapted.glassEffect(in: .circle)
         case .solid:
-            content.background(theme.composerFieldColor, in: Circle())
+            adapted.background(theme.composerFieldColor, in: Circle())
         case .translucent:
-            content.background(theme.composerFieldColor.opacity(0.5), in: Circle())
+            adapted.background(theme.composerFieldColor.opacity(0.5), in: Circle())
+        }
+    }
+
+    private var composerScheme: ColorScheme {
+        switch theme.composerStyle {
+        case .glass: return systemScheme
+        case .solid, .translucent: return theme.composerFieldColor.preferredColorScheme
         }
     }
 }
