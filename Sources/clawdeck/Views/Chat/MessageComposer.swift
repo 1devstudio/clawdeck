@@ -45,7 +45,7 @@ struct MessageComposer: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .glassEffect(in: .circle)
+                .themedComposerButton()
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(isDisabled)
@@ -63,18 +63,9 @@ struct MessageComposer: View {
                 .font(.system(size: messageTextSize))
                 .frame(height: editorHeight)
                 .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
-                        .fill(themeConfig.composerFieldColor.opacity(0.5))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
-                        .stroke(
-                            isDropTargeted
-                                ? themeColor
-                                : themeConfig.composerFieldBorderColor.opacity(0.6),
-                            lineWidth: isDropTargeted ? 2 : 1
-                        )
+                .themedComposerField(
+                    cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18,
+                    isDropTargeted: isDropTargeted
                 )
                 .overlay {
                     if isDisabled && text.isEmpty {

@@ -35,9 +35,8 @@ struct ThemeConfig: Equatable {
     var sidebarStyle: SurfaceStyle = .glass
     var sidebarColorHex: String = "#2C2C2E"
 
-    // ── 3. Composer ──────────────────────────────────────────────────
+    // ── 3. Composer (controls the input field pill + attach button) ──
     var composerStyle: SurfaceStyle = .glass
-    var composerColorHex: String = "#2C2C2E"
     var composerFieldColorHex: String = "#1C1C1E"
     var composerFieldBorderColorHex: String = "#3A3A3C"
 
@@ -47,6 +46,7 @@ struct ThemeConfig: Equatable {
     var toolBlockColorHex: String = "#3A3A3C"
 
     // ── 5. Chrome ────────────────────────────────────────────────────
+    var chromeUsesSystem: Bool = true
     var chromeColorHex: String = "#1C1C1E"
 
     // MARK: - Defaults
@@ -72,12 +72,15 @@ extension EnvironmentValues {
 extension ThemeConfig {
 
     var sidebarColor: Color { Color(hex: sidebarColorHex) }
-    var composerColor: Color { Color(hex: composerColorHex) }
     var composerFieldColor: Color { Color(hex: composerFieldColorHex) }
     var composerFieldBorderColor: Color { Color(hex: composerFieldBorderColorHex) }
     var toolsPanelColor: Color { Color(hex: toolsPanelColorHex) }
     var toolBlockColor: Color { Color(hex: toolBlockColorHex) }
-    var chromeColor: Color { Color(hex: chromeColorHex) }
+
+    /// Chrome color: system default or custom.
+    var chromeColor: Color {
+        chromeUsesSystem ? Color(nsColor: .windowBackgroundColor) : Color(hex: chromeColorHex)
+    }
 }
 
 // MARK: - Luminance-based Color Scheme

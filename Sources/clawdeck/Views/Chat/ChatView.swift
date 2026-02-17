@@ -4,8 +4,6 @@ import MarkdownUI
 /// Center column: message list with composer at the bottom.
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
-    @Environment(\.themeConfig) private var themeConfig
-    @Environment(\.colorScheme) private var systemColorScheme
     @State private var scrollProxy: ScrollViewProxy?
     /// Throttle streaming scroll — don't fire on every single delta.
     @State private var lastStreamingScroll: Date = .distantPast
@@ -160,12 +158,7 @@ struct ChatView: View {
                             }
                         )
                     }
-                    .background { ThemedComposerBackground() }
-                    .adaptiveColorScheme(
-                        style: themeConfig.composerStyle,
-                        background: themeConfig.composerColor,
-                        systemScheme: systemColorScheme
-                    )
+                    .background(.clear)
                 }
                 .overlay {
                     // Loading overlay — shown while history is being fetched

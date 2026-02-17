@@ -60,11 +60,11 @@ struct AppearanceSettingsView: View {
     @State private var assistantBubbleColor: Color = .gray
     @State private var systemBubbleColor: Color = .yellow
     @State private var sidebarColor: Color = .gray
-    @State private var composerColor: Color = .gray
     @State private var composerFieldColor: Color = .gray
     @State private var composerFieldBorderColor: Color = .gray
     @State private var toolsPanelColor: Color = .gray
     @State private var toolBlockColor: Color = .gray
+    @State private var chromeUsesSystem: Bool = true
     @State private var chromeColor: Color = .gray
 
     // ── Theme style pickers ──────────────────────────────────────────
@@ -202,10 +202,9 @@ struct AppearanceSettingsView: View {
                 .pickerStyle(.segmented)
 
                 if composerStyle != .glass {
-                    ColorPicker("Background", selection: $composerColor, supportsOpacity: false)
+                    ColorPicker("Field Background", selection: $composerFieldColor, supportsOpacity: false)
+                    ColorPicker("Field Border", selection: $composerFieldBorderColor, supportsOpacity: false)
                 }
-                ColorPicker("Field Background", selection: $composerFieldColor, supportsOpacity: false)
-                ColorPicker("Field Border", selection: $composerFieldBorderColor, supportsOpacity: false)
             } header: {
                 Label("Composer", systemImage: "pencil.line")
             }
@@ -229,7 +228,11 @@ struct AppearanceSettingsView: View {
 
             // ── Chrome ───────────────────────────────────────────────
             Section {
-                ColorPicker("Background", selection: $chromeColor, supportsOpacity: false)
+                Toggle("Use System Color", isOn: $chromeUsesSystem)
+
+                if !chromeUsesSystem {
+                    ColorPicker("Background", selection: $chromeColor, supportsOpacity: false)
+                }
             } header: {
                 Label("Chrome", systemImage: "macwindow")
             }
@@ -261,12 +264,12 @@ struct AppearanceSettingsView: View {
         .onChange(of: sidebarStyle) { _, _ in syncTheme() }
         .onChange(of: sidebarColor) { _, _ in syncTheme() }
         .onChange(of: composerStyle) { _, _ in syncTheme() }
-        .onChange(of: composerColor) { _, _ in syncTheme() }
         .onChange(of: composerFieldColor) { _, _ in syncTheme() }
         .onChange(of: composerFieldBorderColor) { _, _ in syncTheme() }
         .onChange(of: toolsPanelStyle) { _, _ in syncTheme() }
         .onChange(of: toolsPanelColor) { _, _ in syncTheme() }
         .onChange(of: toolBlockColor) { _, _ in syncTheme() }
+        .onChange(of: chromeUsesSystem) { _, _ in syncTheme() }
         .onChange(of: chromeColor) { _, _ in syncTheme() }
     }
 
@@ -280,12 +283,12 @@ struct AppearanceSettingsView: View {
         sidebarStyle = config.sidebarStyle
         sidebarColor = Color(hex: config.sidebarColorHex)
         composerStyle = config.composerStyle
-        composerColor = Color(hex: config.composerColorHex)
         composerFieldColor = Color(hex: config.composerFieldColorHex)
         composerFieldBorderColor = Color(hex: config.composerFieldBorderColorHex)
         toolsPanelStyle = config.toolsPanelStyle
         toolsPanelColor = Color(hex: config.toolsPanelColorHex)
         toolBlockColor = Color(hex: config.toolBlockColorHex)
+        chromeUsesSystem = config.chromeUsesSystem
         chromeColor = Color(hex: config.chromeColorHex)
     }
 
@@ -298,12 +301,12 @@ struct AppearanceSettingsView: View {
         config.sidebarStyle = sidebarStyle
         config.sidebarColorHex = hexFromColor(sidebarColor)
         config.composerStyle = composerStyle
-        config.composerColorHex = hexFromColor(composerColor)
         config.composerFieldColorHex = hexFromColor(composerFieldColor)
         config.composerFieldBorderColorHex = hexFromColor(composerFieldBorderColor)
         config.toolsPanelStyle = toolsPanelStyle
         config.toolsPanelColorHex = hexFromColor(toolsPanelColor)
         config.toolBlockColorHex = hexFromColor(toolBlockColor)
+        config.chromeUsesSystem = chromeUsesSystem
         config.chromeColorHex = hexFromColor(chromeColor)
         applyTheme(config)
     }

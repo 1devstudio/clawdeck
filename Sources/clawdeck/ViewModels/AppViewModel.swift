@@ -640,12 +640,12 @@ final class AppViewModel {
         d.set(t.sidebarStyle.rawValue, forKey: "theme.sidebarStyle")
         d.set(t.sidebarColorHex, forKey: "theme.sidebarColor")
         d.set(t.composerStyle.rawValue, forKey: "theme.composerStyle")
-        d.set(t.composerColorHex, forKey: "theme.composerColor")
         d.set(t.composerFieldColorHex, forKey: "theme.composerFieldColor")
         d.set(t.composerFieldBorderColorHex, forKey: "theme.composerFieldBorderColor")
         d.set(t.toolsPanelStyle.rawValue, forKey: "theme.toolsPanelStyle")
         d.set(t.toolsPanelColorHex, forKey: "theme.toolsPanelColor")
         d.set(t.toolBlockColorHex, forKey: "theme.toolBlockColor")
+        d.set(t.chromeUsesSystem, forKey: "theme.chromeUsesSystem")
         d.set(t.chromeColorHex, forKey: "theme.chromeColor")
     }
 
@@ -660,12 +660,12 @@ final class AppViewModel {
         if let v = d.string(forKey: "theme.sidebarStyle"), let s = SurfaceStyle(rawValue: v) { t.sidebarStyle = s }
         if let v = d.string(forKey: "theme.sidebarColor"), !v.isEmpty { t.sidebarColorHex = v }
         if let v = d.string(forKey: "theme.composerStyle"), let s = SurfaceStyle(rawValue: v) { t.composerStyle = s }
-        if let v = d.string(forKey: "theme.composerColor"), !v.isEmpty { t.composerColorHex = v }
         if let v = d.string(forKey: "theme.composerFieldColor"), !v.isEmpty { t.composerFieldColorHex = v }
         if let v = d.string(forKey: "theme.composerFieldBorderColor"), !v.isEmpty { t.composerFieldBorderColorHex = v }
         if let v = d.string(forKey: "theme.toolsPanelStyle"), let s = SurfaceStyle(rawValue: v) { t.toolsPanelStyle = s }
         if let v = d.string(forKey: "theme.toolsPanelColor"), !v.isEmpty { t.toolsPanelColorHex = v }
         if let v = d.string(forKey: "theme.toolBlockColor"), !v.isEmpty { t.toolBlockColorHex = v }
+        if d.object(forKey: "theme.chromeUsesSystem") != nil { t.chromeUsesSystem = d.bool(forKey: "theme.chromeUsesSystem") }
         if let v = d.string(forKey: "theme.chromeColor"), !v.isEmpty { t.chromeColorHex = v }
         themeConfig = t
     }

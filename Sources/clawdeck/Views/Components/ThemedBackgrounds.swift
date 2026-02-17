@@ -21,24 +21,83 @@ struct ThemedSidebarBackground: View {
     }
 }
 
-// MARK: - Composer Background
+// MARK: - Composer Field Modifier
 
-/// Renders the composer area background based on the current theme config.
-struct ThemedComposerBackground: View {
+/// Applies themed background + border to the composer text field pill.
+/// Glass: uses `.glassEffect`; Solid/Translucent: uses composerFieldColor.
+struct ThemedComposerFieldModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    let isDropTargeted: Bool
     @Environment(\.themeConfig) private var theme
+    @Environment(\.themeColor) private var themeColor
 
-    var body: some View {
+    func body(content: Content) -> some View {
         switch theme.composerStyle {
         case .glass:
-            Rectangle().fill(.ultraThinMaterial)
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(
+                            isDropTargeted ? themeColor : Color.clear,
+                            lineWidth: isDropTargeted ? 2 : 0
+                        )
+                )
         case .solid:
-            Rectangle().fill(theme.composerColor)
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(theme.composerFieldColor)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(
+                            isDropTargeted ? themeColor : theme.composerFieldBorderColor.opacity(0.6),
+                            lineWidth: isDropTargeted ? 2 : 1
+                        )
+                )
         case .translucent:
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial).opacity(0.3)
-                Rectangle().fill(theme.composerColor.opacity(0.6))
-            }
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(theme.composerFieldColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(
+                            isDropTargeted ? themeColor : theme.composerFieldBorderColor.opacity(0.6),
+                            lineWidth: isDropTargeted ? 2 : 1
+                        )
+                )
         }
+    }
+}
+
+/// Applies themed background to the composer attach button.
+struct ThemedComposerButtonModifier: ViewModifier {
+    @Environment(\.themeConfig) private var theme
+
+    func body(content: Content) -> some View {
+        switch theme.composerStyle {
+        case .glass:
+            content.glassEffect(in: .circle)
+        case .solid:
+            content.background(theme.composerFieldColor, in: Circle())
+        case .translucent:
+            content.background(theme.composerFieldColor.opacity(0.5), in: Circle())
+        }
+    }
+}
+
+extension View {
+    /// Apply themed composer field background + border.
+    func themedComposerField(cornerRadius: CGFloat, isDropTargeted: Bool) -> some View {
+        modifier(ThemedComposerFieldModifier(cornerRadius: cornerRadius, isDropTargeted: isDropTargeted))
+    }
+
+    /// Apply themed composer button background.
+    func themedComposerButton() -> some View {
+        modifier(ThemedComposerButtonModifier())
     }
 }
 
