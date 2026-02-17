@@ -294,7 +294,6 @@ struct MainView: View {
                 chatArea(sessionKey: sessionKey)
             } else {
                 emptyState
-                    .environment(\.colorScheme, systemColorScheme)
             }
         }
     }
@@ -324,7 +323,13 @@ struct MainView: View {
             description: Text("Select a session from the sidebar or create a new one.")
         )
         .padding(32)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .background { ThemedSidebarBackground() }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .adaptiveColorScheme(
+            style: appViewModel.themeConfig.sidebarStyle,
+            background: appViewModel.themeConfig.sidebarColor,
+            systemScheme: systemColorScheme
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
