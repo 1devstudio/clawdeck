@@ -220,4 +220,17 @@ extension View {
         }()
         return self.environment(\.colorScheme, scheme)
     }
+
+    /// Apply color scheme override for the chrome (window shell).
+    /// When `chromeUsesSystem` is true, does nothing — lets the app's
+    /// appearance mode setting (System/Light/Dark) drive the scheme naturally.
+    /// When using a custom color, overrides based on the color's luminance.
+    @ViewBuilder
+    func chromeColorScheme(_ theme: ThemeConfig) -> some View {
+        if theme.chromeUsesSystem {
+            self
+        } else {
+            self.environment(\.colorScheme, Color(hex: theme.chromeColorHex).preferredColorScheme)
+        }
+    }
 }
