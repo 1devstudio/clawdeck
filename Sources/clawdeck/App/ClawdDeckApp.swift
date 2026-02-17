@@ -106,8 +106,23 @@ struct ClawdDeckApp: App {
     @AppStorage("bgUnsplashURL") private var bgUnsplashURL: String = ""
     @AppStorage("bgUnsplashPhotographer") private var bgUnsplashPhotographer: String = ""
 
+    /// Tracks the OS dark-mode setting so we can resolve "System" mode to an
+    /// explicit scheme. Updated via distributed notification when the user
+    /// changes macOS appearance in System Settings.
+    @State private var osIsDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+
     private var appearanceMode: AppearanceMode {
         AppearanceMode(rawValue: appearanceModeRaw) ?? .system
+    }
+
+    /// Always returns a concrete scheme — never nil — so that
+    /// `.preferredColorScheme()` immediately updates the window appearance.
+    private var resolvedColorScheme: ColorScheme {
+        switch appearanceMode {
+        case .light:  return .light
+        case .dark:   return .dark
+        case .system: return osIsDark ? .dark : .light
+        }
     }
 
     private var codeHighlightTheme: HighlightTheme {
@@ -136,7 +151,10 @@ struct ClawdDeckApp: App {
             .environment(\.messageTextSize, messageTextSize)
             .environment(\.codeHighlightTheme, codeHighlightTheme)
             .environment(\.innerPanelBackground, innerPanelBackgroundConfig)
-            .preferredColorScheme(appearanceMode.colorScheme)
+            .preferredColorScheme(resolvedColorScheme)
+            .onReceive(DistributedNotificationCenter.default().publisher(for: .init("AppleInterfaceThemeChangedNotification"))) { _ in
+                osIsDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+            }
             .task {
                 if appViewModel.hasProfiles {
                     await appViewModel.connectAndLoad()

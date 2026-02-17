@@ -124,19 +124,30 @@ struct ThemedToolsPanelBackground: View {
 
 // MARK: - Themed Bubble Modifier
 
-/// Applies the correct background style to a message bubble based on the theme.
+/// Applies the correct background style and adaptive color scheme to a message bubble.
 struct ThemedBubbleModifier: ViewModifier {
     let role: MessageRole
     @Environment(\.themeConfig) private var theme
+    @Environment(\.colorScheme) private var systemScheme
 
     func body(content: Content) -> some View {
+        let adapted = content.environment(\.colorScheme, bubbleScheme)
         switch theme.bubbleStyle {
         case .glass:
-            content.glassEffect(glassStyle, in: .rect(cornerRadius: 12))
+            adapted.glassEffect(glassStyle, in: .rect(cornerRadius: 12))
         case .solid:
-            content.background(solidColor, in: RoundedRectangle(cornerRadius: 12))
+            adapted.background(solidColor, in: RoundedRectangle(cornerRadius: 12))
         case .translucent:
-            content.background(translucentColor, in: RoundedRectangle(cornerRadius: 12))
+            adapted.background(translucentColor, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var bubbleScheme: ColorScheme {
+        switch theme.bubbleStyle {
+        case .glass:
+            return systemScheme
+        case .solid, .translucent:
+            return solidColor.preferredColorScheme
         }
     }
 

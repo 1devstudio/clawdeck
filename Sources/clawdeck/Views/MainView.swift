@@ -19,6 +19,7 @@ import SwiftUI
 struct MainView: View {
     @Bindable var appViewModel: AppViewModel
     @Environment(\.colorScheme) private var systemColorScheme
+    @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
     @State private var sidebarWidth: CGFloat = 260
     @State private var searchText: String = ""
 
@@ -37,6 +38,38 @@ struct MainView: View {
     private let sidebarMinWidth: CGFloat = 200
     private let sidebarMaxWidth: CGFloat = 400
     private let railWidth: CGFloat = 60
+
+    /// The color scheme the chrome (toolbar area) should use.
+    private var chromeScheme: ColorScheme {
+        if !appViewModel.themeConfig.chromeUsesSystem {
+            return Color(hex: appViewModel.themeConfig.chromeColorHex).preferredColorScheme
+        }
+        // Derive the scheme from the explicit appearance mode so toolbar colors
+        // update immediately on picker change. For the "system" case, read the
+        // OS dark-mode setting directly because @Environment(\.colorScheme) can
+        // be stale after switching from an explicit mode to .preferredColorScheme(nil).
+        switch AppearanceMode(rawValue: appearanceModeRaw) ?? .system {
+        case .light:  return .light
+        case .dark:   return .dark
+        case .system:
+            let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+            return isDark ? .dark : .light
+        }
+    }
+
+    /// Toolbar foreground matching `.secondary` for the chrome's color scheme.
+    private var chromeSecondary: Color {
+        chromeScheme == .dark
+            ? Color.white.opacity(0.55)
+            : Color.black.opacity(0.45)
+    }
+
+    /// Toolbar foreground matching `.tertiary` for the chrome's color scheme.
+    private var chromeTertiary: Color {
+        chromeScheme == .dark
+            ? Color.white.opacity(0.35)
+            : Color.black.opacity(0.3)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -58,7 +91,6 @@ struct MainView: View {
 
             // Inner panel (sidebar + content) — inset with border like Slack
             innerPanel
-                .environment(\.colorScheme, systemColorScheme)
                 .background {
                     InnerPanelBackground()
                 }
@@ -82,11 +114,20 @@ struct MainView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(chromeTertiary)
 
-                    TextField("Search messages…", text: $searchText)
+                    TextField("", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
+                        .foregroundColor(chromeScheme == .dark ? .white : .black)
+                        .overlay(alignment: .leading) {
+                            if searchText.isEmpty {
+                                Text("Search messages…")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(chromeTertiary)
+                                    .allowsHitTesting(false)
+                            }
+                        }
                         .focused($isSearchBarFocused)
                         .onSubmit {
                             activeChatVM?.nextMatch()
@@ -97,14 +138,14 @@ struct MainView: View {
                         if count > 0 {
                             Text("\(vm.currentMatchIndex + 1)/\(count)")
                                 .font(.system(size: 11).monospacedDigit())
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(chromeSecondary)
 
                             Button {
                                 vm.previousMatch()
                             } label: {
                                 Image(systemName: "chevron.up")
                                     .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(chromeSecondary)
                             }
                             .buttonStyle(.plain)
 
@@ -113,19 +154,19 @@ struct MainView: View {
                             } label: {
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(chromeSecondary)
                             }
                             .buttonStyle(.plain)
                         } else {
                             Text("No results")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(chromeSecondary)
                         }
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
+                .background(chromeSecondary.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .frame(width: 500)
                 .focusEffectDisabled()
@@ -147,7 +188,7 @@ struct MainView: View {
                         .frame(width: 7, height: 7)
                     Text(appViewModel.activeConnectionState.rawValue.capitalized)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(chromeSecondary)
                 }
             }
 
@@ -157,7 +198,7 @@ struct MainView: View {
                 } label: {
                     Image(systemName: "sidebar.right")
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(chromeSecondary)
                 }
                 .buttonStyle(.borderless)
                 .help("Toggle Inspector (⌘⇧I)")
@@ -244,6 +285,7 @@ struct MainView: View {
                 chatArea(sessionKey: sessionKey)
             } else {
                 emptyState
+                    .environment(\.colorScheme, systemColorScheme)
             }
         }
     }
@@ -256,11 +298,13 @@ struct MainView: View {
             ChatView(viewModel: appViewModel.chatViewModel(for: sessionKey))
                 .frame(maxWidth: .infinity)
                 .id(sessionKey)
+                .environment(\.colorScheme, systemColorScheme)
 
             if appViewModel.isInspectorVisible, let session = appViewModel.selectedSession {
                 Divider()
                 InspectorView(session: session, appViewModel: appViewModel)
                     .frame(width: 280)
+                    .environment(\.colorScheme, chromeScheme)
             }
         }
     }
