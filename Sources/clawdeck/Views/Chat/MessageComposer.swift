@@ -18,6 +18,7 @@ struct MessageComposer: View {
     var onAddAttachment: (URL) -> Void
     @Environment(\.themeColor) private var themeColor
     @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.themeConfig) private var themeConfig
     var onPasteImage: (NSImage) -> Void
     var onRemoveAttachment: (PendingAttachment) -> Void
 
@@ -44,7 +45,7 @@ struct MessageComposer: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .glassEffect(in: .circle)
+                .themedComposerButton()
                 .help("Attach image (⌘⇧A)")
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(isDisabled)
@@ -62,18 +63,9 @@ struct MessageComposer: View {
                 .font(.system(size: messageTextSize))
                 .frame(height: editorHeight)
                 .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
-                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18)
-                        .stroke(
-                            isDropTargeted
-                                ? themeColor
-                                : Color(nsColor: .separatorColor).opacity(0.6),
-                            lineWidth: isDropTargeted ? 2 : 1
-                        )
+                .themedComposerField(
+                    cornerRadius: editorHeight <= 36 ? editorHeight / 2 : 18,
+                    isDropTargeted: isDropTargeted
                 )
                 .overlay {
                     if isDisabled && text.isEmpty {
@@ -267,7 +259,9 @@ struct ComposerTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = NSFont.systemFont(ofSize: fontSize)
-        textView.textColor = NSColor.labelColor
+        let isDark = context.environment.colorScheme == .dark
+        textView.textColor = isDark ? .white : .black
+        textView.insertionPointColor = isDark ? .white : .black
         textView.backgroundColor = .clear
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -302,6 +296,13 @@ struct ComposerTextEditor: NSViewRepresentable {
         if textView.font?.pointSize != CGFloat(fontSize) {
             textView.font = NSFont.systemFont(ofSize: fontSize)
             context.coordinator.recalcHeight(textView)
+        }
+        // Adapt text color to the environment's color scheme (set by ThemedComposerFieldModifier)
+        let isDark = context.environment.colorScheme == .dark
+        let expectedColor: NSColor = isDark ? .white : .black
+        if textView.textColor != expectedColor {
+            textView.textColor = expectedColor
+            textView.insertionPointColor = expectedColor
         }
     }
 

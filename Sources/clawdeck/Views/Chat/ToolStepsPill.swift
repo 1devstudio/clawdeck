@@ -7,6 +7,8 @@ struct ToolStepsPill: View {
     let onTap: () -> Void
 
     @Environment(\.messageTextSize) private var messageTextSize
+    @Environment(\.themeConfig) private var theme
+    @Environment(\.colorScheme) private var systemScheme
 
     /// Just the tool calls from steps.
     private var toolCalls: [ToolCall] {
@@ -45,18 +47,19 @@ struct ToolStepsPill: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
+            .environment(\.colorScheme, pillScheme)
+            .themedPill(style: theme.bubbleStyle, color: Color(hex: theme.assistantBubbleColorHex))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help("\(steps.count) steps — click to view details")
+    }
+
+    private var pillScheme: ColorScheme {
+        switch theme.bubbleStyle {
+        case .glass: return systemScheme
+        case .solid, .translucent: return Color(hex: theme.assistantBubbleColorHex).preferredColorScheme
+        }
     }
 
     // MARK: - Status

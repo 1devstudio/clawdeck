@@ -77,9 +77,11 @@ struct InspectorView: View {
                         await appViewModel.deleteSession(session.key)
                     }
                 }
+                .buttonStyle(.borderedProminent)
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private func formatTokenCount(_ count: Int) -> String {

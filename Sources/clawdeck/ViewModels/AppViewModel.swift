@@ -94,6 +94,9 @@ final class AppViewModel {
     /// Custom accent color set from Agent Settings. Applied app-wide.
     var customAccentColor: Color?
 
+    /// UI theme configuration (bubbles, sidebar, composer, tools, chrome).
+    var themeConfig: ThemeConfig = .default
+
     /// Profile ID being edited (nil = adding new, non-nil = editing).
     var editingAgentProfileId: String?
 
@@ -132,8 +135,9 @@ final class AppViewModel {
             }
         }
 
-        // Load persisted accent color
+        // Load persisted accent color and theme
         loadAccentColor()
+        loadThemeConfig()
 
         // Show setup on first launch
         if !hasProfiles {
@@ -621,6 +625,49 @@ final class AppViewModel {
         nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
         let hex = String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
         UserDefaults.standard.set(hex, forKey: "com.clawdbot.deck.accentColor")
+    }
+
+    // MARK: - Theme Config
+
+    /// Save theme config to UserDefaults.
+    func saveThemeConfig() {
+        let d = UserDefaults.standard
+        let t = themeConfig
+        d.set(t.bubbleStyle.rawValue, forKey: "theme.bubbleStyle")
+        d.set(t.userBubbleColorHex, forKey: "theme.userBubbleColor")
+        d.set(t.assistantBubbleColorHex, forKey: "theme.assistantBubbleColor")
+        d.set(t.systemBubbleColorHex, forKey: "theme.systemBubbleColor")
+        d.set(t.sidebarStyle.rawValue, forKey: "theme.sidebarStyle")
+        d.set(t.sidebarColorHex, forKey: "theme.sidebarColor")
+        d.set(t.composerStyle.rawValue, forKey: "theme.composerStyle")
+        d.set(t.composerFieldColorHex, forKey: "theme.composerFieldColor")
+        d.set(t.composerFieldBorderColorHex, forKey: "theme.composerFieldBorderColor")
+        d.set(t.toolsPanelStyle.rawValue, forKey: "theme.toolsPanelStyle")
+        d.set(t.toolsPanelColorHex, forKey: "theme.toolsPanelColor")
+        d.set(t.toolBlockColorHex, forKey: "theme.toolBlockColor")
+        d.set(t.chromeUsesSystem, forKey: "theme.chromeUsesSystem")
+        d.set(t.chromeColorHex, forKey: "theme.chromeColor")
+    }
+
+    /// Load theme config from UserDefaults.
+    func loadThemeConfig() {
+        let d = UserDefaults.standard
+        var t = ThemeConfig()
+        if let v = d.string(forKey: "theme.bubbleStyle"), let s = SurfaceStyle(rawValue: v) { t.bubbleStyle = s }
+        if let v = d.string(forKey: "theme.userBubbleColor"), !v.isEmpty { t.userBubbleColorHex = v }
+        if let v = d.string(forKey: "theme.assistantBubbleColor"), !v.isEmpty { t.assistantBubbleColorHex = v }
+        if let v = d.string(forKey: "theme.systemBubbleColor"), !v.isEmpty { t.systemBubbleColorHex = v }
+        if let v = d.string(forKey: "theme.sidebarStyle"), let s = SurfaceStyle(rawValue: v) { t.sidebarStyle = s }
+        if let v = d.string(forKey: "theme.sidebarColor"), !v.isEmpty { t.sidebarColorHex = v }
+        if let v = d.string(forKey: "theme.composerStyle"), let s = SurfaceStyle(rawValue: v) { t.composerStyle = s }
+        if let v = d.string(forKey: "theme.composerFieldColor"), !v.isEmpty { t.composerFieldColorHex = v }
+        if let v = d.string(forKey: "theme.composerFieldBorderColor"), !v.isEmpty { t.composerFieldBorderColorHex = v }
+        if let v = d.string(forKey: "theme.toolsPanelStyle"), let s = SurfaceStyle(rawValue: v) { t.toolsPanelStyle = s }
+        if let v = d.string(forKey: "theme.toolsPanelColor"), !v.isEmpty { t.toolsPanelColorHex = v }
+        if let v = d.string(forKey: "theme.toolBlockColor"), !v.isEmpty { t.toolBlockColorHex = v }
+        if d.object(forKey: "theme.chromeUsesSystem") != nil { t.chromeUsesSystem = d.bool(forKey: "theme.chromeUsesSystem") }
+        if let v = d.string(forKey: "theme.chromeColor"), !v.isEmpty { t.chromeColorHex = v }
+        themeConfig = t
     }
 
     /// Load saved accent color from UserDefaults.

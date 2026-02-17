@@ -19,6 +19,8 @@ struct ModelSelectorButton: View {
     let onSelect: (String?) -> Void
 
     @State private var isPopoverPresented = false
+    @Environment(\.themeConfig) private var theme
+    @Environment(\.colorScheme) private var systemScheme
 
     /// The effective model ID to display (override or default).
     private var effectiveModelId: String? {
@@ -28,6 +30,13 @@ struct ModelSelectorButton: View {
     /// Whether the session has a per-session override.
     private var hasOverride: Bool {
         currentModel != nil
+    }
+
+    private var composerScheme: ColorScheme {
+        switch theme.composerStyle {
+        case .glass: return systemScheme
+        case .solid, .translucent: return theme.composerFieldColor.preferredColorScheme
+        }
     }
 
     var body: some View {
@@ -49,14 +58,8 @@ struct ModelSelectorButton: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
+            .environment(\.colorScheme, composerScheme)
+            .themedPill(style: theme.composerStyle, color: theme.composerFieldColor)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
