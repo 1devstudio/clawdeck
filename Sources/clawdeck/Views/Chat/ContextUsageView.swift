@@ -6,36 +6,40 @@ struct ContextUsageView: View {
     let totalTokens: Int
     let contextTokens: Int?
 
+    @Environment(\.themeConfig) private var theme
+    @Environment(\.colorScheme) private var systemScheme
+
     /// Usage percentage (0–100), or nil if context window is unknown.
     private var usagePercent: Int? {
         guard let ctx = contextTokens, ctx > 0 else { return nil }
         return min(100, Int(round(Double(totalTokens) / Double(ctx) * 100)))
     }
 
-    /// Color based on usage level.
-    private var usageColor: Color {
-        guard let pct = usagePercent else { return .secondary }
+    /// Pill background color — warning colors override the composer theme at high usage.
+    private var pillColor: Color {
+        guard let pct = usagePercent else { return theme.composerFieldColor }
         if pct >= 90 { return .red }
         if pct >= 75 { return .orange }
-        return .secondary
+        return theme.composerFieldColor
+    }
+
+    private var pillScheme: ColorScheme {
+        switch theme.composerStyle {
+        case .glass: return systemScheme
+        case .solid, .translucent: return pillColor.preferredColorScheme
+        }
     }
 
     var body: some View {
         Text(usageLabel)
             .font(.system(size: 11, weight: .medium, design: .monospaced))
             .lineLimit(1)
-        .foregroundStyle(usageColor)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(
-            Capsule()
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
-        .help(tooltipText)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .environment(\.colorScheme, pillScheme)
+            .themedPill(style: theme.composerStyle, color: pillColor)
+            .help(tooltipText)
     }
 
     /// Compact label (e.g. "189k/200k (94%)" or "189k tokens").

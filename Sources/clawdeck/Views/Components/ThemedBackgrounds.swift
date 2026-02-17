@@ -119,6 +119,27 @@ extension View {
     }
 }
 
+// MARK: - Themed Pill Background
+
+extension View {
+    /// Apply themed pill (capsule) background matching a surface style and color.
+    @ViewBuilder
+    func themedPill(style: SurfaceStyle, color: Color) -> some View {
+        switch style {
+        case .glass:
+            self.glassEffect(.regular.tint(color.opacity(0.3)), in: .capsule)
+        case .solid:
+            self
+                .background(Capsule().fill(color))
+                .overlay(Capsule().stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5))
+        case .translucent:
+            self
+                .background(Capsule().fill(color.opacity(0.35)))
+                .overlay(Capsule().stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5))
+        }
+    }
+}
+
 // MARK: - Tools Panel Background
 
 /// Renders the tools panel background based on the current theme config.
