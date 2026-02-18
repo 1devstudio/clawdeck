@@ -244,7 +244,7 @@ struct MainView: View {
             AgentSettingsSheet(appViewModel: appViewModel)
         }
         .sheet(isPresented: $appViewModel.showGatewayConnectionSheet) {
-            ConnectionSetupView(appViewModel: appViewModel)
+            ConnectionSetupView(appViewModel: appViewModel, skipAutoDetect: true)
         }
     }
 

@@ -264,7 +264,7 @@ final class GatewayManager {
     // MARK: - Convenience Methods
 
     /// Test a gateway connection without storing the profile.
-    func testConnection(host: String, port: Int, path: String, useTLS: Bool, token: String?) async throws -> AgentsListResult {
+    func testConnection(host: String, port: Int, path: String = "", useTLS: Bool, token: String?) async throws -> AgentsListResult {
         let testProfile = GatewayProfile(
             host: host,
             port: port,
