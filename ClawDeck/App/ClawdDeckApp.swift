@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set the app icon (SPM executables don't pick it up from the asset catalog automatically)
-        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "png"),
            let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
         }

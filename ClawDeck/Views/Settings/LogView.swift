@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct LogView: View {
     @State private var logger = AppLogger.shared
