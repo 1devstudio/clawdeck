@@ -36,7 +36,7 @@ struct GatewayProfile: Identifiable, Codable, Hashable {
         displayName: String? = nil,
         host: String = "gateway.example.com",
         port: Int = 443,
-        path: String = "/ws",
+        path: String = "",
         useTLS: Bool = true,
         token: String? = nil
     ) {
