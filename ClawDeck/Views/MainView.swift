@@ -304,7 +304,6 @@ struct MainView: View {
     private func chatArea(sessionKey: String) -> some View {
         ChatView(viewModel: appViewModel.chatViewModel(for: sessionKey))
             .frame(maxWidth: .infinity)
-            .id(sessionKey)
             .environment(\.colorScheme, systemColorScheme)
     }
 

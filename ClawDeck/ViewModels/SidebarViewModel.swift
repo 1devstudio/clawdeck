@@ -46,7 +46,35 @@ final class SidebarViewModel {
     }
 
     /// Sessions grouped by creation time (stable order that doesn't shift on activity).
+    /// Memoized — recomputes only when the session list or search text changes.
     var groupedSessions: [(title: String, sessions: [Session])] {
+        let version = groupingVersion
+        if version == _lastGroupingVersion, let cached = _cachedGroupedSessions {
+            return cached
+        }
+        let result = computeGroupedSessions()
+        _cachedGroupedSessions = result
+        _lastGroupingVersion = version
+        return result
+    }
+
+    @ObservationIgnored private var _cachedGroupedSessions: [(title: String, sessions: [Session])]?
+    @ObservationIgnored private var _lastGroupingVersion: Int = -1
+
+    /// A lightweight version key that changes when inputs to grouping change.
+    private var groupingVersion: Int {
+        var hasher = Hasher()
+        hasher.combine(searchText)
+        let sessions = appViewModel.sessions
+        hasher.combine(sessions.count)
+        for s in sessions {
+            hasher.combine(s.key)
+            hasher.combine(s.label)
+        }
+        return hasher.finalize()
+    }
+
+    private func computeGroupedSessions() -> [(title: String, sessions: [Session])] {
         let sorted = filteredSessions.sorted { ($0.createdAt) > ($1.createdAt) }
         let calendar = Calendar.current
         let now = Date()

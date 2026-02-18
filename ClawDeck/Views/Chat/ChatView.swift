@@ -258,6 +258,13 @@ struct ChatView: View {
                         }
                     }
                 }
+                .onChange(of: viewModel.sessionKey) { _, _ in
+                    // Reset local state that was previously handled by .id() destruction
+                    isNearBottom = true
+                    sidebarMessage = nil
+                    lastStreamingScroll = .distantPast
+                    scrollToBottom(proxy: proxy, animated: false)
+                }
             }
 
             // Steps sidebar — slides in from the right, reactive to message changes

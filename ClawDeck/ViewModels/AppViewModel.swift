@@ -17,8 +17,13 @@ final class AppViewModel {
     private(set) var sidebarViewModel: SidebarViewModel!
 
     /// Cached chat view models keyed by session key — prevents draft text
-    /// loss on re-renders.
-    private var chatViewModels: [String: ChatViewModel] = [:]
+    /// loss on re-renders. ObservationIgnored because this is an internal cache
+    /// and chatViewModel(for:) is called from view bodies.
+    @ObservationIgnored private var chatViewModels: [String: ChatViewModel] = [:]
+
+    /// LRU access order for chatViewModels — most recently accessed key is last.
+    @ObservationIgnored private var chatVMAccessOrder: [String] = []
+    private static let maxCachedChatVMs = 8
 
     /// In-flight history load task — cancelled when selecting a different session.
     private var historyLoadTask: Task<Void, Never>?
@@ -30,12 +35,28 @@ final class AppViewModel {
 
     /// Get or create a ChatViewModel for a session key.
     func chatViewModel(for sessionKey: String) -> ChatViewModel {
+        chatVMAccessOrder.removeAll { $0 == sessionKey }
+        chatVMAccessOrder.append(sessionKey)
+
         if let existing = chatViewModels[sessionKey] {
+            evictChatVMsIfNeeded()
             return existing
         }
         let vm = ChatViewModel(sessionKey: sessionKey, appViewModel: self)
         chatViewModels[sessionKey] = vm
+        evictChatVMsIfNeeded()
         return vm
+    }
+
+    /// Evict least-recently-used ChatViewModels when over the limit.
+    private func evictChatVMsIfNeeded() {
+        while chatVMAccessOrder.count > Self.maxCachedChatVMs,
+              let oldest = chatVMAccessOrder.first {
+            chatVMAccessOrder.removeFirst()
+            if oldest == selectedSessionKey { continue }
+            if chatViewModels[oldest]?.isStreaming == true { continue }
+            chatViewModels.removeValue(forKey: oldest)
+        }
     }
 
     // MARK: - State
@@ -339,6 +360,7 @@ final class AppViewModel {
     /// Select a session and load its history.
     func selectSession(_ sessionKey: String) async {
         selectedSessionKey = sessionKey
+        messageStore.touchSession(sessionKey)
 
         // Already have messages — nothing to load.
         guard !messageStore.hasMessages(for: sessionKey) else {
@@ -401,8 +423,8 @@ final class AppViewModel {
             )
             guard response.ok, let payload = response.payload else { return }
 
-            let payloadData = try JSONSerialization.data(withJSONObject: payload.value as Any)
-            let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+            // payload.value is already [String: Any] from AnyCodable decoding.
+            let payloadDict = payload.value as? [String: Any]
             let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
 
             // Find the latest assistant message with usage data
@@ -504,6 +526,33 @@ final class AppViewModel {
         return isActiveGatewayConnected
     }
 
+    /// Parse a history payload into display-ready messages on a background thread.
+    /// All work here is pure data transformation with no @MainActor state access.
+    private nonisolated static func parseHistoryPayload(
+        _ payloadValue: Any,
+        sessionKey: String
+    ) throws -> [ChatMessage] {
+        // payload.value is already [String: Any] from AnyCodable decoding —
+        // no need for the costly JSONSerialization round-trip.
+        guard let payloadDict = payloadValue as? [String: Any] else {
+            return []
+        }
+        let rawMessages = payloadDict["messages"] as? [[String: Any]] ?? []
+
+        let allParsed = rawMessages.enumerated().compactMap { index, raw in
+            ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
+        }
+
+        // Match tool results back to their tool calls.
+        enrichToolCallsWithResults(allParsed, rawMessages: rawMessages)
+
+        let allMessages = allParsed.filter { $0.isVisible }
+
+        // Merge consecutive assistant messages into a single message.
+        let messages = mergeConsecutiveAssistantMessages(allMessages)
+        return messages
+    }
+
     /// Single attempt to load history with a specific limit. Returns true on success.
     private func loadHistoryAttempt(for sessionKey: String, limit: Int) async -> Bool {
         guard let client = activeClient else { return false }
@@ -523,30 +572,16 @@ final class AppViewModel {
                 return false
             }
 
-            // Decode payload as raw dictionary to handle complex content field
-            let payloadData = try JSONSerialization.data(withJSONObject: payload.value as Any)
-            let payloadDict = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
-            let rawMessages = payloadDict?["messages"] as? [[String: Any]] ?? []
+            let payloadValue = payload.value as Any
 
-            AppLogger.debug("chat.history returned \(rawMessages.count) raw messages for \(sessionKey) (limit=\(limit))", category: "Session")
+            // Heavy parsing runs off the main thread to keep the UI responsive.
+            let messages = try await Task.detached(priority: .userInitiated) {
+                try Self.parseHistoryPayload(payloadValue, sessionKey: sessionKey)
+            }.value
 
-            let allParsed = rawMessages.enumerated().compactMap { index, raw in
-                ChatMessage.fromHistory(raw, sessionKey: sessionKey, index: index)
-            }
+            guard !Task.isCancelled else { return false }
 
-            // Match tool results back to their tool calls.
-            // The gateway stores: assistant (with toolCall blocks) → toolResult → assistant (next text).
-            // We enrich the assistant's ToolCall objects with the result content.
-            Self.enrichToolCallsWithResults(allParsed, rawMessages: rawMessages)
-
-            let allMessages = allParsed.filter { $0.isVisible }
-
-            // Merge consecutive assistant messages into a single message.
-            // The gateway stores separate messages for each text segment
-            // around tool calls, but the user sees them as one reply.
-            let messages = Self.mergeConsecutiveAssistantMessages(allMessages)
-
-            AppLogger.debug("\(allMessages.count) visible → \(messages.count) after merging consecutive assistant messages", category: "Session")
+            AppLogger.debug("chat.history loaded \(messages.count) messages for \(sessionKey) (limit=\(limit))", category: "Session")
             messageStore.setMessages(messages, for: sessionKey)
             return true
         } catch is CancellationError {
@@ -937,7 +972,7 @@ final class AppViewModel {
     ///   assistant (content: [text, toolCall, toolCall, ...])
     ///   toolResult (for each tool call)
     ///   assistant (next text segment)
-    static func enrichToolCallsWithResults(_ messages: [ChatMessage], rawMessages: [[String: Any]]) {
+    nonisolated static func enrichToolCallsWithResults(_ messages: [ChatMessage], rawMessages: [[String: Any]]) {
         // Build a lookup of tool call IDs to ToolCall objects
         var toolCallLookup: [String: ToolCall] = [:]
         for message in messages where message.role == .assistant {
@@ -979,7 +1014,7 @@ final class AppViewModel {
         }
     }
 
-    static func mergeConsecutiveAssistantMessages(_ messages: [ChatMessage]) -> [ChatMessage] {
+    nonisolated static func mergeConsecutiveAssistantMessages(_ messages: [ChatMessage]) -> [ChatMessage] {
         guard !messages.isEmpty else { return [] }
 
         var merged: [ChatMessage] = []

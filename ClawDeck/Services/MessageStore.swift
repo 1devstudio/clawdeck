@@ -37,6 +37,40 @@ final class MessageStore {
     /// Incremented on every streaming delta — observe this to trigger auto-scroll.
     private(set) var streamingContentVersion: Int = 0
 
+    // MARK: - LRU eviction
+
+    /// Maximum number of sessions to keep loaded in memory.
+    private static let maxCachedSessions = 8
+
+    /// Access order tracking — most recently accessed key is last.
+    @ObservationIgnored private var accessOrder: [String] = []
+
+    /// Record access to a session and evict stale ones if needed.
+    func touchSession(_ sessionKey: String) {
+        accessOrder.removeAll { $0 == sessionKey }
+        accessOrder.append(sessionKey)
+        evictIfNeeded()
+    }
+
+    /// Evict least-recently-used sessions when over the limit.
+    private func evictIfNeeded() {
+        guard accessOrder.count > Self.maxCachedSessions else { return }
+        let streamingKeys = Set(streamingMessages.values.map(\.sessionKey))
+
+        while accessOrder.count > Self.maxCachedSessions {
+            guard let oldest = accessOrder.first else { break }
+            if streamingKeys.contains(oldest) {
+                // Don't evict a session with active streaming — move to end and stop.
+                accessOrder.removeFirst()
+                accessOrder.append(oldest)
+                break
+            }
+            accessOrder.removeFirst()
+            allMessagesBySession.removeValue(forKey: oldest)
+            visibleCountBySession.removeValue(forKey: oldest)
+        }
+    }
+
     // MARK: - Read
 
     /// Get the currently visible messages for a session (paginated tail).
