@@ -1,6 +1,11 @@
 import SwiftUI
 import MarkdownUI
 
+private struct BottomScrollState: Equatable {
+    var isAtBottom: Bool
+    var contentHeight: CGFloat
+}
+
 /// Center column: message list with composer at the bottom.
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
@@ -8,9 +13,18 @@ struct ChatView: View {
     /// Throttle streaming scroll — don't fire on every single delta.
     @State private var lastStreamingScroll: Date = .distantPast
 
+    /// Whether the user is scrolled to (or near) the bottom of the chat.
+    /// When true, new messages and streaming deltas auto-scroll to bottom.
+    /// When false, the view stays put so the user can read history.
+    @State private var isNearBottom: Bool = true
+
     /// Message whose steps are shown in the right sidebar (nil = sidebar hidden).
     /// Storing the message (which is @Observable) keeps the sidebar reactive during streaming.
     @State private var sidebarMessage: ChatMessage? = nil
+
+    /// Threshold (in points) for considering the user "near the bottom".
+    /// Accounts for overscroll bounce and minor offsets.
+    private let nearBottomThreshold: CGFloat = 120
 
     var body: some View {
         HStack(spacing: 0) {
@@ -73,6 +87,23 @@ struct ChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 }
+                .onScrollGeometryChange(for: BottomScrollState.self) { geometry in
+                    // Calculate distance from bottom:
+                    // contentSize - contentOffset - viewHeight = remaining scroll distance
+                    let remaining = geometry.contentSize.height
+                        - geometry.contentOffset.y
+                        - geometry.containerSize.height
+                    return BottomScrollState(isAtBottom: remaining <= nearBottomThreshold, contentHeight: geometry.contentSize.height)
+                } action: { old, new in
+                    if new.isAtBottom {
+                        isNearBottom = true
+                    } else if new.contentHeight <= old.contentHeight {
+                        // Content didn't grow — user scrolled away
+                        isNearBottom = false
+                    }
+                    // If content grew but user didn't scroll, keep isNearBottom as-is
+                    // so auto-scroll continues working
+                }
                 .defaultScrollAnchor(.bottom)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     // Connection banner at top — non-dismissible
@@ -85,6 +116,26 @@ struct ChatView: View {
                         )
                     }
                 }
+                // Floating "scroll to bottom" button — shown when user scrolls up
+                .overlay(alignment: .bottomTrailing) {
+                    if !isNearBottom {
+                        Button {
+                            scrollToBottom(proxy: proxy)
+                        } label: {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .padding(6)
+                                .background(.thinMaterial, in: Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 8)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    }
+                }
+                .animation(.easeOut(duration: 0.15), value: isNearBottom)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     // Bottom bar: error banner + model selector + composer
                     VStack(spacing: 0) {
@@ -183,16 +234,18 @@ struct ChatView: View {
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-                    scrollToBottom(proxy: proxy)
+                    scrollToBottomIfNeeded(proxy: proxy)
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
+                    // Always scroll when the user sends a message
                     if isSending { scrollToBottom(proxy: proxy) }
                 }
                 .onChange(of: viewModel.isStreaming) { _, isStreaming in
                     if isStreaming { viewModel.isAwaitingResponse = false }
-                    scrollToBottom(proxy: proxy)
+                    scrollToBottomIfNeeded(proxy: proxy)
                 }
                 .onChange(of: viewModel.streamingContentVersion) { _, _ in
+                    guard isNearBottom else { return }
                     let now = Date()
                     guard now.timeIntervalSince(lastStreamingScroll) > 0.15 else { return }
                     lastStreamingScroll = now
@@ -220,7 +273,13 @@ struct ChatView: View {
         } // end HStack
     }
 
-    /// Scroll to the last message, targeting it above the composer.
+    /// Scroll to the bottom only when the user is near the bottom (or has just sent a message).
+    private func scrollToBottomIfNeeded(proxy: ScrollViewProxy) {
+        guard isNearBottom else { return }
+        scrollToBottom(proxy: proxy)
+    }
+
+    /// Unconditionally scroll to the last message.
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let targetId: String = {
             if viewModel.showTypingIndicator { return "typing-indicator" }
