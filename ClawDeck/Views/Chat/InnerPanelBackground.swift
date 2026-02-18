@@ -14,8 +14,11 @@ struct InnerPanelBackground: View {
         GeometryReader { geo in
             switch config.mode {
             case .none:
-                Rectangle()
-                    .fill(Color(nsColor: adaptiveBackgroundColor))
+                Color(nsColor: .windowBackgroundColor)
+                    .overlay(
+                        (colorScheme == .dark ? Color.white : Color.black)
+                            .opacity(0.06)
+                    )
 
             case .solidColor:
                 Rectangle()
@@ -41,12 +44,6 @@ struct InnerPanelBackground: View {
         .task(id: config.unsplashURL) {
             await loadUnsplashImage()
         }
-    }
-
-    private var adaptiveBackgroundColor: NSColor {
-        let base = NSColor.windowBackgroundColor
-        let blendColor: NSColor = colorScheme == .dark ? .white : .black
-        return base.blended(withFraction: 0.06, of: blendColor) ?? base
     }
 
     /// Synchronously load from disk cache — no actor hop, no async.
