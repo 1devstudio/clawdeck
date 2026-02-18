@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Wizard Phase
 
-/// The three phases of the connection wizard.
+/// The four phases of the connection wizard.
 private enum WizardPhase: Equatable {
     /// Probing localhost for a running gateway.
     case autoDetecting
@@ -10,6 +10,8 @@ private enum WizardPhase: Equatable {
     case localFound
     /// Manual entry form (no local gateway, or user chose "Connect Another").
     case manualEntry
+    /// Advanced entry form — shown after smart probing fails.
+    case advancedEntry
 }
 
 /// Gateway connection wizard — used for first-run onboarding and "Connect New Gateway" sheet.
@@ -17,7 +19,8 @@ private enum WizardPhase: Equatable {
 /// Flow:
 /// 1. **Auto-detect** — probe localhost for a running gateway (~3s).
 /// 2. **Local found** — show confirmation: "Connect" or "Connect to Another".
-/// 3. **Manual entry** — host + token, with smart auto-probing and collapsed Advanced section.
+/// 3. **Manual entry** — host + token, with AI prompt helper for discovering connection details.
+/// 4. **Advanced entry** — shown automatically if smart probing fails; adds port + TLS fields.
 struct ConnectionSetupView: View {
     let appViewModel: AppViewModel
 
@@ -39,8 +42,7 @@ struct ConnectionSetupView: View {
     @State private var host = ""
     @State private var token = ""
 
-    // Advanced (collapsed by default)
-    @State private var showAdvanced = false
+    // Advanced fields
     @State private var advancedPort = ""
     @State private var advancedUseTLS = false
 
@@ -48,6 +50,9 @@ struct ConnectionSetupView: View {
     @State private var isConnecting = false
     @State private var probeStatus = ""
     @State private var errorMessage: String?
+
+    // Copy feedback
+    @State private var isCopied = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,9 +63,11 @@ struct ConnectionSetupView: View {
                 localFoundView
             case .manualEntry:
                 manualEntryView
+            case .advancedEntry:
+                advancedEntryView
             }
         }
-        .frame(width: 420, height: phase == .autoDetecting ? 200 : 420)
+        .frame(width: 420, height: heightForPhase)
         .animation(.easeInOut(duration: 0.2), value: phase)
         .task {
             if skipAutoDetect {
@@ -68,6 +75,15 @@ struct ConnectionSetupView: View {
             } else {
                 await runAutoDetect()
             }
+        }
+    }
+
+    private var heightForPhase: CGFloat {
+        switch phase {
+        case .autoDetecting: return 200
+        case .localFound:    return 320
+        case .manualEntry:   return 520
+        case .advancedEntry: return 480
         }
     }
 
@@ -126,7 +142,7 @@ struct ConnectionSetupView: View {
                         .foregroundStyle(.secondary)
 
                     if result.agents.agents.count > 0 {
-                        let names = result.agents.agents.prefix(3).map(\.name).joined(separator: ", ")
+                        let names = result.agents.agents.prefix(3).compactMap(\.name).joined(separator: ", ")
                         let suffix = result.agents.agents.count > 3 ? " + \(result.agents.agents.count - 3) more" : ""
                         Text("Agents: \(names)\(suffix)")
                             .font(.caption)
@@ -194,24 +210,13 @@ struct ConnectionSetupView: View {
                         .textContentType(.password)
                         .onSubmit { Task { await connectRemote() } }
                 }
-
-                // Advanced — collapsed by default
-                DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
-                    VStack(spacing: 12) {
-                        LabeledContent("Port") {
-                            TextField("Auto", text: $advancedPort)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 100)
-                        }
-
-                        Toggle("Use TLS (wss://)", isOn: $advancedUseTLS)
-                    }
-                    .padding(.top, 8)
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 24)
+
+            // Helper section
+            helperSection
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
 
             Spacer(minLength: 8)
 
@@ -263,6 +268,189 @@ struct ConnectionSetupView: View {
         }
     }
 
+    // MARK: - Helper Section
+
+    private static let aiPromptText = "What is this machine's local IP address, and what is the gateway auth token from the clawdbot config?"
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var helperSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Need help finding these? Ask your Clawdbot:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Code block styled like HighlightedCodeBlock
+            VStack(alignment: .leading, spacing: 0) {
+                // Header bar
+                HStack {
+                    Text("Prompt")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(Self.aiPromptText, forType: .string)
+                        isCopied = true
+                        Task {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            isCopied = false
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                            Text(isCopied ? "Copied" : "Copy")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(helperHeaderBackground)
+
+                Divider()
+                    .opacity(0.5)
+
+                // Content
+                Text(Self.aiPromptText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(12)
+            }
+            .background(helperCodeBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(helperBorderColor, lineWidth: 0.5)
+            )
+        }
+    }
+
+    private var helperCodeBackground: Color {
+        colorScheme == .dark
+            ? Color(red: 0.08, green: 0.09, blue: 0.10)
+            : Color(red: 0.97, green: 0.97, blue: 0.98)
+    }
+
+    private var helperHeaderBackground: Color {
+        colorScheme == .dark
+            ? Color(red: 0.12, green: 0.13, blue: 0.15)
+            : Color(red: 0.93, green: 0.93, blue: 0.95)
+    }
+
+    private var helperBorderColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.1)
+            : Color.black.opacity(0.1)
+    }
+
+    // MARK: - Phase 4: Advanced entry
+
+    private var advancedEntryView: some View {
+        VStack(spacing: 0) {
+            // Header
+            VStack(spacing: 8) {
+                Image(systemName: "gearshape.2.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.orange)
+
+                Text("Advanced Connection")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("Auto-detection could not connect.\nSpecify the port and protocol manually.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            // Fields
+            VStack(spacing: 16) {
+                LabeledContent("Host or IP") {
+                    TextField("gateway.example.com", text: $host)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.URL)
+                }
+
+                LabeledContent("Token") {
+                    SecureField("Gateway auth token", text: $token)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.password)
+                }
+
+                LabeledContent("Port") {
+                    TextField("e.g. 18789", text: $advancedPort)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 100)
+                }
+
+                Toggle("Use TLS (wss://)", isOn: $advancedUseTLS)
+            }
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 8)
+
+            // Probe status
+            if !probeStatus.isEmpty {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(probeStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 4)
+            }
+
+            // Error
+            if let error = errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+
+            // Actions
+            HStack {
+                Button("Back") {
+                    errorMessage = nil
+                    probeStatus = ""
+                    phase = .manualEntry
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Button("Connect") {
+                    Task { await connectAdvanced() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    host.trimmingCharacters(in: .whitespaces).isEmpty
+                    || advancedPort.isEmpty
+                    || Int(advancedPort) == nil
+                    || isConnecting
+                )
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+    }
+
     // MARK: - Logic
 
     /// Phase 1: Try to find a local gateway.
@@ -279,7 +467,8 @@ struct ConnectionSetupView: View {
         }
     }
 
-    /// Phase 3: Connect to a remote gateway (with smart probing or direct).
+    /// Phase 3: Connect to a remote gateway with smart probing.
+    /// On failure, transitions to advancedEntry phase.
     private func connectRemote() async {
         let trimmedHost = host.trimmingCharacters(in: .whitespaces)
         guard !trimmedHost.isEmpty else { return }
@@ -291,23 +480,7 @@ struct ConnectionSetupView: View {
         let prober = GatewayProber()
         let resolvedToken = token.isEmpty ? nil : token
 
-        // If Advanced is open with explicit values → direct probe
-        if showAdvanced, let port = Int(advancedPort), !advancedPort.isEmpty {
-            probeStatus = "Connecting to \(GatewayProber.probeDescription(host: trimmedHost, port: port, useTLS: advancedUseTLS))…"
-
-            if let result = await prober.probeDirect(host: trimmedHost, port: port, useTLS: advancedUseTLS, token: resolvedToken) {
-                await connectWithProbeResult(result)
-                return
-            }
-
-            errorMessage = "Could not connect to \(trimmedHost):\(port)"
-            probeStatus = ""
-            isConnecting = false
-            return
-        }
-
         // Smart probing — try multiple endpoints
-        // Show progress for each attempt
         let candidates: [(Int, Bool)]
         if isPrivateOrLocal(trimmedHost) {
             candidates = [(18789, false), (443, true), (80, false)]
@@ -324,7 +497,38 @@ struct ConnectionSetupView: View {
             }
         }
 
-        errorMessage = "Could not connect to \(trimmedHost). Check the host and token, or use Advanced to specify port and TLS."
+        // Smart probing failed — transition to advanced entry
+        probeStatus = ""
+        isConnecting = false
+
+        // Pre-fill advanced fields with sensible defaults
+        if advancedPort.isEmpty {
+            advancedPort = isPrivateOrLocal(trimmedHost) ? "18789" : "443"
+            advancedUseTLS = !isPrivateOrLocal(trimmedHost)
+        }
+
+        phase = .advancedEntry
+    }
+
+    /// Phase 4: Connect with explicit port and TLS settings.
+    private func connectAdvanced() async {
+        let trimmedHost = host.trimmingCharacters(in: .whitespaces)
+        guard !trimmedHost.isEmpty,
+              let port = Int(advancedPort) else { return }
+
+        isConnecting = true
+        errorMessage = nil
+        probeStatus = "Connecting to \(GatewayProber.probeDescription(host: trimmedHost, port: port, useTLS: advancedUseTLS))…"
+
+        let prober = GatewayProber()
+        let resolvedToken = token.isEmpty ? nil : token
+
+        if let result = await prober.probeDirect(host: trimmedHost, port: port, useTLS: advancedUseTLS, token: resolvedToken) {
+            await connectWithProbeResult(result)
+            return
+        }
+
+        errorMessage = "Could not connect to \(trimmedHost):\(port). Check the host, port, TLS setting, and token."
         probeStatus = ""
         isConnecting = false
     }

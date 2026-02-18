@@ -51,6 +51,17 @@ actor GatewayProber {
             }
         }
 
+        // Try wss://localhost:443 (local gateway behind TLS reverse proxy)
+        if let result = await probe(host: "localhost", port: 443, useTLS: true, token: token) {
+            return result
+        }
+
+        if token != nil {
+            if let result = await probe(host: "localhost", port: 443, useTLS: true, token: nil) {
+                return result
+            }
+        }
+
         return nil
     }
 
