@@ -270,7 +270,7 @@ struct ConnectionSetupView: View {
 
     // MARK: - Helper Section
 
-    private static let aiPromptText = "What is this machine's local IP address, and what is the gateway auth token from the clawdbot config?"
+    private static let aiPromptText = "Check what is this machine's local IP address, the gateway auth token, and the connection details (port, whether TLS is used, and any WebSocket path like /ws) from the clawdbot and reverse proxy config. Give me IP (host) and path (if needed) with a gateway token for both local and external connection to the websocket."
 
     @Environment(\.colorScheme) private var colorScheme
 
