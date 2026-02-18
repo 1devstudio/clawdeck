@@ -250,7 +250,7 @@ struct ConnectionSetupView: View {
                 Button("Cancel") {
                     appViewModel.showConnectionSetup = false
                     appViewModel.showGatewayConnectionSheet = false
-                    dismiss()
+                    if skipAutoDetect { dismiss() }
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -572,7 +572,7 @@ struct ConnectionSetupView: View {
 
             appViewModel.showConnectionSetup = false
             appViewModel.showGatewayConnectionSheet = false
-            dismiss()
+            if skipAutoDetect { dismiss() }
         } else {
             errorMessage = "No agents found on this gateway"
             isConnecting = false

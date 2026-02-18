@@ -79,13 +79,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             view.layer?.backgroundColor = .clear
             view.layer?.borderWidth = 0
             view.layer?.borderColor = .clear
-            // Force no border on the view itself
             if let cell = (view as? NSControl)?.cell {
                 cell.isBordered = false
             }
         }
 
-        for subview in view.subviews as [NSView] {
+        for subview in view.subviews {
             stripToolbarContainerBackgrounds(in: subview)
         }
     }
@@ -140,12 +139,14 @@ struct ClawdDeckApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
+                MainView(appViewModel: appViewModel)
+                    .frame(minWidth: 800, minHeight: 500)
+
                 if appViewModel.showConnectionSetup {
+                    Color(nsColor: .windowBackgroundColor)
+                        .ignoresSafeArea()
                     ConnectionSetupView(appViewModel: appViewModel)
-                } else {
-                    MainView(appViewModel: appViewModel)
-                        .frame(minWidth: 800, minHeight: 500)
                 }
             }
             .environment(\.messageTextSize, messageTextSize)

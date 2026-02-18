@@ -118,107 +118,118 @@ struct MainView: View {
         .environment(\.themeConfig, appViewModel.themeConfig)
         .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
-            // Search bar — searches messages in the active session
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 12))
-                        .foregroundStyle(chromeTertiary)
+            if !appViewModel.showConnectionSetup {
+                // Search bar — searches messages in the active session
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 12))
+                            .foregroundStyle(chromeTertiary)
 
-                    TextField("", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .foregroundColor(chromeScheme == .dark ? .white : .black)
-                        .overlay(alignment: .leading) {
-                            if searchText.isEmpty {
-                                Text("Search messages…")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(chromeTertiary)
-                                    .allowsHitTesting(false)
+                        TextField("", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .foregroundColor(chromeScheme == .dark ? .white : .black)
+                            .overlay(alignment: .leading) {
+                                if searchText.isEmpty {
+                                    Text("Search messages…")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(chromeTertiary)
+                                        .allowsHitTesting(false)
+                                }
                             }
-                        }
-                        .focused($isSearchBarFocused)
-                        .onSubmit {
-                            activeChatVM?.nextMatch()
-                        }
+                            .focused($isSearchBarFocused)
+                            .onSubmit {
+                                activeChatVM?.nextMatch()
+                            }
 
-                    if let vm = activeChatVM, !searchText.isEmpty {
-                        let count = vm.searchMatchIds.count
-                        if count > 0 {
-                            Text("\(vm.currentMatchIndex + 1)/\(count)")
-                                .font(.system(size: 11).monospacedDigit())
-                                .foregroundStyle(chromeSecondary)
+                        if let vm = activeChatVM, !searchText.isEmpty {
+                            let count = vm.searchMatchIds.count
+                            if count > 0 {
+                                Text("\(vm.currentMatchIndex + 1)/\(count)")
+                                    .font(.system(size: 11).monospacedDigit())
+                                    .foregroundStyle(chromeSecondary)
 
-                            Button {
-                                vm.previousMatch()
-                            } label: {
-                                Image(systemName: "chevron.up")
-                                    .font(.system(size: 10, weight: .semibold))
+                                Button {
+                                    vm.previousMatch()
+                                } label: {
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(chromeSecondary)
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    vm.nextMatch()
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(chromeSecondary)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Text("No results")
+                                    .font(.system(size: 11))
                                     .foregroundStyle(chromeSecondary)
                             }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                vm.nextMatch()
-                            } label: {
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(chromeSecondary)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Text("No results")
-                                .font(.system(size: 11))
-                                .foregroundStyle(chromeSecondary)
                         }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(chromeSecondary.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(width: 500)
+                    .focusEffectDisabled()
+                    .onChange(of: searchText) { _, newValue in
+                        activeChatVM?.searchQuery = newValue
+                        activeChatVM?.currentMatchIndex = 0
+                    }
+                    .onChange(of: appViewModel.selectedSessionKey) { _, _ in
+                        searchText = ""
+                        activeChatVM?.searchQuery = ""
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(chromeSecondary.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .frame(width: 500)
-                .focusEffectDisabled()
-                .onChange(of: searchText) { _, newValue in
-                    activeChatVM?.searchQuery = newValue
-                    activeChatVM?.currentMatchIndex = 0
+
+                // Right-aligned controls — separate items, no shared background
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(connectionStatusColor)
+                            .frame(width: 7, height: 7)
+                        Text(appViewModel.activeConnectionState.rawValue.capitalized)
+                            .font(.system(size: 11))
+                            .foregroundStyle(chromeSecondary)
+                    }
                 }
-                .onChange(of: appViewModel.selectedSessionKey) { _, _ in
-                    searchText = ""
-                    activeChatVM?.searchQuery = ""
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        appViewModel.isInspectorVisible.toggle()
+                    } label: {
+                        Image(systemName: "sidebar.right")
+                            .font(.system(size: 13))
+                            .foregroundStyle(chromeSecondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Toggle Inspector (⌘⇧I)")
                 }
             }
-
-            // Right-aligned controls — separate items, no shared background
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(connectionStatusColor)
-                        .frame(width: 7, height: 7)
-                    Text(appViewModel.activeConnectionState.rawValue.capitalized)
-                        .font(.system(size: 11))
-                        .foregroundStyle(chromeSecondary)
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    appViewModel.isInspectorVisible.toggle()
-                } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 13))
-                        .foregroundStyle(chromeSecondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Toggle Inspector (⌘⇧I)")
-            }
-
         }
         .onAppear {
             // Configure the window title bar to be transparent
             DispatchQueue.main.async {
                 if let window = NSApp.windows.first {
                     AppDelegate.configureWindowTitleBar(window)
+                }
+            }
+        }
+        // Re-strip toolbar borders when onboarding completes (items appear for the first time)
+        .onChange(of: appViewModel.showConnectionSetup) { _, showing in
+            if !showing {
+                DispatchQueue.main.async {
+                    if let window = NSApp.windows.first {
+                        AppDelegate.configureWindowTitleBar(window)
+                    }
                 }
             }
         }
