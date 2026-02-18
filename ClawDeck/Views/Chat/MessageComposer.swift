@@ -288,6 +288,7 @@ struct ComposerTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
         let textView = scrollView.documentView as! NSTextView
         if textView.string != text {
             textView.string = text
