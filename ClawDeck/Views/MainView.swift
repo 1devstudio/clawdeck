@@ -86,6 +86,9 @@ struct MainView: View {
                 },
                 onConnectNewGateway: {
                     appViewModel.showGatewayConnectionSheet = true
+                },
+                onCreateNewAgent: {
+                    appViewModel.showCreateAgentSheet = true
                 }
             )
 
@@ -256,6 +259,9 @@ struct MainView: View {
         }
         .sheet(isPresented: $appViewModel.showGatewayConnectionSheet) {
             ConnectionSetupView(appViewModel: appViewModel, skipAutoDetect: true)
+        }
+        .sheet(isPresented: $appViewModel.showCreateAgentSheet) {
+            CreateAgentSheet(appViewModel: appViewModel)
         }
     }
 

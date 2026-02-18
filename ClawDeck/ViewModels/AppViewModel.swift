@@ -97,6 +97,9 @@ final class AppViewModel {
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
+    /// Whether the "create new agent" sheet is shown.
+    var showCreateAgentSheet = false
+
     /// Cached list of available models from the active gateway.
     var availableModels: [GatewayModel] = []
 

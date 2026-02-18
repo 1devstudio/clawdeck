@@ -9,6 +9,7 @@ struct AgentRailView: View {
     let onSelect: (AgentBinding) -> Void
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
+    let onCreateNewAgent: () -> Void
 
     @State private var showAddPopover = false
 
@@ -62,6 +63,10 @@ struct AgentRailView: View {
                     onConnectNewGateway: {
                         showAddPopover = false
                         onConnectNewGateway()
+                    },
+                    onCreateNewAgent: {
+                        showAddPopover = false
+                        onCreateNewAgent()
                     }
                 )
             }
@@ -203,6 +208,7 @@ struct AddAgentPopover: View {
     let gatewayManager: GatewayManager
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
+    let onCreateNewAgent: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -260,6 +266,16 @@ struct AddAgentPopover: View {
             }
 
             Divider()
+
+            Button {
+                onCreateNewAgent()
+            } label: {
+                HStack {
+                    Image(systemName: "person.badge.plus")
+                    Text("Create New Agent…")
+                }
+            }
+            .buttonStyle(.plain)
 
             Button {
                 onConnectNewGateway()
