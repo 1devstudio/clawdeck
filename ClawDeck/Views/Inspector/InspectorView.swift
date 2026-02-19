@@ -7,16 +7,21 @@ struct InspectorView: View {
 
     @State private var editingLabel = false
     @State private var labelText = ""
+    @FocusState private var isLabelFieldFocused: Bool
 
     var body: some View {
         Form {
             Section("Session Info") {
-                LabeledContent("Title") {
-                    if editingLabel {
-                        TextField("Session title", text: $labelText)
+                if editingLabel {
+                    LabeledContent("Title") {
+                        TextField("Session name", text: $labelText)
                             .textFieldStyle(.roundedBorder)
+                            .focused($isLabelFieldFocused)
                             .onSubmit { commitLabel() }
-                    } else {
+                            .onExitCommand { editingLabel = false }
+                    }
+                } else {
+                    LabeledContent("Title") {
                         HStack {
                             Text(session.displayTitle)
                                 .lineLimit(2)
@@ -24,6 +29,10 @@ struct InspectorView: View {
                             Button {
                                 labelText = session.label ?? session.displayTitle
                                 editingLabel = true
+                                // Delay focus to next runloop so the field is mounted
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    isLabelFieldFocused = true
+                                }
                             } label: {
                                 Image(systemName: "pencil")
                             }
