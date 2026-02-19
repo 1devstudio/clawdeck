@@ -3,6 +3,7 @@ import SwiftUI
 /// A single session item in the sidebar.
 struct SessionRow: View {
     let session: Session
+    let isStarred: Bool
     let isRenaming: Bool
     @Binding var renameText: String
     var onCommitRename: () -> Void
@@ -23,14 +24,21 @@ struct SessionRow: View {
                     .onExitCommand { onCancelRename() }
                     .onAppear { isTextFieldFocused = true }
             } else {
-                Text(session.displayTitle)
-                    .font(.system(size: messageTextSize))
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .onTapGesture(count: 2) {
-                        onDoubleClickTitle()
+                HStack(spacing: 4) {
+                    if isStarred {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.yellow)
                     }
+                    Text(session.displayTitle)
+                        .font(.system(size: messageTextSize))
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .onTapGesture(count: 2) {
+                    onDoubleClickTitle()
+                }
             }
 
             if let lastMessage = session.lastMessage, !lastMessage.isEmpty {

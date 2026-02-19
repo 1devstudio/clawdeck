@@ -41,6 +41,18 @@ struct InspectorView: View {
                     }
                 }
 
+                LabeledContent("Starred") {
+                    Button {
+                        appViewModel.starredSessionsStore.toggle(session.key)
+                    } label: {
+                        Image(systemName: appViewModel.starredSessionsStore.isStarred(session.key)
+                              ? "star.fill" : "star")
+                            .foregroundStyle(appViewModel.starredSessionsStore.isStarred(session.key)
+                                             ? .yellow : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 LabeledContent("Key", value: session.key)
 
                 if let model = session.model {

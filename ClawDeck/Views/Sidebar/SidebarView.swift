@@ -72,6 +72,7 @@ struct SidebarView: View {
                         ForEach(group.sessions) { session in
                             SessionRow(
                                 session: session,
+                                isStarred: viewModel.isStarred(session.key),
                                 isRenaming: viewModel.renamingSessionKey == session.key,
                                 renameText: $viewModel.renameText,
                                 onCommitRename: {
@@ -87,6 +88,16 @@ struct SidebarView: View {
                             .tag(session.key)
                             .listRowBackground(Color.clear)
                             .contextMenu {
+                                Button {
+                                    viewModel.toggleStar(session.key)
+                                } label: {
+                                    if viewModel.isStarred(session.key) {
+                                        Label("Unstar", systemImage: "star.slash")
+                                    } else {
+                                        Label("Star", systemImage: "star")
+                                    }
+                                }
+
                                 Button("Rename…") {
                                     viewModel.beginRename(session.key)
                                 }

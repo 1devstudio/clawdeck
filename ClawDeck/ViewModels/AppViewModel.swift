@@ -10,6 +10,7 @@ final class AppViewModel {
 
     let gatewayManager = GatewayManager()
     let messageStore = MessageStore()
+    let starredSessionsStore = StarredSessionsStore()
 
     // MARK: - Child View Models (created once, shared)
 
@@ -282,6 +283,10 @@ final class AppViewModel {
             
             // Filter to the active agent
             filterSessionsToActiveAgent()
+
+            // Prune starred keys for sessions that no longer exist
+            let validKeys = Set(allGatewaySessions.map(\.key))
+            starredSessionsStore.prune(validKeys: validKeys)
         } catch {
             AppLogger.error("Failed to list sessions: \(error)", category: "Session")
         }
