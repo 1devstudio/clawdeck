@@ -263,6 +263,45 @@ actor GatewayClient {
         let _ = try await send(method: GatewayMethod.sessionsPatch, params: params)
     }
 
+    // MARK: - Cron
+
+    /// List all cron jobs.
+    func cronList() async throws -> CronListResult {
+        let response = try await send(method: GatewayMethod.cronList)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(CronListResult.self)
+    }
+
+    /// Fetch run history for a cron job.
+    func cronRuns(jobId: String, limit: Int = 10) async throws -> CronRunsResult {
+        let params = CronRunsParams(jobId: jobId, limit: limit)
+        let response = try await send(method: GatewayMethod.cronRuns, params: params)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(CronRunsResult.self)
+    }
+
+    /// Manually trigger a cron job.
+    func cronRun(jobId: String) async throws {
+        let params = CronRunParams(jobId: jobId)
+        let _ = try await send(method: GatewayMethod.cronRun, params: params)
+    }
+
+    /// Update a cron job (e.g. enable/disable).
+    func cronUpdate(jobId: String, enabled: Bool? = nil) async throws {
+        let params = CronUpdateParams(jobId: jobId, enabled: enabled)
+        let _ = try await send(method: GatewayMethod.cronUpdate, params: params)
+    }
+
+    /// Remove a cron job.
+    func cronRemove(jobId: String) async throws {
+        let params = CronRemoveParams(jobId: jobId)
+        let _ = try await send(method: GatewayMethod.cronRemove, params: params)
+    }
+
     /// Fetch the current gateway config.
     func configGet() async throws -> ConfigGetResult {
         let response = try await send(method: GatewayMethod.configGet)
