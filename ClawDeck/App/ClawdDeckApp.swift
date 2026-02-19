@@ -5,6 +5,9 @@ import HighlightSwift
 /// Ensures the SPM executable is treated as a regular GUI app with proper
 /// keyboard event routing, menu bar, and dock presence.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Tracks which windows have already been configured to avoid redundant work.
+    private var configuredWindowNumbers: Set<Int> = []
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
     }
@@ -19,7 +22,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Make the title bar transparent so content flows under the traffic lights
         if let window = NSApp.windows.first {
             Self.configureWindowTitleBar(window)
+            configuredWindowNumbers.insert(window.windowNumber)
         }
+
+        // Re-apply toolbar config whenever a new window becomes key (handles reopen after close)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+    }
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        guard !configuredWindowNumbers.contains(window.windowNumber) else { return }
+        // Only configure main WindowGroup windows (unified toolbar sets fullSizeContentView).
+        // Settings and Log windows use standard .titleBar and don't need customization.
+        guard window.styleMask.contains(.fullSizeContentView),
+              window.toolbar != nil else { return }
+
+        configuredWindowNumbers.insert(window.windowNumber)
+        Self.configureWindowTitleBar(window)
     }
 
     /// Configure the window for a Slack-style layout where content extends into the title bar.
@@ -28,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titleVisibility = .hidden
         // Extend content into the title bar area
         window.styleMask.insert(.fullSizeContentView)
+        // Prevent macOS from treating transparent areas as window drag handles,
+        // which blocks SwiftUI button/gesture taps in the agent rail.
+        window.isMovableByWindowBackground = false
         // Match the toolbar/title bar background to the agent rail
         window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95)
 
@@ -60,8 +87,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         item.isBordered = false
                     }
                 }
-                // Walk NSView tree and strip backgrounds
-                stripToolbarContainerBackgrounds(in: window.contentView?.superview)
+                // Walk only titlebar views — skip the content view (NSHostingView)
+                // to avoid modifying SwiftUI-managed views which breaks event delivery.
+                if let themeFrame = window.contentView?.superview {
+                    for subview in themeFrame.subviews where subview !== window.contentView {
+                        stripToolbarContainerBackgrounds(in: subview)
+                    }
+                }
             }
         }
     }

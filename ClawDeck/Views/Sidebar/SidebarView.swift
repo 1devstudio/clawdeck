@@ -85,16 +85,6 @@ struct SidebarView: View {
                 Spacer()
 
                 Button {
-                    viewModel.showAgentSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Settings")
-
-                Button {
                     Task { await viewModel.refreshSessions() }
                 } label: {
                     Image(systemName: "arrow.clockwise")

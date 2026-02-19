@@ -9,6 +9,7 @@ struct AgentRailView: View {
     let onSelect: (AgentBinding) -> Void
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
+    let onSettings: (AgentBinding) -> Void
 
     @State private var showAddPopover = false
 
@@ -21,11 +22,16 @@ struct AgentRailView: View {
                             binding: binding,
                             gatewayManager: gatewayManager,
                             isActive: binding.id == activeBindingId,
-                            isConnected: gatewayManager.isConnected(binding.gatewayId)
+                            isConnected: gatewayManager.isConnected(binding.gatewayId),
+                            onSelect: { onSelect(binding) },
+                            onSettings: { onSettings(binding) }
                         )
-                        .onTapGesture { onSelect(binding) }
                         .contextMenu {
-                            AgentContextMenu(binding: binding, gatewayManager: gatewayManager)
+                            AgentContextMenu(
+                                binding: binding,
+                                gatewayManager: gatewayManager,
+                                onSettings: { onSettings(binding) }
+                            )
                         }
                     }
                 }
@@ -68,7 +74,6 @@ struct AgentRailView: View {
             .padding(.bottom, 8)
         }
         .frame(width: 60)
-        .background(Color.clear)
     }
 }
 
@@ -78,43 +83,72 @@ struct AgentRailItem: View {
     let gatewayManager: GatewayManager
     let isActive: Bool
     let isConnected: Bool
+    let onSelect: () -> Void
+    let onSettings: () -> Void
     @Environment(\.themeColor) private var themeColor
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Active indicator pill on the left edge
-            RoundedRectangle(cornerRadius: 2)
-                .fill(isActive ? themeColor : Color.clear)
-                .frame(width: 4, height: isActive ? 28 : 0)
-                .animation(.easeInOut(duration: 0.15), value: isActive)
+        VStack(spacing: 10) {
+            Button {
+                onSelect()
+            } label: {
+                HStack(spacing: 0) {
+                    // Active indicator pill on the left edge
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isActive ? themeColor : Color.clear)
+                        .frame(width: 4, height: isActive ? 28 : 0)
+                        .animation(.easeInOut(duration: 0.15), value: isActive)
 
-            Spacer()
+                    Spacer()
 
-            // Avatar
-            ZStack {
-                RoundedRectangle(cornerRadius: isActive ? 14 : 20)
-                    .fill(isActive ? themeColor.opacity(0.2) : Color.gray.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                    .animation(.easeInOut(duration: 0.15), value: isActive)
+                    // Avatar
+                    ZStack {
+                        RoundedRectangle(cornerRadius: isActive ? 14 : 20)
+                            .fill(isActive ? themeColor.opacity(0.2) : Color.gray.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                            .animation(.easeInOut(duration: 0.15), value: isActive)
 
-                agentAvatar
-            }
-            // Connection state ring
-            .overlay(alignment: .bottomTrailing) {
-                if isActive {
-                    Circle()
-                        .fill(isConnected ? Color.green : Color.orange)
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(.background, lineWidth: 2))
-                        .offset(x: 2, y: 2)
+                        agentAvatar
+                    }
+                    // Connection state ring
+                    .overlay(alignment: .bottomTrailing) {
+                        if isActive {
+                            Circle()
+                                .fill(isConnected ? Color.green : Color.orange)
+                                .frame(width: 10, height: 10)
+                                .overlay(Circle().stroke(.background, lineWidth: 2))
+                                .offset(x: 2, y: 2)
+                        }
+                    }
+
+                    Spacer()
                 }
+                .frame(width: 60)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
+            .help(binding.displayName(from: gatewayManager))
 
-            Spacer()
+            // Settings gear icon — only visible for the active agent
+            if isActive {
+                Button {
+                    onSettings()
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help("Agent Settings")
+                .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
+            }
         }
-        .frame(width: 60)
-        .contentShape(Rectangle())
-        .help(binding.displayName(from: gatewayManager))
+        .animation(.easeInOut(duration: 0.15), value: isActive)
     }
 
     @ViewBuilder
@@ -161,6 +195,7 @@ struct AgentRailItem: View {
 struct AgentContextMenu: View {
     let binding: AgentBinding
     let gatewayManager: GatewayManager
+    let onSettings: () -> Void
 
     private var gatewayProfile: GatewayProfile? {
         gatewayManager.gatewayProfiles.first { $0.id == binding.gatewayId }
@@ -182,7 +217,7 @@ struct AgentContextMenu: View {
             Divider()
 
             Button("Agent Settings…") {
-                // TODO: Open agent settings
+                onSettings()
             }
 
             Button("Gateway Settings…") {
