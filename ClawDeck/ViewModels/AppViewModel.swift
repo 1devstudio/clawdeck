@@ -32,7 +32,7 @@ final class AppViewModel {
     /// Session key for the in-flight history load.
     /// Prevents re-entering selectSession from cancelling a load for
     /// the same session that's already in progress.
-    private var historyLoadingKey: String?
+    private(set) var historyLoadingKey: String?
 
     /// Get or create a ChatViewModel for a session key.
     func chatViewModel(for sessionKey: String) -> ChatViewModel {
@@ -73,6 +73,12 @@ final class AppViewModel {
 
     /// Sessions visible in the sidebar (filtered to the active agent).
     var sessions: [Session] = []
+
+    /// Whether sessions are currently being fetched from the gateway.
+    var isLoadingSessions = false
+
+    /// Whether sessions have been loaded at least once (after first successful fetch).
+    var hasLoadedSessions = false
 
     /// Currently selected session key.
     var selectedSessionKey: String?
@@ -214,6 +220,7 @@ final class AppViewModel {
         agents.removeAll()
         allGatewaySessions.removeAll()
         sessions.removeAll()
+        hasLoadedSessions = false
         selectedSessionKey = nil
         availableModels.removeAll()
         defaultModelId = nil
@@ -254,6 +261,11 @@ final class AppViewModel {
             allGatewaySessions.removeAll()
             sessions.removeAll()
             return
+        }
+        isLoadingSessions = true
+        defer {
+            isLoadingSessions = false
+            hasLoadedSessions = true
         }
         
         do {
@@ -387,9 +399,12 @@ final class AppViewModel {
         historyLoadingKey = sessionKey
 
         AppLogger.debug("selectSession(\(sessionKey)): starting history load", category: "Session")
+        let chatVM = chatViewModel(for: sessionKey)
+        chatVM.isLoadingHistory = true
         let task = Task { await loadHistory(for: sessionKey) }
         historyLoadTask = task
         await task.value
+        chatVM.isLoadingHistory = false
 
         // Clear the loading key if it still matches (wasn't replaced).
         if historyLoadingKey == sessionKey {
@@ -404,9 +419,12 @@ final class AppViewModel {
         historyLoadingKey = sessionKey
 
         AppLogger.info("reloadSession(\(sessionKey)): force-reloading history", category: "Session")
+        let chatVM = chatViewModel(for: sessionKey)
+        chatVM.isLoadingHistory = true
         let task = Task { await loadHistory(for: sessionKey) }
         historyLoadTask = task
         await task.value
+        chatVM.isLoadingHistory = false
 
         if historyLoadingKey == sessionKey {
             historyLoadingKey = nil

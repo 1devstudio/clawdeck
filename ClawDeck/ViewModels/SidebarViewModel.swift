@@ -15,7 +15,10 @@ final class SidebarViewModel {
     var searchText = ""
 
     /// Whether the session list is loading.
-    var isLoading = false
+    var isLoading: Bool { appViewModel.isLoadingSessions }
+
+    /// Whether sessions have been loaded at least once.
+    var hasLoadedSessions: Bool { appViewModel.hasLoadedSessions }
 
     /// Currently hovered session (for context menu).
     var hoveredSessionKey: String?
@@ -71,6 +74,11 @@ final class SidebarViewModel {
         starredStore.isStarred(sessionKey)
     }
 
+    /// Whether a session is currently loading its message history.
+    func isLoadingHistory(_ sessionKey: String) -> Bool {
+        appViewModel.historyLoadingKey == sessionKey
+    }
+
     /// Toggle the starred state of a session.
     func toggleStar(_ sessionKey: String) {
         starredStore.toggle(sessionKey)
@@ -108,6 +116,9 @@ final class SidebarViewModel {
         return hasher.finalize()
     }
 
+    /// Whether a group title is a History sub-group (Today, Yesterday, etc.).
+    static let historySubgroups: Set<String> = ["Today", "Yesterday", "This Week", "Older"]
+
     private func computeGroupedSessions() -> [(title: String, sessions: [Session])] {
         let sorted = filteredSessions.sorted { ($0.createdAt) > ($1.createdAt) }
         let calendar = Calendar.current
@@ -120,8 +131,6 @@ final class SidebarViewModel {
         var thisWeek: [Session] = []
         var older: [Session] = []
 
-        // Starred sessions go into their own group and are excluded from the rest.
-        // Active (non-starred) sessions go into Active and are also excluded.
         for session in sorted {
             if starredStore.isStarred(session.key) {
                 starred.append(session)
@@ -140,12 +149,12 @@ final class SidebarViewModel {
         }
 
         var groups: [(title: String, sessions: [Session])] = []
-        if !starred.isEmpty { groups.append(("Starred", starred)) }
-        if !active.isEmpty { groups.append(("Active", active)) }
-        if !today.isEmpty { groups.append(("Today", today)) }
+        if !starred.isEmpty   { groups.append(("Starred", starred)) }
+        if !active.isEmpty    { groups.append(("Active", active)) }
+        if !today.isEmpty     { groups.append(("Today", today)) }
         if !yesterday.isEmpty { groups.append(("Yesterday", yesterday)) }
-        if !thisWeek.isEmpty { groups.append(("This Week", thisWeek)) }
-        if !older.isEmpty { groups.append(("Older", older)) }
+        if !thisWeek.isEmpty  { groups.append(("This Week", thisWeek)) }
+        if !older.isEmpty     { groups.append(("Older", older)) }
         return groups
     }
 
@@ -165,9 +174,7 @@ final class SidebarViewModel {
 
     /// Refresh sessions from the gateway.
     func refreshSessions() async {
-        isLoading = true
         await appViewModel.refreshSessions()
-        isLoading = false
     }
 
     /// Select a session.

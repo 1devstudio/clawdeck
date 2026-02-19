@@ -35,6 +35,9 @@ struct MainView: View {
         return appViewModel.chatViewModel(for: key)
     }
 
+    /// Whether a session is currently selected.
+    private var hasSession: Bool { appViewModel.selectedSessionKey != nil }
+
     private let sidebarMinWidth: CGFloat = 200
     private let sidebarMaxWidth: CGFloat = 400
     private let railWidth: CGFloat = 60
@@ -180,6 +183,8 @@ struct MainView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .frame(width: 500)
                     .focusEffectDisabled()
+                    .opacity(hasSession ? 1 : 0)
+                    .disabled(!hasSession)
                     .onChange(of: searchText) { _, newValue in
                         activeChatVM?.searchQuery = newValue
                         activeChatVM?.currentMatchIndex = 0
@@ -200,6 +205,7 @@ struct MainView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(chromeSecondary)
                     }
+                    .opacity(hasSession ? 1 : 0)
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -212,6 +218,8 @@ struct MainView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Toggle Inspector (⌘⇧I)")
+                    .opacity(hasSession ? 1 : 0)
+                    .disabled(!hasSession)
                 }
             }
         }

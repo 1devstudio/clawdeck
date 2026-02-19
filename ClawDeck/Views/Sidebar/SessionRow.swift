@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionRow: View {
     let session: Session
     let isStarred: Bool
+    let isLoadingHistory: Bool
     let isRenaming: Bool
     @Binding var renameText: String
     var onCommitRename: () -> Void
@@ -49,7 +50,15 @@ struct SessionRow: View {
                     .truncationMode(.tail)
             }
 
-            if let date = session.lastMessageAt ?? session.updatedAt as Date? {
+            if isLoadingHistory {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Loading messages…")
+                        .font(.system(size: messageTextSize - 3))
+                        .foregroundStyle(.tertiary)
+                }
+            } else if let date = session.lastMessageAt ?? session.updatedAt as Date? {
                 Text(date, style: .relative)
                     .font(.system(size: messageTextSize - 3))
                     .foregroundStyle(.tertiary)

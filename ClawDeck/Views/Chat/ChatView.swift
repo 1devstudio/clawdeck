@@ -212,19 +212,25 @@ struct ChatView: View {
                     .background(.clear)
                 }
                 .overlay {
-                    // Loading overlay — shown while history is being fetched
                     if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .controlSize(.large)
-                            Text("Loading messages…")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        ContentUnavailableView {
+                            Label {
+                                Text("Loading Messages")
+                            } icon: {
+                                ProgressView()
+                                    .controlSize(.large)
+                            }
+                        } description: {
+                            Text("Fetching conversation history…")
                         }
+                        .padding(32)
+                        .background { ThemedSidebarBackground() }
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.regularMaterial)
+                        .transition(.opacity)
                     }
                 }
+                .animation(.easeInOut(duration: 0.3), value: viewModel.isLoadingHistory)
                 .onAppear {
                     scrollProxy = proxy
                 }
