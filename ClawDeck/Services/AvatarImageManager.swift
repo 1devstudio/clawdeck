@@ -14,13 +14,16 @@ enum AvatarImageManager {
         return dir
     }()
 
+    /// Maximum dimension (width or height) for avatar images.
+    static let maxDimension: CGFloat = 256
+
     /// Save an image for a given binding ID. Returns the filename on success.
     /// Images are resized to fit within 256×256 and saved as PNG.
     static func saveAvatar(image: NSImage, bindingId: String) throws -> String {
         let filename = "\(bindingId).png"
         let url = avatarsDirectory.appendingPathComponent(filename)
 
-        guard let pngData = resizeAndEncode(image: image, maxDimension: 256) else {
+        guard let pngData = resizeAndEncode(image: image, maxDimension: maxDimension) else {
             throw AvatarError.encodingFailed
         }
 
@@ -38,6 +41,42 @@ enum AvatarImageManager {
     static func deleteAvatar(named filename: String) {
         let url = avatarsDirectory.appendingPathComponent(filename)
         try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Resize an image to fit within `maxDimension` × `maxDimension`, preserving
+    /// aspect ratio. Returns the original image if it already fits.
+    static func resized(image: NSImage, maxDimension: CGFloat = AvatarImageManager.maxDimension) -> NSImage? {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData) else { return nil }
+
+        let w = CGFloat(bitmap.pixelsWide)
+        let h = CGFloat(bitmap.pixelsHigh)
+        let longest = max(w, h)
+
+        guard longest > maxDimension else { return image }
+
+        let scale = maxDimension / longest
+        let newW = Int(w * scale)
+        let newH = Int(h * scale)
+
+        guard let resized = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: newW, pixelsHigh: newH,
+            bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0
+        ) else { return nil }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: resized)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        bitmap.draw(in: NSRect(x: 0, y: 0, width: newW, height: newH))
+        NSGraphicsContext.restoreGraphicsState()
+
+        let result = NSImage(size: NSSize(width: newW, height: newH))
+        result.addRepresentation(resized)
+        return result
     }
 
     // MARK: - Private

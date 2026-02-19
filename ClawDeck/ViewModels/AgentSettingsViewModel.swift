@@ -85,12 +85,18 @@ final class AgentSettingsViewModel {
     }
 
     /// Handle a user-selected image file from the file picker.
+    /// The image is immediately resized to fit within the avatar max dimension
+    /// so the preview stays lightweight and the save path gets a pre-sized image.
     func selectCustomImage(from url: URL) {
         guard let image = NSImage(contentsOf: url) else {
             errorMessage = "Could not load image from selected file"
             return
         }
-        avatarSelection = .customImage(image, filename: nil)
+        guard let resized = AvatarImageManager.resized(image: image) else {
+            errorMessage = "Failed to process the selected image"
+            return
+        }
+        avatarSelection = .customImage(resized, filename: nil)
     }
     
     // MARK: - Gateway Connection (local settings)
