@@ -7,7 +7,9 @@ struct SessionRow: View {
     @Binding var renameText: String
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
+    var onDoubleClickTitle: () -> Void
     @Environment(\.messageTextSize) private var messageTextSize
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -16,14 +18,19 @@ struct SessionRow: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: messageTextSize))
                     .fontWeight(.medium)
+                    .focused($isTextFieldFocused)
                     .onSubmit { onCommitRename() }
                     .onExitCommand { onCancelRename() }
+                    .onAppear { isTextFieldFocused = true }
             } else {
                 Text(session.displayTitle)
                     .font(.system(size: messageTextSize))
                     .fontWeight(.medium)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .onTapGesture(count: 2) {
+                        onDoubleClickTitle()
+                    }
             }
 
             if let lastMessage = session.lastMessage, !lastMessage.isEmpty {

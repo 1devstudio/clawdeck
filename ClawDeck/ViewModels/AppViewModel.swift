@@ -619,7 +619,12 @@ final class AppViewModel {
         guard let client = activeClient else { return }
         do {
             try await client.patchSession(key: sessionKey, label: label)
-            if let session = sessions.first(where: { $0.key == sessionKey }) {
+            // Update both the filtered sessions and the all-gateway cache
+            // so the label survives subsequent refreshes.
+            for session in sessions where session.key == sessionKey {
+                session.label = label
+            }
+            for session in allGatewaySessions where session.key == sessionKey {
                 session.label = label
             }
             AppLogger.info("Renamed session \(sessionKey) to '\(label)'", category: "Session")

@@ -79,6 +79,9 @@ struct SidebarView: View {
                                 },
                                 onCancelRename: {
                                     viewModel.cancelRename()
+                                },
+                                onDoubleClickTitle: {
+                                    viewModel.beginRename(session.key)
                                 }
                             )
                             .tag(session.key)
