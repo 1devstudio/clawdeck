@@ -3,6 +3,8 @@ import SwiftUI
 /// A single session item in the sidebar.
 struct SessionRow: View {
     let session: Session
+    let isStarred: Bool
+    let isLoadingHistory: Bool
     let isRenaming: Bool
     @Binding var renameText: String
     var onCommitRename: () -> Void
@@ -23,14 +25,21 @@ struct SessionRow: View {
                     .onExitCommand { onCancelRename() }
                     .onAppear { isTextFieldFocused = true }
             } else {
-                Text(session.displayTitle)
-                    .font(.system(size: messageTextSize))
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .onTapGesture(count: 2) {
-                        onDoubleClickTitle()
+                HStack(spacing: 4) {
+                    if isStarred {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: messageTextSize - 3))
+                            .foregroundStyle(.yellow)
                     }
+                    Text(session.displayTitle)
+                        .font(.system(size: messageTextSize))
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .onTapGesture(count: 2) {
+                    onDoubleClickTitle()
+                }
             }
 
             if let lastMessage = session.lastMessage, !lastMessage.isEmpty {
@@ -41,7 +50,15 @@ struct SessionRow: View {
                     .truncationMode(.tail)
             }
 
-            if let date = session.lastMessageAt ?? session.updatedAt as Date? {
+            if isLoadingHistory {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Loading messages…")
+                        .font(.system(size: messageTextSize - 3))
+                        .foregroundStyle(.tertiary)
+                }
+            } else if let date = session.lastMessageAt ?? session.updatedAt as Date? {
                 Text(date, style: .relative)
                     .font(.system(size: messageTextSize - 3))
                     .foregroundStyle(.tertiary)
