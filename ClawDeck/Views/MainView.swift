@@ -89,6 +89,13 @@ struct MainView: View {
                 },
                 onConnectNewGateway: {
                     appViewModel.showGatewayConnectionSheet = true
+                },
+                onSettings: { binding in
+                    appViewModel.editingAgentProfileId = binding.id
+                    appViewModel.showAgentSettings = true
+                },
+                onCronJobs: { _ in
+                    appViewModel.showCronJobsSheet = true
                 }
             )
 
@@ -223,19 +230,11 @@ struct MainView: View {
                 }
             }
         }
-        .onAppear {
-            // Configure the window title bar to be transparent
-            DispatchQueue.main.async {
-                if let window = NSApp.windows.first {
-                    AppDelegate.configureWindowTitleBar(window)
-                }
-            }
-        }
         // Re-strip toolbar borders when onboarding completes (items appear for the first time)
         .onChange(of: appViewModel.showConnectionSetup) { _, showing in
             if !showing {
                 DispatchQueue.main.async {
-                    if let window = NSApp.windows.first {
+                    if let window = NSApp.keyWindow {
                         AppDelegate.configureWindowTitleBar(window)
                     }
                 }
@@ -264,6 +263,9 @@ struct MainView: View {
         }
         .sheet(isPresented: $appViewModel.showGatewayConnectionSheet) {
             ConnectionSetupView(appViewModel: appViewModel, skipAutoDetect: true)
+        }
+        .sheet(isPresented: $appViewModel.showCronJobsSheet) {
+            CronJobsSheet(appViewModel: appViewModel)
         }
     }
 

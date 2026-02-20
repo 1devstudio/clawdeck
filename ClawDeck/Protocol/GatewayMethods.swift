@@ -464,6 +464,117 @@ struct ModelsListResult: Codable, Sendable {
     let models: [GatewayModel]
 }
 
+// MARK: - Cron
+
+/// Parameters for cron.list.
+struct CronListParams: Codable, Sendable {
+    let includeDisabled: Bool?
+}
+
+/// Result of cron.list.
+struct CronListResult: Codable, Sendable {
+    let jobs: [CronJobSummary]
+}
+
+/// A single cron job from the gateway.
+struct CronJobSummary: Codable, Sendable, Identifiable {
+    let id: String
+    let agentId: String?
+    let name: String
+    var enabled: Bool
+    let deleteAfterRun: Bool?
+    let createdAtMs: Double?
+    let updatedAtMs: Double?
+    let schedule: CronSchedule
+    let sessionTarget: String?        // "main" | "isolated"
+    let wakeMode: String?             // "now" | "next-heartbeat"
+    let payload: CronPayload?
+    let isolation: CronIsolation?
+    let state: CronJobState?
+}
+
+/// Cron schedule.
+struct CronSchedule: Codable, Sendable {
+    let kind: String                  // "cron" | "at" | "every"
+    let expr: String?                 // cron expression or ISO timestamp
+    let tz: String?                   // IANA timezone
+    let intervalMs: Double?           // for "every" kind
+}
+
+/// Cron job payload.
+struct CronPayload: Codable, Sendable {
+    let kind: String?                 // "agentTurn" | "systemEvent"
+    let message: String?              // for agentTurn
+    let text: String?                 // for systemEvent
+    let deliver: Bool?
+    let channel: String?
+    let to: String?
+    let model: String?
+    let thinking: String?
+}
+
+/// Cron isolation options.
+struct CronIsolation: Codable, Sendable {
+    let postToMainPrefix: String?
+    let postToMainMode: String?
+    let postToMainMaxChars: Int?
+}
+
+/// Cron job runtime state.
+struct CronJobState: Codable, Sendable {
+    let nextRunAtMs: Double?
+    let lastRunAtMs: Double?
+    let lastStatus: String?           // "ok" | "error"
+    let lastDurationMs: Double?
+}
+
+/// Parameters for cron.runs.
+struct CronRunsParams: Codable, Sendable {
+    let jobId: String
+    let limit: Int?
+}
+
+/// Result of cron.runs.
+struct CronRunsResult: Codable, Sendable {
+    let entries: [CronRunEntry]
+}
+
+/// A single cron run history entry.
+struct CronRunEntry: Codable, Sendable, Identifiable {
+    let ts: Double
+    let jobId: String
+    let action: String?               // "finished" | "error"
+    let status: String?               // "ok" | "error"
+    let summary: String?
+    let runAtMs: Double?
+    let durationMs: Double?
+    let nextRunAtMs: Double?
+    let error: String?
+
+    var id: Double { ts }
+}
+
+/// Parameters for cron.update.
+struct CronUpdateParams: Codable, Sendable {
+    let id: String
+    let patch: CronUpdatePatch
+
+    struct CronUpdatePatch: Codable, Sendable {
+        let enabled: Bool?
+        let payload: PayloadPatch?
+    }
+
+    struct PayloadPatch: Codable, Sendable {
+        let kind: String
+        let message: String?
+    }
+}
+
+/// Parameters for cron.remove.
+struct CronRemoveParams: Codable, Sendable {
+    let jobId: String
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.

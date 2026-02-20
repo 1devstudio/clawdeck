@@ -101,6 +101,9 @@ final class AppViewModel {
     /// Whether the agent settings sheet is shown.
     var showAgentSettings = false
 
+    /// Whether the cron jobs sheet is shown.
+    var showCronJobsSheet = false
+
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
