@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import HighlightSwift
+import Sparkle
 
 /// Ensures the SPM executable is treated as a regular GUI app with proper
 /// keyboard event routing, menu bar, and dock presence.
@@ -127,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
+    @StateObject private var softwareUpdate = SoftwareUpdateViewModel()
     @Environment(\.openWindow) private var openWindow
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
@@ -198,6 +200,15 @@ struct ClawdDeckApp: App {
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1100, height: 700)
         .commands {
+            // MARK: - App Menu / Check for Updates
+
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    softwareUpdate.checkForUpdates()
+                }
+                .disabled(!softwareUpdate.canCheckForUpdates)
+            }
+
             TextEditingCommands()
 
             // MARK: - File / New Item
