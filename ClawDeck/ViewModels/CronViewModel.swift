@@ -25,6 +25,14 @@ final class CronViewModel {
     /// Job IDs currently performing an action (run/toggle/delete).
     var busyJobIds: Set<String> = []
 
+    /// Temporary feedback message after an action (auto-clears).
+    var actionFeedback: ActionFeedback?
+
+    struct ActionFeedback {
+        let message: String
+        let isError: Bool
+    }
+
     // MARK: - Grouped jobs
 
     struct JobGroup: Identifiable {
@@ -94,27 +102,30 @@ final class CronViewModel {
         busyJobIds.insert(job.id)
         defer { busyJobIds.remove(job.id) }
 
+        let newEnabled = !job.enabled
         do {
-            try await client.cronUpdate(jobId: job.id, enabled: !job.enabled)
+            try await client.cronUpdate(jobId: job.id, enabled: newEnabled)
             await loadJobs()
+            showFeedback(newEnabled ? "Job enabled" : "Job disabled")
         } catch {
+            showFeedback("Failed to toggle job", isError: true)
             AppLogger.error("Failed to toggle cron job \(job.id): \(error)", category: "Cron")
         }
     }
 
-    func runNow(_ job: CronJobSummary) async {
+    func updatePrompt(_ job: CronJobSummary, message: String) async throws {
         guard let client = appViewModel?.activeClient else { return }
         busyJobIds.insert(job.id)
         defer { busyJobIds.remove(job.id) }
 
         do {
-            try await client.cronRun(jobId: job.id)
-            // Brief delay then refresh to pick up the new run state
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try await client.cronUpdate(jobId: job.id, payloadKind: job.payload?.kind ?? "agentTurn", message: message)
             await loadJobs()
-            await loadRunHistory(for: job.id)
+            showFeedback("Prompt updated")
         } catch {
-            AppLogger.error("Failed to run cron job \(job.id): \(error)", category: "Cron")
+            showFeedback("Failed to update prompt", isError: true)
+            AppLogger.error("Failed to update cron prompt \(job.id): \(error)", category: "Cron")
+            throw error
         }
     }
 
@@ -127,8 +138,20 @@ final class CronViewModel {
             try await client.cronRemove(jobId: job.id)
             jobs.removeAll { $0.id == job.id }
             runHistory.removeValue(forKey: job.id)
+            showFeedback("Job removed")
         } catch {
+            showFeedback("Failed to remove job", isError: true)
             AppLogger.error("Failed to remove cron job \(job.id): \(error)", category: "Cron")
+        }
+    }
+
+    private func showFeedback(_ message: String, isError: Bool = false) {
+        actionFeedback = ActionFeedback(message: message, isError: isError)
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if actionFeedback?.message == message {
+                actionFeedback = nil
+            }
         }
     }
 

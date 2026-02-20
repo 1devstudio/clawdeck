@@ -36,7 +36,6 @@ enum GatewayMethod {
     static let modelsList = "models.list"
     static let cronList = "cron.list"
     static let cronRuns = "cron.runs"
-    static let cronRun = "cron.run"
     static let cronUpdate = "cron.update"
     static let cronRemove = "cron.remove"
 }

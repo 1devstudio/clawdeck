@@ -35,7 +35,6 @@ struct CronJobsView: View {
                             runHistory: viewModel.runHistory[job.id],
                             onToggleExpand: { viewModel.toggleExpanded(job.id) },
                             onToggleEnabled: { Task { await viewModel.toggleEnabled(job) } },
-                            onRunNow: { Task { await viewModel.runNow(job) } },
                             onRemove: { Task { await viewModel.removeJob(job) } }
                         )
                         .listRowBackground(Color.clear)
@@ -110,7 +109,6 @@ struct CronJobRow: View {
     let runHistory: [CronRunEntry]?
     var onToggleExpand: () -> Void
     var onToggleEnabled: () -> Void
-    var onRunNow: () -> Void
     var onRemove: () -> Void
 
     var body: some View {
@@ -294,16 +292,6 @@ struct CronJobRow: View {
     private var actionButtons: some View {
         HStack(spacing: 8) {
             if job.enabled {
-                Button {
-                    onRunNow()
-                } label: {
-                    Label("Run Now", systemImage: "play.fill")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isBusy)
-
                 Button {
                     onToggleEnabled()
                 } label: {

@@ -466,6 +466,11 @@ struct ModelsListResult: Codable, Sendable {
 
 // MARK: - Cron
 
+/// Parameters for cron.list.
+struct CronListParams: Codable, Sendable {
+    let includeDisabled: Bool?
+}
+
 /// Result of cron.list.
 struct CronListResult: Codable, Sendable {
     let jobs: [CronJobSummary]
@@ -476,7 +481,7 @@ struct CronJobSummary: Codable, Sendable, Identifiable {
     let id: String
     let agentId: String?
     let name: String
-    let enabled: Bool
+    var enabled: Bool
     let deleteAfterRun: Bool?
     let createdAtMs: Double?
     let updatedAtMs: Double?
@@ -549,15 +554,20 @@ struct CronRunEntry: Codable, Sendable, Identifiable {
     var id: Double { ts }
 }
 
-/// Parameters for cron.run (manual trigger).
-struct CronRunParams: Codable, Sendable {
-    let jobId: String
-}
-
 /// Parameters for cron.update.
 struct CronUpdateParams: Codable, Sendable {
-    let jobId: String
-    let enabled: Bool?
+    let id: String
+    let patch: CronUpdatePatch
+
+    struct CronUpdatePatch: Codable, Sendable {
+        let enabled: Bool?
+        let payload: PayloadPatch?
+    }
+
+    struct PayloadPatch: Codable, Sendable {
+        let kind: String
+        let message: String?
+    }
 }
 
 /// Parameters for cron.remove.

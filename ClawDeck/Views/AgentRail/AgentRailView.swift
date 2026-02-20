@@ -10,6 +10,7 @@ struct AgentRailView: View {
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
     let onSettings: (AgentBinding) -> Void
+    let onCronJobs: (AgentBinding) -> Void
 
     @State private var showAddPopover = false
 
@@ -24,13 +25,15 @@ struct AgentRailView: View {
                             isActive: binding.id == activeBindingId,
                             isConnected: gatewayManager.isConnected(binding.gatewayId),
                             onSelect: { onSelect(binding) },
-                            onSettings: { onSettings(binding) }
+                            onSettings: { onSettings(binding) },
+                            onCronJobs: { onCronJobs(binding) }
                         )
                         .contextMenu {
                             AgentContextMenu(
                                 binding: binding,
                                 gatewayManager: gatewayManager,
-                                onSettings: { onSettings(binding) }
+                                onSettings: { onSettings(binding) },
+                                onCronJobs: { onCronJobs(binding) }
                             )
                         }
                     }
@@ -85,6 +88,7 @@ struct AgentRailItem: View {
     let isConnected: Bool
     let onSelect: () -> Void
     let onSettings: () -> Void
+    let onCronJobs: () -> Void
     @Environment(\.themeColor) private var themeColor
 
     var body: some View {
@@ -146,6 +150,22 @@ struct AgentRailItem: View {
                 .buttonStyle(.plain)
                 .help("Agent Settings")
                 .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
+
+                Button {
+                    onCronJobs()
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help("Cron Jobs")
+                .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
             }
         }
         .animation(.easeInOut(duration: 0.15), value: isActive)
@@ -196,6 +216,7 @@ struct AgentContextMenu: View {
     let binding: AgentBinding
     let gatewayManager: GatewayManager
     let onSettings: () -> Void
+    let onCronJobs: () -> Void
 
     private var gatewayProfile: GatewayProfile? {
         gatewayManager.gatewayProfiles.first { $0.id == binding.gatewayId }
@@ -218,6 +239,10 @@ struct AgentContextMenu: View {
 
             Button("Agent Settings…") {
                 onSettings()
+            }
+
+            Button("Cron Jobs…") {
+                onCronJobs()
             }
 
             Button("Gateway Settings…") {

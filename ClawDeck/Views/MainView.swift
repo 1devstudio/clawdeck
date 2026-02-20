@@ -93,6 +93,9 @@ struct MainView: View {
                 onSettings: { binding in
                     appViewModel.editingAgentProfileId = binding.id
                     appViewModel.showAgentSettings = true
+                },
+                onCronJobs: { _ in
+                    appViewModel.showCronJobsSheet = true
                 }
             )
 
@@ -260,6 +263,9 @@ struct MainView: View {
         }
         .sheet(isPresented: $appViewModel.showGatewayConnectionSheet) {
             ConnectionSetupView(appViewModel: appViewModel, skipAutoDetect: true)
+        }
+        .sheet(isPresented: $appViewModel.showCronJobsSheet) {
+            CronJobsSheet(appViewModel: appViewModel)
         }
     }
 

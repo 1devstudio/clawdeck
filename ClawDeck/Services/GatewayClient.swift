@@ -265,9 +265,10 @@ actor GatewayClient {
 
     // MARK: - Cron
 
-    /// List all cron jobs.
+    /// List all cron jobs (including disabled).
     func cronList() async throws -> CronListResult {
-        let response = try await send(method: GatewayMethod.cronList)
+        let params = CronListParams(includeDisabled: true)
+        let response = try await send(method: GatewayMethod.cronList, params: params)
         guard response.ok, let payload = response.payload else {
             throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }
@@ -284,22 +285,28 @@ actor GatewayClient {
         return try payload.decode(CronRunsResult.self)
     }
 
-    /// Manually trigger a cron job.
-    func cronRun(jobId: String) async throws {
-        let params = CronRunParams(jobId: jobId)
-        let _ = try await send(method: GatewayMethod.cronRun, params: params)
-    }
-
-    /// Update a cron job (e.g. enable/disable).
-    func cronUpdate(jobId: String, enabled: Bool? = nil) async throws {
-        let params = CronUpdateParams(jobId: jobId, enabled: enabled)
-        let _ = try await send(method: GatewayMethod.cronUpdate, params: params)
+    /// Update a cron job (e.g. enable/disable, change prompt).
+    func cronUpdate(jobId: String, enabled: Bool? = nil, payloadKind: String? = nil, message: String? = nil) async throws {
+        let payloadPatch: CronUpdateParams.PayloadPatch? = if let payloadKind, let message {
+            CronUpdateParams.PayloadPatch(kind: payloadKind, message: message)
+        } else {
+            nil
+        }
+        let patch = CronUpdateParams.CronUpdatePatch(enabled: enabled, payload: payloadPatch)
+        let params = CronUpdateParams(id: jobId, patch: patch)
+        let response = try await send(method: GatewayMethod.cronUpdate, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
     }
 
     /// Remove a cron job.
     func cronRemove(jobId: String) async throws {
         let params = CronRemoveParams(jobId: jobId)
-        let _ = try await send(method: GatewayMethod.cronRemove, params: params)
+        let response = try await send(method: GatewayMethod.cronRemove, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
     }
 
     /// Fetch the current gateway config.
