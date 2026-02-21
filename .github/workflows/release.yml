@@ -30,6 +30,9 @@ env:
   SCHEME: ClawDeck
   BUNDLE_ID: com.1devstudio.ClawDeck
 
+permissions:
+  contents: write
+
 jobs:
   build-sign-release:
     runs-on: macos-15
