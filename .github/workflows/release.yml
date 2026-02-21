@@ -190,72 +190,61 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-
-          # Debug: verify everything exists
-          echo "=== DMG file ==="
-          ls -lh "$APP_NAME-$VERSION.dmg" || echo "DMG NOT FOUND!"
-
-          echo "=== sign_update binary ==="
-          ls -lh /tmp/bin/sign_update || echo "sign_update NOT FOUND!"
-          file /tmp/bin/sign_update 2>/dev/null || true
-
-          echo "=== Sparkle key ==="
           echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
-          echo "Key file size: $(wc -c < /tmp/sparkle_key) bytes"
-          echo "Key file lines: $(wc -l < /tmp/sparkle_key)"
 
-          echo "=== Running sign_update ==="
           # sign_update outputs: sparkle:edSignature="..." length="..."
           SIGN_OUTPUT=$(/tmp/bin/sign_update "$APP_NAME-$VERSION.dmg" \
-            -f /tmp/sparkle_key 2>&1) || {
-            echo "sign_update FAILED with exit code $?"
-            echo "Output was: $SIGN_OUTPUT"
-            exit 1
-          }
-          echo "sign_update succeeded"
+            -f /tmp/sparkle_key)
           echo "SPARKLE_SIGNATURE=$SIGN_OUTPUT" >> "$GITHUB_ENV"
 
           rm /tmp/sparkle_key
 
       # ── Generate appcast.xml ──
       - name: Generate appcast
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           FILESIZE=$(stat -f%z "$APP_NAME-$VERSION.dmg")
           PUBDATE=$(date -R)
 
-          # Escape release notes for XML
-          RELEASE_BODY=$(cat << 'NOTES_EOF'
-          ${{ github.event.release.body }}
-          NOTES_EOF
-          )
-
-          cat > appcast.xml << EOF
+          cat > appcast.xml << 'APPCAST_EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0"
                xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
                xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
-              <title>$APP_NAME Changelog</title>
+              <title>ClawDeck Changelog</title>
               <link>https://1devstudio.github.io/clawdeck-updates/appcast.xml</link>
               <description>Most recent changes with links to updates.</description>
               <language>en</language>
               <item>
-                <title>Version $VERSION</title>
-                <description><![CDATA[<pre>${RELEASE_BODY}</pre>]]></description>
-                <pubDate>$PUBDATE</pubDate>
+                <title>PLACEHOLDER</title>
+                <description><![CDATA[<pre>RELEASE_NOTES_PLACEHOLDER</pre>]]></description>
+                <pubDate>PUBDATE_PLACEHOLDER</pubDate>
                 <enclosure
-                  url="https://github.com/1devstudio/clawdeck/releases/download/v$VERSION/$APP_NAME-$VERSION.dmg"
-                  $SPARKLE_SIGNATURE
-                  length="$FILESIZE"
+                  url="DOWNLOAD_URL_PLACEHOLDER"
+                  SPARKLE_SIG_PLACEHOLDER
+                  length="FILESIZE_PLACEHOLDER"
                   type="application/octet-stream"
-                  sparkle:version="$VERSION"
-                  sparkle:shortVersionString="$VERSION" />
+                  sparkle:version="VERSION_PLACEHOLDER"
+                  sparkle:shortVersionString="VERSION_PLACEHOLDER" />
                 <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
               </item>
             </channel>
           </rss>
-          EOF
+          APPCAST_EOF
+
+          # Safe substitutions via sed (no shell expansion issues)
+          sed -i '' "s|DOWNLOAD_URL_PLACEHOLDER|https://github.com/1devstudio/clawdeck/releases/download/v$VERSION/$APP_NAME-$VERSION.dmg|g" appcast.xml
+          sed -i '' "s|SPARKLE_SIG_PLACEHOLDER|$SPARKLE_SIGNATURE|g" appcast.xml
+          sed -i '' "s|FILESIZE_PLACEHOLDER|$FILESIZE|g" appcast.xml
+          sed -i '' "s|VERSION_PLACEHOLDER|$VERSION|g" appcast.xml
+          sed -i '' "s|PUBDATE_PLACEHOLDER|$PUBDATE|g" appcast.xml
+          sed -i '' "s|<title>PLACEHOLDER</title>|<title>Version $VERSION</title>|g" appcast.xml
+
+          # Replace release notes (may contain special chars — use perl for safety)
+          perl -0777 -i -pe 'BEGIN { $notes = $ENV{"RELEASE_BODY"} } s/RELEASE_NOTES_PLACEHOLDER/$notes/g' appcast.xml
 
       # ── Upload DMG to GitHub Release ──
       - name: Upload DMG to release
