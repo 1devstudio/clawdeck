@@ -190,11 +190,29 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
 
+          # Debug: verify everything exists
+          echo "=== DMG file ==="
+          ls -lh "$APP_NAME-$VERSION.dmg" || echo "DMG NOT FOUND!"
+
+          echo "=== sign_update binary ==="
+          ls -lh /tmp/bin/sign_update || echo "sign_update NOT FOUND!"
+          file /tmp/bin/sign_update 2>/dev/null || true
+
+          echo "=== Sparkle key ==="
+          echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
+          echo "Key file size: $(wc -c < /tmp/sparkle_key) bytes"
+          echo "Key file lines: $(wc -l < /tmp/sparkle_key)"
+
+          echo "=== Running sign_update ==="
           # sign_update outputs: sparkle:edSignature="..." length="..."
           SIGN_OUTPUT=$(/tmp/bin/sign_update "$APP_NAME-$VERSION.dmg" \
-            -f /tmp/sparkle_key)
+            -f /tmp/sparkle_key 2>&1) || {
+            echo "sign_update FAILED with exit code $?"
+            echo "Output was: $SIGN_OUTPUT"
+            exit 1
+          }
+          echo "sign_update succeeded"
           echo "SPARKLE_SIGNATURE=$SIGN_OUTPUT" >> "$GITHUB_ENV"
 
           rm /tmp/sparkle_key
