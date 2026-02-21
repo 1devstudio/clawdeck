@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Sparkle auto-update configuration -->
+    <key>SUFeedURL</key>
+    <string>https://1devstudio.github.io/clawdeck-updates/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>wUaJlq1kZBIofni2ljodefxYeiQ4EWoiEjs43nvk51M=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+</dict>
+</plist>

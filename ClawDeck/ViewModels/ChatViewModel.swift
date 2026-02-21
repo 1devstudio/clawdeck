@@ -468,7 +468,7 @@ final class ChatViewModel {
             case .notConnected:
                 return "Not connected to gateway"
             case .timeout:
-                return "Request timed out"
+                return "Gateway request timed out"
             default:
                 return gwError.localizedDescription
             }

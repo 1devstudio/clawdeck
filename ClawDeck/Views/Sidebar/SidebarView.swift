@@ -204,7 +204,7 @@ struct SidebarView: View {
         }
         .onChange(of: viewModel.selectedSessionKey) { _, newKey in
             if let key = newKey {
-                Task { await viewModel.selectSession(key) }
+                viewModel.selectSession(key)
             }
         }
     }

@@ -11,6 +11,7 @@
 		ECC43D6F2F450E6500D8EB54 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = ECC43D6E2F450E6500D8EB54 /* HighlightSwift */; };
 		ECC43E6D2F463AF600D8EB54 /* Assets.xcassetsContents.json in Resources */ = {isa = PBXBuildFile; fileRef = ECC43E6C2F463AF600D8EB54 /* Assets.xcassetsContents.json */; };
 		ECC43E6F2F463AFD00D8EB54 /* Assets.xcassetsAccentColor.colorsetContents.json in Resources */ = {isa = PBXBuildFile; fileRef = ECC43E6E2F463AFD00D8EB54 /* Assets.xcassetsAccentColor.colorsetContents.json */; };
+		ECE1335F2F485DF200C02621 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = ECE1335E2F485DF200C02621 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ECE1335F2F485DF200C02621 /* Sparkle in Frameworks */,
 				ECC43D6C2F450E4700D8EB54 /* MarkdownUI in Frameworks */,
 				ECC43D6F2F450E6500D8EB54 /* HighlightSwift in Frameworks */,
 			);
@@ -80,6 +82,7 @@
 			packageProductDependencies = (
 				ECC43D6B2F450E4700D8EB54 /* MarkdownUI */,
 				ECC43D6E2F450E6500D8EB54 /* HighlightSwift */,
+				ECE1335E2F485DF200C02621 /* Sparkle */,
 			);
 			productName = ClawDeck;
 			productReference = ECC43D5C2F450DF000D8EB54 /* ClawDeck.app */;
@@ -112,6 +115,7 @@
 			packageReferences = (
 				ECC43D6A2F450E4700D8EB54 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				ECC43D6D2F450E6500D8EB54 /* XCRemoteSwiftPackageReference "HighlightSwift" */,
+				ECE1335D2F485DF200C02621 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = ECC43D5D2F450DF000D8EB54 /* Products */;
@@ -291,13 +295,14 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ClawDeck/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.1devstudio.ClawDeck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -335,13 +340,14 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ClawDeck/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.1devstudio.ClawDeck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -394,6 +400,14 @@
 				minimumVersion = 1.0.9;
 			};
 		};
+		ECE1335D2F485DF200C02621 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -406,6 +420,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = ECC43D6D2F450E6500D8EB54 /* XCRemoteSwiftPackageReference "HighlightSwift" */;
 			productName = HighlightSwift;
+		};
+		ECE1335E2F485DF200C02621 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ECE1335D2F485DF200C02621 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
