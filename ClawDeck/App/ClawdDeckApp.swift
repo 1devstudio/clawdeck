@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ClawdDeckApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
-    @StateObject private var softwareUpdate = SoftwareUpdateViewModel()
+    @State private var softwareUpdate = SoftwareUpdateViewModel()
     @Environment(\.openWindow) private var openWindow
     @AppStorage("messageTextSize") private var messageTextSize: Double = 14
     @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue

@@ -16,7 +16,7 @@
 # Required secrets (see docs/RELEASE.md):
 #   DEV_ID_P12_BASE64, DEV_ID_P12_PASSWORD,
 #   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD,
-#   SPARKLE_PRIVATE_KEY, DEPLOY_KEY
+#   SPARKLE_PRIVATE_KEY, UPDATES_PAT
 # ============================================================
 
 name: Release ClawDeck
@@ -260,14 +260,9 @@ jobs:
       # ── Publish appcast to updates repo (GitHub Pages) ──
       - name: Publish appcast
         env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          UPDATES_PAT: ${{ secrets.UPDATES_PAT }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          export GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no'
-
-          git clone git@github.com:1devstudio/clawdeck-updates.git deploy
+          git clone https://x-access-token:${UPDATES_PAT}@github.com/1devstudio/clawdeck-updates.git deploy
           cp appcast.xml deploy/
 
           cd deploy
@@ -276,8 +271,6 @@ jobs:
           git add appcast.xml
           git commit -m "Release v${GITHUB_REF_NAME#v}" || echo "No changes"
           git push origin main
-
-          rm ~/.ssh/deploy_key
 
       # ── Cleanup keychain ──
       - name: Cleanup

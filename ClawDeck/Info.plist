@@ -7,7 +7,7 @@
     <key>SUFeedURL</key>
     <string>https://1devstudio.github.io/clawdeck-updates/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>REPLACE_WITH_YOUR_SPARKLE_PUBLIC_KEY</string>
+    <string>wUaJlq1kZBIofni2ljodefxYeiQ4EWoiEjs43nvk51M=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
 </dict>

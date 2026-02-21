@@ -82,23 +82,18 @@ base64 -i DeveloperID.p12 | pbcopy
 4. Go to **Settings → Pages** → Deploy from branch: `main`, folder: `/ (root)`
 5. Appcast URL will be: `https://1devstudio.github.io/clawdeck-updates/appcast.xml`
 
-### 5. Generate deploy key
+### 5. Create a Personal Access Token for the updates repo
 
 The release workflow needs write access to the updates repo.
 
-```bash
-ssh-keygen -t ed25519 -C "clawdeck-deploy" -N "" -f /tmp/clawdeck_deploy_key
-
-# Public key → add to clawdeck-updates repo:
-#   Settings → Deploy Keys → Add → paste public key → ✅ Allow write access
-cat /tmp/clawdeck_deploy_key.pub
-
-# Private key → add to clawdeck repo as secret:
-cat /tmp/clawdeck_deploy_key
-# → Save as GitHub secret: DEPLOY_KEY
-
-rm /tmp/clawdeck_deploy_key /tmp/clawdeck_deploy_key.pub
-```
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Name: `clawdeck-release`
+4. Resource owner: `1devstudio`
+5. Repository access: **Only select repositories** → `clawdeck-updates`
+6. Permissions: **Contents → Read and write**
+7. Generate and copy the token
+8. Save as GitHub secret: `UPDATES_PAT`
 
 ### 6. Find your Team ID
 
@@ -123,7 +118,7 @@ Add these to the `1devstudio/clawdeck` repo under **Settings → Secrets and var
 | `APPLE_TEAM_ID` | 10-character Team ID | `LE9Q47C92D` |
 | `APPLE_APP_PASSWORD` | App-specific password for notarization | `xxxx-xxxx-xxxx-xxxx` |
 | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (from `generate_keys -x`) | `LS0tLS1CRU...` |
-| `DEPLOY_KEY` | SSH private key for pushing to updates repo | `-----BEGIN OPENSSH...` |
+| `UPDATES_PAT` | Fine-grained PAT with write access to updates repo | `github_pat_...` |
 
 ## How to Release
 

@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Sparkle
 
@@ -6,10 +7,12 @@ import Sparkle
 /// Wraps ``SPUStandardUpdaterController`` and exposes a single
 /// ``checkForUpdates()`` action plus a bindable ``canCheckForUpdates``
 /// flag for the menu item.
-final class SoftwareUpdateViewModel: ObservableObject {
-    @Published var canCheckForUpdates = false
+@Observable
+final class SoftwareUpdateViewModel {
+    var canCheckForUpdates = false
 
     private let updaterController: SPUStandardUpdaterController
+    private var cancellable: AnyCancellable?
 
     /// The underlying Sparkle updater — exposed so the settings view can
     /// bind to ``SPUUpdater/automaticallyChecksForUpdates`` if needed.
@@ -24,8 +27,10 @@ final class SoftwareUpdateViewModel: ObservableObject {
             userDriverDelegate: nil
         )
 
-        updater.publisher(for: \.canCheckForUpdates)
-            .assign(to: &$canCheckForUpdates)
+        cancellable = updater.publisher(for: \.canCheckForUpdates)
+            .sink { [weak self] value in
+                self?.canCheckForUpdates = value
+            }
     }
 
     /// Trigger a user-initiated update check (shows UI).
