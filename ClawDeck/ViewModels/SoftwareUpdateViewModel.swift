@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Combine
 import Sparkle
 
 /// Manages Sparkle auto-updates.
