@@ -194,7 +194,7 @@ jobs:
 
           # sign_update outputs: sparkle:edSignature="..." length="..."
           SIGN_OUTPUT=$(/tmp/bin/sign_update "$APP_NAME-$VERSION.dmg" \
-            --ed-key-file /tmp/sparkle_key)
+            -f /tmp/sparkle_key)
           echo "SPARKLE_SIGNATURE=$SIGN_OUTPUT" >> "$GITHUB_ENV"
 
           rm /tmp/sparkle_key
