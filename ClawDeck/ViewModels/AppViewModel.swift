@@ -377,8 +377,10 @@ final class AppViewModel {
 
     // MARK: - Session actions
 
-    /// Select a session and load its history.
-    func selectSession(_ sessionKey: String) async {
+    /// Select a session and start loading its history in the background.
+    /// Returns immediately — the UI shows a loading indicator until the
+    /// history arrives (or fails).
+    func selectSession(_ sessionKey: String) {
         selectedSessionKey = sessionKey
         messageStore.touchSession(sessionKey)
 
@@ -404,19 +406,24 @@ final class AppViewModel {
         AppLogger.debug("selectSession(\(sessionKey)): starting history load", category: "Session")
         let chatVM = chatViewModel(for: sessionKey)
         chatVM.isLoadingHistory = true
-        let task = Task { await loadHistory(for: sessionKey) }
-        historyLoadTask = task
-        await task.value
-        chatVM.isLoadingHistory = false
 
-        // Clear the loading key if it still matches (wasn't replaced).
-        if historyLoadingKey == sessionKey {
-            historyLoadingKey = nil
+        historyLoadTask = Task {
+            await loadHistory(for: sessionKey)
+
+            if historyLoadingKey == sessionKey {
+                historyLoadingKey = nil
+            }
+            chatVM.isLoadingHistory = false
+
+            // If still no messages after load, show error so the user can retry.
+            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+                chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
+            }
         }
     }
 
     /// Force-reload a session's history from the gateway, clearing the cached messages.
-    func reloadSession(_ sessionKey: String) async {
+    func reloadSession(_ sessionKey: String) {
         messageStore.clearSession(sessionKey)
         historyLoadTask?.cancel()
         historyLoadingKey = sessionKey
@@ -424,13 +431,18 @@ final class AppViewModel {
         AppLogger.info("reloadSession(\(sessionKey)): force-reloading history", category: "Session")
         let chatVM = chatViewModel(for: sessionKey)
         chatVM.isLoadingHistory = true
-        let task = Task { await loadHistory(for: sessionKey) }
-        historyLoadTask = task
-        await task.value
-        chatVM.isLoadingHistory = false
 
-        if historyLoadingKey == sessionKey {
-            historyLoadingKey = nil
+        historyLoadTask = Task {
+            await loadHistory(for: sessionKey)
+
+            if historyLoadingKey == sessionKey {
+                historyLoadingKey = nil
+            }
+            chatVM.isLoadingHistory = false
+
+            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+                chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
+            }
         }
     }
 
@@ -956,11 +968,11 @@ final class AppViewModel {
            let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
             let previousIndex = currentIndex - 1
             if previousIndex >= 0 {
-                Task { await selectSession(sessionList[previousIndex].key) }
+                selectSession(sessionList[previousIndex].key)
             }
         } else {
             // No session selected — select the last one
-            Task { await selectSession(sessionList.last!.key) }
+            selectSession(sessionList.last!.key)
         }
     }
 
@@ -973,11 +985,11 @@ final class AppViewModel {
            let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
             let nextIndex = currentIndex + 1
             if nextIndex < sessionList.count {
-                Task { await selectSession(sessionList[nextIndex].key) }
+                selectSession(sessionList[nextIndex].key)
             }
         } else {
             // No session selected — select the first one
-            Task { await selectSession(sessionList.first!.key) }
+            selectSession(sessionList.first!.key)
         }
     }
 

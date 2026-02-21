@@ -178,8 +178,8 @@ final class SidebarViewModel {
     }
 
     /// Select a session.
-    func selectSession(_ key: String) async {
-        await appViewModel.selectSession(key)
+    func selectSession(_ key: String) {
+        appViewModel.selectSession(key)
     }
 
     /// Delete a session.
