@@ -110,15 +110,15 @@ security find-identity -v -p codesigning | grep "Developer ID"
 
 Add these to the `1devstudio/clawdeck` repo under **Settings → Secrets and variables → Actions**:
 
-| Secret | Description | Example |
-|---|---|---|
-| `DEV_ID_P12_BASE64` | Base64 of Developer ID .p12 certificate | `MIIKrAIBA...` |
-| `DEV_ID_P12_PASSWORD` | Password for the .p12 (empty string if none) | `mysecretpw` |
-| `APPLE_ID` | Your Apple ID email | `you@example.com` |
-| `APPLE_TEAM_ID` | 10-character Team ID | `LE9Q47C92D` |
-| `APPLE_APP_PASSWORD` | App-specific password for notarization | `xxxx-xxxx-xxxx-xxxx` |
-| `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (from `generate_keys -x`) | `LS0tLS1CRU...` |
-| `UPDATES_PAT` | Fine-grained PAT with write access to updates repo | `github_pat_...` |
+| Secret                | Description                                         | Example               |
+| --------------------- | --------------------------------------------------- | --------------------- |
+| `DEV_ID_P12_BASE64`   | Base64 of Developer ID .p12 certificate             | `MIIKrAIBA...`        |
+| `DEV_ID_P12_PASSWORD` | Password for the .p12 (empty string if none)        | `mysecretpw`          |
+| `APPLE_ID`            | Your Apple ID email                                 | `you@example.com`     |
+| `APPLE_TEAM_ID`       | 10-character Team ID                                | `LE9Q47C92E`          |
+| `APPLE_APP_PASSWORD`  | App-specific password for notarization              | `xxxx-xxxx-xxxx-xxxx` |
+| `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (from `generate_keys -x`) | `LS0tLS1CRU...`       |
+| `UPDATES_PAT`         | Fine-grained PAT with write access to updates repo  | `github_pat_...`      |
 
 ## How to Release
 
@@ -139,6 +139,7 @@ gh release create v1.2.0 \
 ```
 
 The workflow runs automatically:
+
 - Builds → Signs → Notarizes → DMG → Uploads → Publishes appcast
 - Users with ClawDeck installed get a native update prompt
 

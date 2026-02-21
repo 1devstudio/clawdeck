@@ -240,7 +240,11 @@ struct ChatView: View {
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-                    scrollToBottomIfNeeded(proxy: proxy)
+                    // Defer by one run-loop tick so LazyVStack can finish laying
+                    // out newly added views before we ask the proxy to scroll.
+                    DispatchQueue.main.async {
+                        scrollToBottomIfNeeded(proxy: proxy)
+                    }
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     // Always scroll when the user sends a message
@@ -265,11 +269,12 @@ struct ChatView: View {
                     }
                 }
                 .onChange(of: viewModel.sessionKey) { _, _ in
-                    // Reset local state that was previously handled by .id() destruction
+                    // Reset local state that was previously handled by .id() destruction.
+                    // Don't call scrollToBottom here — .defaultScrollAnchor(.bottom) handles
+                    // initial positioning, and an immediate scroll races with LazyVStack layout.
                     isNearBottom = true
                     sidebarMessage = nil
                     lastStreamingScroll = .distantPast
-                    scrollToBottom(proxy: proxy, animated: false)
                 }
             }
 
