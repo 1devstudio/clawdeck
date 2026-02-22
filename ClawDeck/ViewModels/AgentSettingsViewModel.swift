@@ -526,6 +526,107 @@ final class AgentSettingsViewModel {
         gatewayUseTLS != originalGatewayUseTLS ||
         gatewayToken != originalGatewayToken
     }
+
+    // MARK: - Delete Agent
+
+    /// Whether the agent is currently being deleted.
+    var isDeleting = false
+
+    /// Whether this agent can be deleted.
+    /// The last remaining agent on a gateway cannot be removed.
+    var canDeleteAgent: Bool {
+        guard let binding = currentBinding,
+              let appViewModel else { return false }
+        let gatewayAgents = appViewModel.gatewayManager.agentSummaries[binding.gatewayId] ?? []
+        return gatewayAgents.count > 1
+    }
+
+    /// Delete the agent from the gateway config and clean up.
+    ///
+    /// Sends a `config.patch` with `agents.list` excluding this agent,
+    /// removes the local binding, and switches to another agent.
+    /// Returns `true` on success.
+    @discardableResult
+    func deleteAgent() async -> Bool {
+        guard let appViewModel,
+              let binding = currentBinding,
+              let client = appViewModel.gatewayManager.client(for: binding.gatewayId) else {
+            errorMessage = "No active gateway connection"
+            return false
+        }
+
+        let existingAgents = appViewModel.gatewayManager.agentSummaries[binding.gatewayId] ?? []
+        guard existingAgents.count > 1 else {
+            errorMessage = "Cannot delete the only agent on this gateway"
+            return false
+        }
+
+        isDeleting = true
+        errorMessage = nil
+
+        do {
+            // Ensure we have a fresh config hash
+            if configHash.isEmpty {
+                let result = try await client.configGet()
+                configHash = result.hash ?? ""
+            }
+
+            // Build config.patch with this agent removed from the list.
+            // Keep all other agents with only their IDs to avoid clobbering
+            // gateway-managed fields.
+            let remainingAgents: [[String: Any]] = existingAgents
+                .filter { $0.id != binding.agentId }
+                .map { ["id": $0.id] }
+
+            let patch: [String: Any] = [
+                "agents": ["list": remainingAgents]
+            ]
+
+            let patchData = try JSONSerialization.data(
+                withJSONObject: patch,
+                options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            )
+            guard let patchString = String(data: patchData, encoding: .utf8) else {
+                throw AgentSettingsError.jsonSerializationFailed
+            }
+
+            // Phase 1: Applying config
+            restartPhase = .applyingConfig
+            try await client.configPatch(
+                raw: patchString,
+                baseHash: configHash,
+                note: "Agent '\(binding.agentId)' removed via ClawDeck"
+            )
+
+            // Phase 2: Waiting for gateway restart
+            restartPhase = .waitingForRestart
+            AppLogger.info("Agent '\(binding.agentId)' removed from config, waiting for restart...", category: "Session")
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+
+            // Phase 3: Reconnecting
+            restartPhase = .reconnecting
+            await appViewModel.gatewayManager.reconnect(gatewayId: binding.gatewayId)
+            await appViewModel.loadInitialData()
+
+            // Phase 4: Remove local binding and switch to another agent
+            appViewModel.gatewayManager.removeAgentBinding(binding)
+
+            if let nextBinding = appViewModel.gatewayManager.sortedAgentBindings.first {
+                await appViewModel.switchAgent(nextBinding)
+            }
+
+            restartPhase = .done
+            isDeleting = false
+
+            AppLogger.info("Agent '\(binding.agentId)' deleted successfully", category: "Session")
+            return true
+        } catch {
+            errorMessage = "Failed to delete agent: \(error.localizedDescription)"
+            restartPhase = .none
+            isDeleting = false
+            return false
+        }
+    }
 }
 
 // MARK: - Errors

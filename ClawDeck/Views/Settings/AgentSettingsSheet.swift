@@ -8,6 +8,7 @@ struct AgentSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel: AgentSettingsViewModel
+    @State private var showDeleteConfirmation = false
 
     init(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel
@@ -43,6 +44,10 @@ struct AgentSettingsSheet: View {
                     iconSection
                     gatewayConnectionSection
                     modelSection
+
+                    if viewModel.canDeleteAgent {
+                        dangerZoneSection
+                    }
 
                     if let errorMessage = viewModel.errorMessage {
                         errorSection(errorMessage)
@@ -103,6 +108,20 @@ struct AgentSettingsSheet: View {
         }
         .task {
             await viewModel.loadConfig()
+        }
+        .alert("Delete Agent", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task {
+                    let deleted = await viewModel.deleteAgent()
+                    if deleted {
+                        try? await Task.sleep(nanoseconds: 400_000_000)
+                        dismiss()
+                    }
+                }
+            }
+        } message: {
+            Text("Remove \"\(viewModel.agentDisplayName.isEmpty ? "this agent" : viewModel.agentDisplayName)\" from the gateway? The agent's workspace and files on disk won't be deleted.")
         }
     }
 
@@ -295,6 +314,33 @@ struct AgentSettingsSheet: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.vertical, 2)
+        }
+    }
+
+    private var dangerZoneSection: some View {
+        Section {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Delete Agent")
+                        .font(.body)
+                    Text("Remove this agent from the gateway configuration. Workspace files on disk are preserved.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Text("Delete…")
+                        .frame(width: 70)
+                }
+                .disabled(viewModel.isDeleting)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("Danger Zone")
         }
     }
 
