@@ -138,38 +138,35 @@ struct AgentRailItem: View {
             .buttonStyle(.borderless)
             .help(binding.displayName(from: gatewayManager))
 
-            // Settings gear icon — only visible for the active agent
+            // Settings & cron — only visible for the active agent
             if isActive {
-                Button {
-                    onSettings()
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.15))
-                            .frame(width: 40, height: 40)
+                VStack(spacing: 8) {
+                    Button {
+                        onSettings()
+                    } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.gray.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                     }
-                }
-                .buttonStyle(.plain)
-                .help("Agent Settings")
-                .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
+                    .buttonStyle(.plain)
+                    .help("Agent Settings")
 
-                Button {
-                    onCronJobs()
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.15))
-                            .frame(width: 40, height: 40)
+                    Button {
+                        onCronJobs()
+                    } label: {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.gray.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
+                    .help("Cron Jobs")
                 }
-                .buttonStyle(.plain)
-                .help("Cron Jobs")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
                 .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
             }
         }
@@ -180,10 +177,14 @@ struct AgentRailItem: View {
     private var agentAvatar: some View {
         if let avatarName = binding.avatarName(from: gatewayManager) {
             if avatarName.hasPrefix("sf:") {
-                // SF Symbol
-                Image(systemName: String(avatarName.dropFirst(3)))
-                    .font(.system(size: 18))
-                    .foregroundStyle(isActive ? themeColor : Color.secondary)
+                let symbolName = String(avatarName.dropFirst(3))
+                if NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) != nil {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 18))
+                        .foregroundStyle(isActive ? themeColor : Color.secondary)
+                } else {
+                    initialsView
+                }
             } else {
                 // Custom image from app support
                 if let image = loadCustomAvatar(named: avatarName) {
