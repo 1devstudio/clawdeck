@@ -118,10 +118,12 @@ extension Session {
             updatedDate = Date()
         }
 
-        // Extract agent ID from session key (e.g., "agent:main:main" → "main")
+        // Extract agent ID from session key (e.g., "agent:main:abc123" → "main").
+        // Keys follow the format "agent:<agentId>:<shortId>". Legacy or
+        // gateway-created keys that don't match return nil.
         let agentId: String? = {
             let parts = summary.key.split(separator: ":")
-            if parts.count >= 2 {
+            if parts.count >= 3, parts[0] == "agent" {
                 return String(parts[1])
             }
             return nil

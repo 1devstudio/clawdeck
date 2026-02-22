@@ -107,6 +107,9 @@ final class AppViewModel {
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
 
+    /// Whether the "create new agent" sheet is shown.
+    var showCreateAgentSheet = false
+
     /// Cached list of available models from the active gateway.
     var availableModels: [GatewayModel] = []
 
@@ -211,8 +214,12 @@ final class AppViewModel {
             await refreshSessions()
             await fetchModels()
         } else {
-            // Same gateway — just filter the cached sessions (instant)
-            filterSessionsToActiveAgent()
+            // Same gateway — refresh sessions from the gateway so the new
+            // agent gets a complete, up-to-date list. The previous cache-only
+            // approach (filterSessionsToActiveAgent) broke when the cached
+            // allGatewaySessions was stale after agent creation or when the
+            // limit cut off sessions belonging to this agent.
+            await refreshSessions()
         }
     }
 
@@ -272,8 +279,16 @@ final class AppViewModel {
         }
         
         do {
+            AppLogger.info("[refreshSessions] Fetching sessions for binding agentId='\(binding.agentId)' gatewayId='\(binding.gatewayId)'", category: "Session")
             let result = try await client.listSessions()
-            AppLogger.debug("sessions.list returned \(result.sessions.count) sessions for gateway \(binding.gatewayId)", category: "Session")
+            AppLogger.info("[refreshSessions] Gateway returned \(result.sessions.count) sessions", category: "Session")
+
+            // Log each session key and its parsed agentId for debugging
+            for summary in result.sessions {
+                let parts = summary.key.split(separator: ":")
+                let parsedAgentId = (parts.count >= 3 && parts[0] == "agent") ? String(parts[1]) : "nil"
+                AppLogger.debug("[refreshSessions]   key='\(summary.key)' → parsedAgentId='\(parsedAgentId)'", category: "Session")
+            }
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
@@ -295,7 +310,9 @@ final class AppViewModel {
                     }
                     return session
                 }
-            
+
+            AppLogger.info("[refreshSessions] allGatewaySessions=\(allGatewaySessions.count), now filtering...", category: "Session")
+
             // Filter to the active agent
             filterSessionsToActiveAgent()
 
@@ -304,6 +321,10 @@ final class AppViewModel {
             starredSessionsStore.prune(validKeys: validKeys)
         } catch {
             AppLogger.error("Failed to list sessions: \(error)", category: "Session")
+            // Even when the fetch fails, filter the cached sessions to the
+            // active agent so stale sessions from a previous agent don't
+            // remain visible in the sidebar.
+            filterSessionsToActiveAgent()
         }
     }
 
@@ -313,11 +334,19 @@ final class AppViewModel {
             sessions.removeAll()
             return
         }
-        
+
+        AppLogger.info("[filterSessions] Filtering \(allGatewaySessions.count) cached sessions for agentId='\(binding.agentId)'", category: "Session")
+        for session in allGatewaySessions {
+            let match = session.agentId == binding.agentId
+            AppLogger.debug("[filterSessions]   key='\(session.key)' agentId='\(session.agentId ?? "nil")' match=\(match)", category: "Session")
+        }
+
         sessions = allGatewaySessions.filter { session in
             session.agentId == binding.agentId
         }
-        
+
+        AppLogger.info("[filterSessions] Result: \(sessions.count) sessions pass filter", category: "Session")
+
         // Clear selection if the selected session doesn't belong to this agent
         if let selectedKey = selectedSessionKey,
            !sessions.contains(where: { $0.key == selectedKey }) {
@@ -687,6 +716,9 @@ final class AppViewModel {
             updatedAt: Date(),
             isActive: true
         )
+        // Add to both the filtered list and the all-gateway cache so the
+        // session survives subsequent filterSessionsToActiveAgent() calls.
+        allGatewaySessions.insert(newSession, at: 0)
         sessions.insert(newSession, at: 0)
         selectedSessionKey = sessionKey
         AppLogger.info("Created new session: \(sessionKey)", category: "Session")

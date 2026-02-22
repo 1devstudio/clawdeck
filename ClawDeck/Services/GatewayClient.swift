@@ -256,9 +256,9 @@ actor GatewayClient {
         let _ = try await send(method: GatewayMethod.chatAbort, params: params)
     }
 
-    /// List all sessions.
-    func listSessions(limit: Int = 50) async throws -> SessionsListResult {
-        let params = SessionsListParams(limit: limit, includeDerivedTitles: true, includeLastMessage: true)
+    /// List all sessions, optionally filtered to a specific agent.
+    func listSessions(limit: Int = 50, agentId: String? = nil) async throws -> SessionsListResult {
+        let params = SessionsListParams(limit: limit, includeDerivedTitles: true, includeLastMessage: true, agentId: agentId)
         let response = try await send(method: GatewayMethod.sessionsList, params: params)
         guard response.ok, let payload = response.payload else {
             throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))

@@ -27,21 +27,12 @@ struct AgentBinding: Identifiable, Codable, Hashable {
         return agentId.capitalized
     }
 
-    /// Avatar: local override ?? live agent avatar from gateway ?? nil (show initials)
+    /// Avatar: local override only. Gateway emoji is intentionally ignored here
+    /// (it is used in the chat view, not the agent rail).
     @MainActor func avatarName(from gatewayManager: GatewayManager?) -> String? {
         if let localAvatarName, !localAvatarName.isEmpty {
             return localAvatarName
         }
-        
-        // Try to get live agent avatar from gateway
-        if let gatewayManager,
-           let agentSummaries = gatewayManager.agentSummaries[gatewayId],
-           let agentSummary = agentSummaries.first(where: { $0.id == agentId }),
-           let avatar = agentSummary.avatar,
-           !avatar.isEmpty {
-            return avatar.hasPrefix("http") ? nil : "sf:\(avatar)" // Convert gateway icons to SF symbols
-        }
-        
         return nil
     }
 

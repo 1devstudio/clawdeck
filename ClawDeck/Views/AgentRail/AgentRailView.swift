@@ -9,6 +9,7 @@ struct AgentRailView: View {
     let onSelect: (AgentBinding) -> Void
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
+    let onCreateNewAgent: () -> Void
     let onSettings: (AgentBinding) -> Void
     let onCronJobs: (AgentBinding) -> Void
 
@@ -71,6 +72,10 @@ struct AgentRailView: View {
                     onConnectNewGateway: {
                         showAddPopover = false
                         onConnectNewGateway()
+                    },
+                    onCreateNewAgent: {
+                        showAddPopover = false
+                        onCreateNewAgent()
                     }
                 )
             }
@@ -107,7 +112,7 @@ struct AgentRailItem: View {
 
                     // Avatar
                     ZStack {
-                        RoundedRectangle(cornerRadius: isActive ? 14 : 20)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(isActive ? themeColor.opacity(0.2) : Color.gray.opacity(0.15))
                             .frame(width: 40, height: 40)
                             .animation(.easeInOut(duration: 0.15), value: isActive)
@@ -133,38 +138,35 @@ struct AgentRailItem: View {
             .buttonStyle(.borderless)
             .help(binding.displayName(from: gatewayManager))
 
-            // Settings gear icon — only visible for the active agent
+            // Settings & cron — only visible for the active agent
             if isActive {
-                Button {
-                    onSettings()
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.15))
-                            .frame(width: 40, height: 40)
+                VStack(spacing: 8) {
+                    Button {
+                        onSettings()
+                    } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.gray.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                     }
-                }
-                .buttonStyle(.plain)
-                .help("Agent Settings")
-                .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
+                    .buttonStyle(.plain)
+                    .help("Agent Settings")
 
-                Button {
-                    onCronJobs()
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.15))
-                            .frame(width: 40, height: 40)
+                    Button {
+                        onCronJobs()
+                    } label: {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.gray.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
+                    .help("Cron Jobs")
                 }
-                .buttonStyle(.plain)
-                .help("Cron Jobs")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
                 .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .top)))
             }
         }
@@ -175,10 +177,14 @@ struct AgentRailItem: View {
     private var agentAvatar: some View {
         if let avatarName = binding.avatarName(from: gatewayManager) {
             if avatarName.hasPrefix("sf:") {
-                // SF Symbol
-                Image(systemName: String(avatarName.dropFirst(3)))
-                    .font(.system(size: 18))
-                    .foregroundStyle(isActive ? themeColor : Color.secondary)
+                let symbolName = String(avatarName.dropFirst(3))
+                if NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) != nil {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 18))
+                        .foregroundStyle(isActive ? themeColor : Color.secondary)
+                } else {
+                    initialsView
+                }
             } else {
                 // Custom image from app support
                 if let image = loadCustomAvatar(named: avatarName) {
@@ -186,7 +192,7 @@ struct AgentRailItem: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 36, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: isActive ? 12 : 18))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     initialsView
                 }
@@ -263,6 +269,7 @@ struct AddAgentPopover: View {
     let gatewayManager: GatewayManager
     let onAddBinding: (AgentBinding) -> Void
     let onConnectNewGateway: () -> Void
+    let onCreateNewAgent: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -320,6 +327,16 @@ struct AddAgentPopover: View {
             }
 
             Divider()
+
+            Button {
+                onCreateNewAgent()
+            } label: {
+                HStack {
+                    Image(systemName: "person.badge.plus")
+                    Text("Create New Agent…")
+                }
+            }
+            .buttonStyle(.plain)
 
             Button {
                 onConnectNewGateway()

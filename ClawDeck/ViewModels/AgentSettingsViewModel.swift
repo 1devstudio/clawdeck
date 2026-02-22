@@ -138,10 +138,11 @@ final class AgentSettingsViewModel {
     
     /// Load current values from gateway config and local settings.
     func loadConfig() async {
-        guard let appViewModel, 
+        guard let appViewModel,
               let client = appViewModel.activeClient,
               let binding = appViewModel.activeBinding else {
             errorMessage = "No active gateway connection"
+            isLoading = false
             return
         }
         
@@ -186,7 +187,9 @@ final class AgentSettingsViewModel {
            let currentAgent = agentsList.first(where: { ($0["id"] as? String) == currentBinding?.agentId }),
            let identity = currentAgent["identity"] as? [String: Any] {
             
-            agentDisplayName = identity["name"] as? String ?? ""
+            if let name = identity["name"] as? String, !name.isEmpty {
+                agentDisplayName = name
+            }
             agentEmoji = identity["emoji"] as? String ?? ""
             
             if let themeColor = identity["theme"] as? String {
@@ -222,6 +225,7 @@ final class AgentSettingsViewModel {
         
         if let binding = appViewModel.activeBinding {
             currentBinding = binding
+            agentDisplayName = binding.displayName(from: appViewModel.gatewayManager)
 
             // Use the app's current accent color as immediate default
             if let accentColor = appViewModel.customAccentColor {
@@ -363,18 +367,19 @@ final class AgentSettingsViewModel {
         // Phase 2: Waiting for gateway restart
         restartPhase = .waitingForRestart
         AppLogger.info("Config patch applied, waiting for gateway restart...", category: "Session")
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
 
-        // Phase 3: Reconnecting
+        // Phase 3: Reconnecting with retry — the gateway may take several
+        // seconds to restart after a config.patch.
         restartPhase = .reconnecting
-
-        // Force reconnect if not already reconnected
         if let appVM = appViewModel,
-           let binding = appVM.activeBinding,
-           !appVM.gatewayManager.isConnected(binding.gatewayId) {
+           let binding = appVM.activeBinding {
             AppLogger.debug("Reconnecting after config patch...", category: "Session")
-            await appVM.gatewayManager.reconnect(gatewayId: binding.gatewayId)
-            // Reload agents/sessions after reconnecting
+            await appVM.gatewayManager.reconnectWithRetry(
+                gatewayId: binding.gatewayId,
+                timeout: 30,
+                retryInterval: 2
+            )
             await appVM.loadInitialData()
         }
     }
@@ -524,6 +529,112 @@ final class AgentSettingsViewModel {
         gatewayPort != originalGatewayPort ||
         gatewayUseTLS != originalGatewayUseTLS ||
         gatewayToken != originalGatewayToken
+    }
+
+    // MARK: - Delete Agent
+
+    /// Whether the agent is currently being deleted.
+    var isDeleting = false
+
+    /// Whether this agent can be deleted.
+    /// The last remaining agent on a gateway cannot be removed.
+    var canDeleteAgent: Bool {
+        guard let binding = currentBinding,
+              let appViewModel else { return false }
+        let gatewayAgents = appViewModel.gatewayManager.agentSummaries[binding.gatewayId] ?? []
+        return gatewayAgents.count > 1
+    }
+
+    /// Delete the agent from the gateway config and clean up.
+    ///
+    /// Sends a `config.patch` with `agents.list` excluding this agent,
+    /// removes the local binding, and switches to another agent.
+    /// Returns `true` on success.
+    @discardableResult
+    func deleteAgent() async -> Bool {
+        guard let appViewModel,
+              let binding = currentBinding,
+              let client = appViewModel.gatewayManager.client(for: binding.gatewayId) else {
+            errorMessage = "No active gateway connection"
+            return false
+        }
+
+        let existingAgents = appViewModel.gatewayManager.agentSummaries[binding.gatewayId] ?? []
+        guard existingAgents.count > 1 else {
+            errorMessage = "Cannot delete the only agent on this gateway"
+            return false
+        }
+
+        isDeleting = true
+        errorMessage = nil
+
+        do {
+            // Ensure we have a fresh config hash
+            if configHash.isEmpty {
+                let result = try await client.configGet()
+                configHash = result.hash ?? ""
+            }
+
+            // Build config.patch with this agent removed from the list.
+            // Keep all other agents with only their IDs to avoid clobbering
+            // gateway-managed fields.
+            let remainingAgents: [[String: Any]] = existingAgents
+                .filter { $0.id != binding.agentId }
+                .map { ["id": $0.id] }
+
+            let patch: [String: Any] = [
+                "agents": ["list": remainingAgents]
+            ]
+
+            let patchData = try JSONSerialization.data(
+                withJSONObject: patch,
+                options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            )
+            guard let patchString = String(data: patchData, encoding: .utf8) else {
+                throw AgentSettingsError.jsonSerializationFailed
+            }
+
+            // Phase 1: Applying config
+            restartPhase = .applyingConfig
+            try await client.configPatch(
+                raw: patchString,
+                baseHash: configHash,
+                note: "Agent '\(binding.agentId)' removed via ClawDeck"
+            )
+
+            // Phase 2: Waiting for gateway restart
+            restartPhase = .waitingForRestart
+            AppLogger.info("Agent '\(binding.agentId)' removed from config, waiting for restart...", category: "Session")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            // Phase 3: Reconnecting with retry — the gateway may take several
+            // seconds to restart after a config.patch.
+            restartPhase = .reconnecting
+            await appViewModel.gatewayManager.reconnectWithRetry(
+                gatewayId: binding.gatewayId,
+                timeout: 30,
+                retryInterval: 2
+            )
+            await appViewModel.loadInitialData()
+
+            // Phase 4: Remove local binding and switch to another agent
+            appViewModel.gatewayManager.removeAgentBinding(binding)
+
+            if let nextBinding = appViewModel.gatewayManager.sortedAgentBindings.first {
+                await appViewModel.switchAgent(nextBinding)
+            }
+
+            restartPhase = .done
+            isDeleting = false
+
+            AppLogger.info("Agent '\(binding.agentId)' deleted successfully", category: "Session")
+            return true
+        } catch {
+            errorMessage = "Failed to delete agent: \(error.localizedDescription)"
+            restartPhase = .none
+            isDeleting = false
+            return false
+        }
     }
 }
 
