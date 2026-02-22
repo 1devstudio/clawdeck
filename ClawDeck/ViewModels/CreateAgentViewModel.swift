@@ -167,8 +167,10 @@ final class CreateAgentViewModel {
                 await fetchConfigHash()
             }
 
-            // Build the config.patch payload
-            let patch = buildConfigPatch()
+            // Build the config.patch payload — include existing agents so the
+            // merge-patch doesn't replace the list with only the new agent.
+            let existingAgents = appViewModel.gatewayManager.agentSummaries[targetGatewayId] ?? []
+            let patch = buildConfigPatch(existingAgents: existingAgents)
             let patchData = try JSONSerialization.data(
                 withJSONObject: patch,
                 options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -231,7 +233,10 @@ final class CreateAgentViewModel {
     // MARK: - Private helpers
 
     /// Build the config.patch JSON payload for adding a new agent.
-    private func buildConfigPatch() -> [String: Any] {
+    ///
+    /// Includes existing agents (by ID only) so the merge-patch preserves them
+    /// rather than replacing the entire `agents.list` with just the new entry.
+    private func buildConfigPatch(existingAgents: [AgentSummary]) -> [String: Any] {
         let trimmedId = agentId.trimmingCharacters(in: .whitespaces)
 
         var agentEntry: [String: Any] = ["id": trimmedId]
@@ -253,9 +258,12 @@ final class CreateAgentViewModel {
             agentEntry["identity"] = identity
         }
 
-        var patch: [String: Any] = [:]
-        var agentsPatch: [String: Any] = [:]
-        agentsPatch["list"] = [agentEntry]
+        // Preserve existing agents — include only their IDs so we don't
+        // clobber gateway-managed fields (workspace, config, etc.).
+        var agentsList: [[String: Any]] = existingAgents.map { ["id": $0.id] }
+        agentsList.append(agentEntry)
+
+        var agentsPatch: [String: Any] = ["list": agentsList]
 
         // Model (only if explicitly selected)
         let model = selectedModel.trimmingCharacters(in: .whitespaces)
@@ -265,8 +273,7 @@ final class CreateAgentViewModel {
             ]
         }
 
-        patch["agents"] = agentsPatch
-        return patch
+        return ["agents": agentsPatch]
     }
 
     /// Send an initial message to the newly created agent to trigger BOOTSTRAP.md onboarding.

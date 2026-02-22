@@ -318,7 +318,9 @@ final class AppViewModel {
         }
         
         sessions = allGatewaySessions.filter { session in
-            session.agentId == binding.agentId
+            // Include sessions that match the active agent, plus any sessions
+            // with no agentId (legacy/gateway-created keys without "agent:" prefix).
+            session.agentId == nil || session.agentId == binding.agentId
         }
         
         // Clear selection if the selected session doesn't belong to this agent

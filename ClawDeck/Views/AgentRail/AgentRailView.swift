@@ -112,7 +112,7 @@ struct AgentRailItem: View {
 
                     // Avatar
                     ZStack {
-                        RoundedRectangle(cornerRadius: isActive ? 14 : 20)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(isActive ? themeColor.opacity(0.2) : Color.gray.opacity(0.15))
                             .frame(width: 40, height: 40)
                             .animation(.easeInOut(duration: 0.15), value: isActive)
@@ -191,7 +191,7 @@ struct AgentRailItem: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 36, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: isActive ? 12 : 18))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     initialsView
                 }
