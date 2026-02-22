@@ -214,8 +214,12 @@ final class AppViewModel {
             await refreshSessions()
             await fetchModels()
         } else {
-            // Same gateway — just filter the cached sessions (instant)
-            filterSessionsToActiveAgent()
+            // Same gateway — refresh sessions from the gateway so the new
+            // agent gets a complete, up-to-date list. The previous cache-only
+            // approach (filterSessionsToActiveAgent) broke when the cached
+            // allGatewaySessions was stale after agent creation or when the
+            // limit cut off sessions belonging to this agent.
+            await refreshSessions()
         }
     }
 
@@ -275,8 +279,8 @@ final class AppViewModel {
         }
         
         do {
-            let result = try await client.listSessions()
-            AppLogger.debug("sessions.list returned \(result.sessions.count) sessions for gateway \(binding.gatewayId)", category: "Session")
+            let result = try await client.listSessions(agentId: binding.agentId)
+            AppLogger.debug("sessions.list returned \(result.sessions.count) sessions for agent \(binding.agentId) on gateway \(binding.gatewayId)", category: "Session")
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
@@ -318,9 +322,7 @@ final class AppViewModel {
         }
         
         sessions = allGatewaySessions.filter { session in
-            // Include sessions that match the active agent, plus any sessions
-            // with no agentId (legacy/gateway-created keys without "agent:" prefix).
-            session.agentId == nil || session.agentId == binding.agentId
+            session.agentId == binding.agentId
         }
         
         // Clear selection if the selected session doesn't belong to this agent
@@ -508,9 +510,10 @@ final class AppViewModel {
     /// Refresh a session's token counts from the gateway (sessions.list).
     /// Called after a response completes to update the context usage indicator.
     private func refreshSessionTokens(for sessionKey: String) async {
-        guard let client = activeClient else { return }
+        guard let client = activeClient,
+              let binding = activeBinding else { return }
         do {
-            let result = try await client.listSessions()
+            let result = try await client.listSessions(agentId: binding.agentId)
             if let summary = result.sessions.first(where: { $0.key == sessionKey }),
                let session = sessions.first(where: { $0.key == sessionKey }) {
                 session.totalTokens = summary.totalTokens
@@ -692,6 +695,9 @@ final class AppViewModel {
             updatedAt: Date(),
             isActive: true
         )
+        // Add to both the filtered list and the all-gateway cache so the
+        // session survives subsequent filterSessionsToActiveAgent() calls.
+        allGatewaySessions.insert(newSession, at: 0)
         sessions.insert(newSession, at: 0)
         selectedSessionKey = sessionKey
         AppLogger.info("Created new session: \(sessionKey)", category: "Session")
