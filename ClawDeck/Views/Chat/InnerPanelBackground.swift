@@ -37,6 +37,7 @@ struct InnerPanelBackground: View {
                 }
             }
         }
+        .allowsHitTesting(false)
         .onAppear {
             // Try synchronous disk cache first for instant display on launch
             loadCachedImageSync()

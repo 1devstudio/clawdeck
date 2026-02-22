@@ -1,22 +1,101 @@
 import SwiftUI
 
-/// Right panel showing details about the selected session.
+/// Inspector tab selection.
+enum InspectorTab: String, CaseIterable {
+    case session = "Session"
+    case cron = "Cron Jobs"
+
+    var icon: String {
+        switch self {
+        case .session: return "info.circle"
+        case .cron: return "clock"
+        }
+    }
+}
+
+/// Right panel showing details about the selected session or cron jobs.
 struct InspectorView: View {
+    let session: Session
+    let appViewModel: AppViewModel
+
+    @State private var selectedTab: InspectorTab = .session
+    @State private var cronViewModel: CronViewModel
+
+    init(session: Session, appViewModel: AppViewModel) {
+        self.session = session
+        self.appViewModel = appViewModel
+        self._cronViewModel = State(initialValue: CronViewModel(appViewModel: appViewModel))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Tab picker
+            HStack(spacing: 0) {
+                ForEach(InspectorTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 10))
+                            Text(tab.rawValue)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
+                        )
+                        .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            // Tab content
+            switch selectedTab {
+            case .session:
+                SessionInfoContent(
+                    session: session,
+                    appViewModel: appViewModel
+                )
+            case .cron:
+                CronJobsView(viewModel: cronViewModel)
+            }
+        }
+    }
+}
+
+// MARK: - Session Info Content (extracted from old InspectorView)
+
+/// The session info tab content.
+struct SessionInfoContent: View {
     let session: Session
     let appViewModel: AppViewModel
 
     @State private var editingLabel = false
     @State private var labelText = ""
+    @FocusState private var isLabelFieldFocused: Bool
 
     var body: some View {
         Form {
             Section("Session Info") {
-                LabeledContent("Title") {
-                    if editingLabel {
-                        TextField("Session title", text: $labelText)
+                if editingLabel {
+                    LabeledContent("Title") {
+                        TextField("Session name", text: $labelText)
                             .textFieldStyle(.roundedBorder)
+                            .focused($isLabelFieldFocused)
                             .onSubmit { commitLabel() }
-                    } else {
+                            .onExitCommand { editingLabel = false }
+                    }
+                } else {
+                    LabeledContent("Title") {
                         HStack {
                             Text(session.displayTitle)
                                 .lineLimit(2)
@@ -24,12 +103,27 @@ struct InspectorView: View {
                             Button {
                                 labelText = session.label ?? session.displayTitle
                                 editingLabel = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    isLabelFieldFocused = true
+                                }
                             } label: {
                                 Image(systemName: "pencil")
                             }
                             .buttonStyle(.plain)
                         }
                     }
+                }
+
+                LabeledContent("Starred") {
+                    Button {
+                        appViewModel.starredSessionsStore.toggle(session.key)
+                    } label: {
+                        Image(systemName: appViewModel.starredSessionsStore.isStarred(session.key)
+                              ? "star.fill" : "star")
+                            .foregroundStyle(appViewModel.starredSessionsStore.isStarred(session.key)
+                                             ? .yellow : .secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 LabeledContent("Key", value: session.key)

@@ -16,7 +16,7 @@ enum GatewayClientError: Error, LocalizedError {
     case invalidURL
     case handshakeFailed(String)
     case requestFailed(ErrorShape)
-    case timeout
+    case timeout(method: String, seconds: TimeInterval)
     case encodingError(String)
     case cancelled
 
@@ -26,7 +26,7 @@ enum GatewayClientError: Error, LocalizedError {
         case .invalidURL: return "Invalid gateway URL"
         case .handshakeFailed(let msg): return "Handshake failed: \(msg)"
         case .requestFailed(let err): return "Request failed: \(err.message ?? "unknown")"
-        case .timeout: return "Request timed out"
+        case .timeout(let method, let seconds): return "\(method) timed out after \(Int(seconds))s"
         case .encodingError(let msg): return "Encoding error: \(msg)"
         case .cancelled: return "Request cancelled"
         }
@@ -158,7 +158,10 @@ actor GatewayClient {
     /// while waiting for the gateway response, the pending continuation is
     /// immediately resumed with `CancellationError` and removed from the
     /// in-flight dictionary so it doesn't leak.
-    func send(method: String, params: (any Encodable)? = nil) async throws -> ResponseFrame {
+    ///
+    /// A timeout (default 30s) prevents the request from hanging indefinitely
+    /// if the gateway accepts the frame but never responds.
+    func send(method: String, params: (any Encodable)? = nil, timeout: TimeInterval = 30) async throws -> ResponseFrame {
         guard isHandshakeComplete else {
             throw GatewayClientError.notConnected
         }
@@ -176,6 +179,18 @@ actor GatewayClient {
 
         let frame = RequestFrame(id: requestId, method: method, params: anyCodableParams)
         try await sendFrame(frame)
+
+        // Start a timeout watchdog that expires the pending request
+        // if the gateway never responds.
+        let timeoutTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                await self?.timeoutPendingRequest(id: requestId, method: method, timeout: timeout)
+            } catch {
+                // Sleep cancelled — response arrived before timeout.
+            }
+        }
+        defer { timeoutTask.cancel() }
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -201,6 +216,15 @@ actor GatewayClient {
     private func cancelPendingRequest(id: String) {
         if let continuation = pendingRequests.removeValue(forKey: id) {
             continuation.resume(throwing: CancellationError())
+        }
+    }
+
+    /// Expire a pending request that exceeded its timeout.
+    /// Actor serialization ensures only one of response / timeout / cancel
+    /// will find the continuation — the others see nothing and return.
+    private func timeoutPendingRequest(id: String, method: String, timeout: TimeInterval) {
+        if let continuation = pendingRequests.removeValue(forKey: id) {
+            continuation.resume(throwing: GatewayClientError.timeout(method: method, seconds: timeout))
         }
     }
 
@@ -261,6 +285,52 @@ actor GatewayClient {
     func patchSession(key: String, label: String? = nil, model: String? = nil) async throws {
         let params = SessionsPatchParams(key: key, label: label, model: model)
         let _ = try await send(method: GatewayMethod.sessionsPatch, params: params)
+    }
+
+    // MARK: - Cron
+
+    /// List all cron jobs (including disabled).
+    func cronList() async throws -> CronListResult {
+        let params = CronListParams(includeDisabled: true)
+        let response = try await send(method: GatewayMethod.cronList, params: params)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(CronListResult.self)
+    }
+
+    /// Fetch run history for a cron job.
+    func cronRuns(jobId: String, limit: Int = 10) async throws -> CronRunsResult {
+        let params = CronRunsParams(jobId: jobId, limit: limit)
+        let response = try await send(method: GatewayMethod.cronRuns, params: params)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(CronRunsResult.self)
+    }
+
+    /// Update a cron job (e.g. enable/disable, change prompt).
+    func cronUpdate(jobId: String, enabled: Bool? = nil, payloadKind: String? = nil, message: String? = nil) async throws {
+        let payloadPatch: CronUpdateParams.PayloadPatch? = if let payloadKind, let message {
+            CronUpdateParams.PayloadPatch(kind: payloadKind, message: message)
+        } else {
+            nil
+        }
+        let patch = CronUpdateParams.CronUpdatePatch(enabled: enabled, payload: payloadPatch)
+        let params = CronUpdateParams(id: jobId, patch: patch)
+        let response = try await send(method: GatewayMethod.cronUpdate, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+    }
+
+    /// Remove a cron job.
+    func cronRemove(jobId: String) async throws {
+        let params = CronRemoveParams(jobId: jobId)
+        let response = try await send(method: GatewayMethod.cronRemove, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
     }
 
     /// Fetch the current gateway config.

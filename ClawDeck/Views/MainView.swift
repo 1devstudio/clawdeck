@@ -35,6 +35,9 @@ struct MainView: View {
         return appViewModel.chatViewModel(for: key)
     }
 
+    /// Whether a session is currently selected.
+    private var hasSession: Bool { appViewModel.selectedSessionKey != nil }
+
     private let sidebarMinWidth: CGFloat = 200
     private let sidebarMaxWidth: CGFloat = 400
     private let railWidth: CGFloat = 60
@@ -89,6 +92,13 @@ struct MainView: View {
                 },
                 onCreateNewAgent: {
                     appViewModel.showCreateAgentSheet = true
+                },
+                onSettings: { binding in
+                    appViewModel.editingAgentProfileId = binding.id
+                    appViewModel.showAgentSettings = true
+                },
+                onCronJobs: { _ in
+                    appViewModel.showCronJobsSheet = true
                 }
             )
 
@@ -183,6 +193,8 @@ struct MainView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .frame(width: 500)
                     .focusEffectDisabled()
+                    .opacity(hasSession ? 1 : 0)
+                    .disabled(!hasSession)
                     .onChange(of: searchText) { _, newValue in
                         activeChatVM?.searchQuery = newValue
                         activeChatVM?.currentMatchIndex = 0
@@ -203,6 +215,7 @@ struct MainView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(chromeSecondary)
                     }
+                    .opacity(hasSession ? 1 : 0)
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -215,14 +228,8 @@ struct MainView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Toggle Inspector (⌘⇧I)")
-                }
-            }
-        }
-        .onAppear {
-            // Configure the window title bar to be transparent
-            DispatchQueue.main.async {
-                if let window = NSApp.windows.first {
-                    AppDelegate.configureWindowTitleBar(window)
+                    .opacity(hasSession ? 1 : 0)
+                    .disabled(!hasSession)
                 }
             }
         }
@@ -230,7 +237,7 @@ struct MainView: View {
         .onChange(of: appViewModel.showConnectionSetup) { _, showing in
             if !showing {
                 DispatchQueue.main.async {
-                    if let window = NSApp.windows.first {
+                    if let window = NSApp.keyWindow {
                         AppDelegate.configureWindowTitleBar(window)
                     }
                 }
@@ -262,6 +269,9 @@ struct MainView: View {
         }
         .sheet(isPresented: $appViewModel.showCreateAgentSheet) {
             CreateAgentSheet(appViewModel: appViewModel)
+        }
+        .sheet(isPresented: $appViewModel.showCronJobsSheet) {
+            CronJobsSheet(appViewModel: appViewModel)
         }
     }
 

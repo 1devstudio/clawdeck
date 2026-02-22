@@ -212,19 +212,25 @@ struct ChatView: View {
                     .background(.clear)
                 }
                 .overlay {
-                    // Loading overlay — shown while history is being fetched
                     if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .controlSize(.large)
-                            Text("Loading messages…")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        ContentUnavailableView {
+                            Label {
+                                Text("Loading Messages")
+                            } icon: {
+                                ProgressView()
+                                    .controlSize(.large)
+                            }
+                        } description: {
+                            Text("Fetching conversation history…")
                         }
+                        .padding(32)
+                        .background { ThemedSidebarBackground() }
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.regularMaterial)
+                        .transition(.opacity)
                     }
                 }
+                .animation(.easeInOut(duration: 0.3), value: viewModel.isLoadingHistory)
                 .onAppear {
                     scrollProxy = proxy
                 }
@@ -234,7 +240,11 @@ struct ChatView: View {
                        last.role == .assistant {
                         viewModel.isAwaitingResponse = false
                     }
-                    scrollToBottomIfNeeded(proxy: proxy)
+                    // Defer by one run-loop tick so LazyVStack can finish laying
+                    // out newly added views before we ask the proxy to scroll.
+                    DispatchQueue.main.async {
+                        scrollToBottomIfNeeded(proxy: proxy)
+                    }
                 }
                 .onChange(of: viewModel.isSending) { _, isSending in
                     // Always scroll when the user sends a message
@@ -259,11 +269,12 @@ struct ChatView: View {
                     }
                 }
                 .onChange(of: viewModel.sessionKey) { _, _ in
-                    // Reset local state that was previously handled by .id() destruction
+                    // Reset local state that was previously handled by .id() destruction.
+                    // Don't call scrollToBottom here — .defaultScrollAnchor(.bottom) handles
+                    // initial positioning, and an immediate scroll races with LazyVStack layout.
                     isNearBottom = true
                     sidebarMessage = nil
                     lastStreamingScroll = .distantPast
-                    scrollToBottom(proxy: proxy, animated: false)
                 }
             }
 

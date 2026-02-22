@@ -10,6 +10,7 @@ final class AppViewModel {
 
     let gatewayManager = GatewayManager()
     let messageStore = MessageStore()
+    let starredSessionsStore = StarredSessionsStore()
 
     // MARK: - Child View Models (created once, shared)
 
@@ -31,7 +32,7 @@ final class AppViewModel {
     /// Session key for the in-flight history load.
     /// Prevents re-entering selectSession from cancelling a load for
     /// the same session that's already in progress.
-    private var historyLoadingKey: String?
+    private(set) var historyLoadingKey: String?
 
     /// Get or create a ChatViewModel for a session key.
     func chatViewModel(for sessionKey: String) -> ChatViewModel {
@@ -73,6 +74,12 @@ final class AppViewModel {
     /// Sessions visible in the sidebar (filtered to the active agent).
     var sessions: [Session] = []
 
+    /// Whether sessions are currently being fetched from the gateway.
+    var isLoadingSessions = false
+
+    /// Whether sessions have been loaded at least once (after first successful fetch).
+    var hasLoadedSessions = false
+
     /// Currently selected session key.
     var selectedSessionKey: String?
 
@@ -93,6 +100,9 @@ final class AppViewModel {
 
     /// Whether the agent settings sheet is shown.
     var showAgentSettings = false
+
+    /// Whether the cron jobs sheet is shown.
+    var showCronJobsSheet = false
 
     /// Whether the "connect new gateway" sheet is shown (from + popover).
     var showGatewayConnectionSheet = false
@@ -216,6 +226,7 @@ final class AppViewModel {
         agents.removeAll()
         allGatewaySessions.removeAll()
         sessions.removeAll()
+        hasLoadedSessions = false
         selectedSessionKey = nil
         availableModels.removeAll()
         defaultModelId = nil
@@ -257,6 +268,11 @@ final class AppViewModel {
             sessions.removeAll()
             return
         }
+        isLoadingSessions = true
+        defer {
+            isLoadingSessions = false
+            hasLoadedSessions = true
+        }
         
         do {
             let result = try await client.listSessions()
@@ -285,6 +301,10 @@ final class AppViewModel {
             
             // Filter to the active agent
             filterSessionsToActiveAgent()
+
+            // Prune starred keys for sessions that no longer exist
+            let validKeys = Set(allGatewaySessions.map(\.key))
+            starredSessionsStore.prune(validKeys: validKeys)
         } catch {
             AppLogger.error("Failed to list sessions: \(error)", category: "Session")
         }
@@ -360,8 +380,10 @@ final class AppViewModel {
 
     // MARK: - Session actions
 
-    /// Select a session and load its history.
-    func selectSession(_ sessionKey: String) async {
+    /// Select a session and start loading its history in the background.
+    /// Returns immediately — the UI shows a loading indicator until the
+    /// history arrives (or fails).
+    func selectSession(_ sessionKey: String) {
         selectedSessionKey = sessionKey
         messageStore.touchSession(sessionKey)
 
@@ -385,29 +407,45 @@ final class AppViewModel {
         historyLoadingKey = sessionKey
 
         AppLogger.debug("selectSession(\(sessionKey)): starting history load", category: "Session")
-        let task = Task { await loadHistory(for: sessionKey) }
-        historyLoadTask = task
-        await task.value
+        let chatVM = chatViewModel(for: sessionKey)
+        chatVM.isLoadingHistory = true
 
-        // Clear the loading key if it still matches (wasn't replaced).
-        if historyLoadingKey == sessionKey {
-            historyLoadingKey = nil
+        historyLoadTask = Task {
+            await loadHistory(for: sessionKey)
+
+            if historyLoadingKey == sessionKey {
+                historyLoadingKey = nil
+            }
+            chatVM.isLoadingHistory = false
+
+            // If still no messages after load, show error so the user can retry.
+            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+                chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
+            }
         }
     }
 
     /// Force-reload a session's history from the gateway, clearing the cached messages.
-    func reloadSession(_ sessionKey: String) async {
+    func reloadSession(_ sessionKey: String) {
         messageStore.clearSession(sessionKey)
         historyLoadTask?.cancel()
         historyLoadingKey = sessionKey
 
         AppLogger.info("reloadSession(\(sessionKey)): force-reloading history", category: "Session")
-        let task = Task { await loadHistory(for: sessionKey) }
-        historyLoadTask = task
-        await task.value
+        let chatVM = chatViewModel(for: sessionKey)
+        chatVM.isLoadingHistory = true
 
-        if historyLoadingKey == sessionKey {
-            historyLoadingKey = nil
+        historyLoadTask = Task {
+            await loadHistory(for: sessionKey)
+
+            if historyLoadingKey == sessionKey {
+                historyLoadingKey = nil
+            }
+            chatVM.isLoadingHistory = false
+
+            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+                chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
+            }
         }
     }
 
@@ -622,7 +660,12 @@ final class AppViewModel {
         guard let client = activeClient else { return }
         do {
             try await client.patchSession(key: sessionKey, label: label)
-            if let session = sessions.first(where: { $0.key == sessionKey }) {
+            // Update both the filtered sessions and the all-gateway cache
+            // so the label survives subsequent refreshes.
+            for session in sessions where session.key == sessionKey {
+                session.label = label
+            }
+            for session in allGatewaySessions where session.key == sessionKey {
                 session.label = label
             }
             AppLogger.info("Renamed session \(sessionKey) to '\(label)'", category: "Session")
@@ -928,11 +971,11 @@ final class AppViewModel {
            let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
             let previousIndex = currentIndex - 1
             if previousIndex >= 0 {
-                Task { await selectSession(sessionList[previousIndex].key) }
+                selectSession(sessionList[previousIndex].key)
             }
         } else {
             // No session selected — select the last one
-            Task { await selectSession(sessionList.last!.key) }
+            selectSession(sessionList.last!.key)
         }
     }
 
@@ -945,11 +988,11 @@ final class AppViewModel {
            let currentIndex = sessionList.firstIndex(where: { $0.key == currentKey }) {
             let nextIndex = currentIndex + 1
             if nextIndex < sessionList.count {
-                Task { await selectSession(sessionList[nextIndex].key) }
+                selectSession(sessionList[nextIndex].key)
             }
         } else {
             // No session selected — select the first one
-            Task { await selectSession(sessionList.first!.key) }
+            selectSession(sessionList.first!.key)
         }
     }
 

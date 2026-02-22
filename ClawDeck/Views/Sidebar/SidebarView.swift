@@ -1,5 +1,75 @@
 import SwiftUI
 
+/// Custom section header with optional leading icon and inter-section spacing.
+private struct SectionHeaderView: View {
+    let title: String
+    let isFirst: Bool
+    /// When true, shows the "History" parent header above the sub-group title.
+    var showHistoryParent: Bool = false
+
+    private var iconName: String? {
+        switch title {
+        case "Starred": "star.fill"
+        case "Active":  "circle.fill"
+        default:        nil
+        }
+    }
+
+    private var iconColor: Color {
+        switch title {
+        case "Starred": .yellow
+        case "Active":  .green
+        default:        .secondary
+        }
+    }
+
+    /// Whether this title is a History sub-group.
+    private var isSubgroup: Bool {
+        SidebarViewModel.historySubgroups.contains(title)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if showHistoryParent {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.secondary)
+                    Text("HISTORY")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .tracking(0.3)
+                }
+                .padding(.top, isFirst ? 0 : 12)
+                .padding(.bottom, 4)
+            }
+
+            if isSubgroup {
+                Text(title.uppercased())
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.2)
+                    .padding(.top, showHistoryParent ? 0 : 8)
+                    .padding(.bottom, 2)
+            } else {
+                HStack(spacing: 4) {
+                    if let iconName {
+                        Image(systemName: iconName)
+                            .font(.system(size: 7))
+                            .foregroundStyle(iconColor)
+                    }
+                    Text(title.uppercased())
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .tracking(0.3)
+                }
+                .padding(.top, isFirst ? 0 : 12)
+                .padding(.bottom, 4)
+            }
+        }
+    }
+}
+
 /// Left sidebar showing agents and sessions.
 struct SidebarView: View {
     @Bindable var viewModel: SidebarViewModel
@@ -13,16 +83,6 @@ struct SidebarView: View {
                     .lineLimit(1)
 
                 Spacer()
-
-                Button {
-                    viewModel.showAgentSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Settings")
 
                 Button {
                     Task { await viewModel.refreshSessions() }
@@ -67,11 +127,13 @@ struct SidebarView: View {
 
             List(selection: $viewModel.selectedSessionKey) {
                 // Sessions grouped by time
-                ForEach(viewModel.groupedSessions, id: \.title) { group in
-                    Section(group.title) {
+                ForEach(Array(viewModel.groupedSessions.enumerated()), id: \.element.title) { index, group in
+                    Section {
                         ForEach(group.sessions) { session in
                             SessionRow(
                                 session: session,
+                                isStarred: viewModel.isStarred(session.key),
+                                isLoadingHistory: viewModel.isLoadingHistory(session.key),
                                 isRenaming: viewModel.renamingSessionKey == session.key,
                                 renameText: $viewModel.renameText,
                                 onCommitRename: {
@@ -79,11 +141,24 @@ struct SidebarView: View {
                                 },
                                 onCancelRename: {
                                     viewModel.cancelRename()
+                                },
+                                onDoubleClickTitle: {
+                                    viewModel.beginRename(session.key)
                                 }
                             )
                             .tag(session.key)
                             .listRowBackground(Color.clear)
                             .contextMenu {
+                                Button {
+                                    viewModel.toggleStar(session.key)
+                                } label: {
+                                    if viewModel.isStarred(session.key) {
+                                        Label("Unstar", systemImage: "star.slash")
+                                    } else {
+                                        Label("Star", systemImage: "star")
+                                    }
+                                }
+
                                 Button("Rename…") {
                                     viewModel.beginRename(session.key)
                                 }
@@ -93,6 +168,13 @@ struct SidebarView: View {
                                 }
                             }
                         }
+                    } header: {
+                        SectionHeaderView(
+                            title: group.title,
+                            isFirst: index == 0,
+                            showHistoryParent: SidebarViewModel.historySubgroups.contains(group.title)
+                                && (index == 0 || !SidebarViewModel.historySubgroups.contains(viewModel.groupedSessions[index - 1].title))
+                        )
                     }
                 }
             }
@@ -101,7 +183,18 @@ struct SidebarView: View {
             .alternatingRowBackgrounds(.disabled)
         }
         .overlay {
-            if viewModel.filteredSessions.isEmpty {
+            if viewModel.filteredSessions.isEmpty && !viewModel.hasLoadedSessions {
+                ContentUnavailableView {
+                    Label {
+                        Text("Loading Sessions")
+                    } icon: {
+                        ProgressView()
+                            .controlSize(.large)
+                    }
+                } description: {
+                    Text("Fetching sessions from gateway…")
+                }
+            } else if viewModel.filteredSessions.isEmpty {
                 ContentUnavailableView(
                     "No Sessions",
                     systemImage: "tray",
@@ -111,7 +204,7 @@ struct SidebarView: View {
         }
         .onChange(of: viewModel.selectedSessionKey) { _, newKey in
             if let key = newKey {
-                Task { await viewModel.selectSession(key) }
+                viewModel.selectSession(key)
             }
         }
     }

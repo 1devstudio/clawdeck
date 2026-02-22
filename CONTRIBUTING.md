@@ -8,29 +8,23 @@ Thank you for your interest in contributing to ClawDeck! We're excited to have y
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/clawd-deck.git
-   cd clawd-deck
+   git clone https://github.com/1devstudio/clawdeck.git
+   cd clawdeck
    ```
 
-2. **Build the project**:
+2. **Open the project in Xcode**:
    ```bash
-   # Using Swift Package Manager
-   swift build
-   
-   # Or open in Xcode (optional but recommended)
-   open Package.swift
+   open ClawDeck.xcodeproj
    ```
 
-3. **Run the application**:
-   ```bash
-   swift run ClawdDeck
-   ```
+3. **Build and run**:
+
+   Select the **ClawDeck** scheme, then **Product → Run** (⌘R).
 
 ### Requirements
 
-- **macOS 15+** (Sequoia or later)
-- **Swift 6.0+** 
-- **Xcode 16+** (if you prefer the IDE experience)
+- **macOS 26+** (Tahoe)
+- **Xcode 26+**
 - A running Clawdbot gateway for testing connections
 
 ## Project Structure
@@ -38,7 +32,7 @@ Thank you for your interest in contributing to ClawDeck! We're excited to have y
 ClawDeck follows a clean MVVM architecture using modern SwiftUI patterns:
 
 ```
-Sources/ClawdDeck/
+ClawDeck/
 ├── App/            # Application entry point and main app configuration
 ├── Models/         # Data models (Agent, Session, ChatMessage, ConnectionState, etc.)
 ├── Protocol/       # Gateway wire protocol definitions and constants
@@ -51,10 +45,10 @@ Sources/ClawdDeck/
 
 ### Key Architecture Principles
 
-- **SwiftUI + @Observable**: We use Swift 5.9's Observation framework for reactive state management
+- **SwiftUI + @Observable**: We use Swift's Observation framework for reactive state management
 - **MVVM Pattern**: ViewModels own business logic and state; Views are purely declarative
 - **Actor Isolation**: Thread-safe networking and data access using Swift's actor model
-- **No External Dependencies**: Pure Swift/SwiftUI implementation using native Apple frameworks
+- **No External Dependencies**: Pure Swift/SwiftUI implementation using native Apple frameworks (plus Sparkle for auto-updates)
 
 ## Code Style
 
@@ -71,7 +65,7 @@ We follow these conventions to maintain consistency:
 Before submitting a PR, please run:
 
 ```bash
-swift-format --in-place --recursive Sources/
+swift-format --in-place --recursive ClawDeck/
 ```
 
 ## How to Contribute
@@ -104,9 +98,9 @@ If you encounter a bug or have a feature request:
    - Update documentation if needed
 
 4. **Test your changes**:
-   - Build and run the app locally
+   - Build and run the app locally (⌘R in Xcode)
    - Test with a real Clawdbot gateway connection
-   - Verify your changes work across different macOS versions if possible
+   - Verify your changes work on macOS 26+
 
 5. **Commit with clear messages**:
    ```bash
@@ -133,7 +127,7 @@ We welcome various types of contributions:
 - **UI/UX improvements**: Make the app more intuitive and visually appealing
 - **Performance optimizations**: Help ClawDeck run faster and use fewer resources
 - **Documentation**: Improve README, code comments, or create tutorials
-- **Testing**: Add unit tests or help with manual testing across macOS versions
+- **Testing**: Add unit tests or help with manual testing
 
 ## Getting Help
 

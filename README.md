@@ -1,8 +1,15 @@
-# Clawd Deck
+# ClawDeck
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Download](https://img.shields.io/badge/Download-Latest-blue.svg)](https://github.com/1devstudio/clawdeck/releases/latest/download/ClawDeck.dmg)
 
 Native macOS desktop app for [Clawdbot](https://github.com/clawdbot/clawdbot).
+
+## Download
+
+[**⬇ Download ClawDeck.dmg**](https://github.com/1devstudio/clawdeck/releases/latest/download/ClawDeck.dmg)
+
+Or browse all releases on the [Releases page](https://github.com/1devstudio/clawdeck/releases).
 
 ## Requirements
 
@@ -12,14 +19,13 @@ Native macOS desktop app for [Clawdbot](https://github.com/clawdbot/clawdbot).
 
 ## Build
 
-Open `Package.swift` in Xcode, select the ClawdDeck scheme, and run.
-
-Or via command line:
+Open the Xcode project and run:
 
 ```bash
-swift build
-swift run clawdeck
+open ClawDeck.xcodeproj
 ```
+
+Select the **ClawDeck** scheme, then **Product → Run** (⌘R).
 
 ## Connecting to Your Gateway
 
@@ -131,11 +137,12 @@ sudo ufw status
 - Session management
 - Markdown rendering with syntax highlighting
 - Keyboard-driven navigation (Cmd+K, Cmd+N, etc.)
-- Native macOS look and feel
+- Sparkle auto-updates
+- Native macOS Liquid Glass UI
 
 ## Architecture
 
-- **SwiftUI** with `@Observable` (Swift 5.9 Observation framework)
+- **SwiftUI** with `@Observable` (Swift Observation framework)
 - **MVVM** — ViewModels own state, Views are declarative
 - **Gateway Protocol v3** — WebSocket-based communication with Clawdbot
 - **URLSessionWebSocketTask** — native Apple networking, no third-party deps
@@ -144,7 +151,7 @@ sudo ufw status
 ## Project Structure
 
 ```
-Sources/ClawdDeck/
+ClawDeck/
 ├── App/            # App entry point
 ├── Models/         # Data models (Agent, Session, ChatMessage, etc.)
 ├── Protocol/       # Gateway wire protocol types and constants

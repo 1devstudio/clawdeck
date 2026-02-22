@@ -1,5 +1,4 @@
 # Xcode
-*.xcodeproj/
 *.xcworkspace/
 xcuserdata/
 *.xccheckout
