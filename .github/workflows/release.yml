@@ -180,6 +180,9 @@ jobs:
 
           xcrun stapler staple "$APP_NAME-$VERSION.dmg"
 
+          # Create stable-name copy for "latest" download link
+          cp "$APP_NAME-$VERSION.dmg" "$APP_NAME.dmg"
+
       # ── Sign update with Sparkle EdDSA key ──
       - name: Setup Sparkle tools
         run: |
@@ -257,7 +260,11 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           CHECKSUM=$(shasum -a 256 "$APP_NAME-$VERSION.dmg" | cut -d ' ' -f 1)
 
-          gh release upload "v$VERSION" "$APP_NAME-$VERSION.dmg" --clobber
+          # Upload versioned DMG + stable-name DMG for latest permalink
+          gh release upload "v$VERSION" \
+            "$APP_NAME-$VERSION.dmg" \
+            "$APP_NAME.dmg" \
+            --clobber
 
           # Append checksum to release notes
           EXISTING_NOTES=$(gh release view "v$VERSION" --json body -q .body)
