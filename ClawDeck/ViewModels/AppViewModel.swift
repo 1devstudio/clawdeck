@@ -321,6 +321,10 @@ final class AppViewModel {
             starredSessionsStore.prune(validKeys: validKeys)
         } catch {
             AppLogger.error("Failed to list sessions: \(error)", category: "Session")
+            // Even when the fetch fails, filter the cached sessions to the
+            // active agent so stale sessions from a previous agent don't
+            // remain visible in the sidebar.
+            filterSessionsToActiveAgent()
         }
     }
 

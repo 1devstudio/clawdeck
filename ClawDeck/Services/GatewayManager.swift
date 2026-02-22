@@ -227,6 +227,46 @@ final class GatewayManager {
         await connectGateway(gatewayId)
     }
 
+    /// Reconnect to a gateway with retry logic for post-restart scenarios.
+    ///
+    /// After a config.patch triggers a gateway restart, the gateway may not be
+    /// ready to accept connections immediately. This method polls with retries
+    /// until a successful connection is established or the timeout expires.
+    @discardableResult
+    func reconnectWithRetry(
+        gatewayId: String,
+        timeout: TimeInterval = 30,
+        retryInterval: TimeInterval = 2
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            disconnectGateway(gatewayId)
+            await connectGateway(gatewayId)
+
+            if isConnected(gatewayId) {
+                AppLogger.info("Reconnected to gateway \(gatewayId) successfully", category: "Network")
+                return true
+            }
+
+            let remainingTime = deadline.timeIntervalSince(Date())
+            let sleepDuration = min(retryInterval, remainingTime)
+            guard sleepDuration > 0 else { break }
+
+            AppLogger.debug(
+                "Gateway \(gatewayId) not ready, retrying in \(sleepDuration)s...",
+                category: "Network"
+            )
+            try? await Task.sleep(nanoseconds: UInt64(sleepDuration * 1_000_000_000))
+        }
+
+        AppLogger.error(
+            "Failed to reconnect to gateway \(gatewayId) within \(timeout)s timeout",
+            category: "Network"
+        )
+        return false
+    }
+
     // MARK: - Agent Loading
 
     /// Load agents for a specific gateway.

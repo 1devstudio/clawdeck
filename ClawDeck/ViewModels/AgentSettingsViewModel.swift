@@ -187,7 +187,9 @@ final class AgentSettingsViewModel {
            let currentAgent = agentsList.first(where: { ($0["id"] as? String) == currentBinding?.agentId }),
            let identity = currentAgent["identity"] as? [String: Any] {
             
-            agentDisplayName = identity["name"] as? String ?? ""
+            if let name = identity["name"] as? String, !name.isEmpty {
+                agentDisplayName = name
+            }
             agentEmoji = identity["emoji"] as? String ?? ""
             
             if let themeColor = identity["theme"] as? String {
@@ -223,6 +225,7 @@ final class AgentSettingsViewModel {
         
         if let binding = appViewModel.activeBinding {
             currentBinding = binding
+            agentDisplayName = binding.displayName(from: appViewModel.gatewayManager)
 
             // Use the app's current accent color as immediate default
             if let accentColor = appViewModel.customAccentColor {
@@ -364,18 +367,19 @@ final class AgentSettingsViewModel {
         // Phase 2: Waiting for gateway restart
         restartPhase = .waitingForRestart
         AppLogger.info("Config patch applied, waiting for gateway restart...", category: "Session")
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
 
-        // Phase 3: Reconnecting
+        // Phase 3: Reconnecting with retry — the gateway may take several
+        // seconds to restart after a config.patch.
         restartPhase = .reconnecting
-
-        // Force reconnect if not already reconnected
         if let appVM = appViewModel,
-           let binding = appVM.activeBinding,
-           !appVM.gatewayManager.isConnected(binding.gatewayId) {
+           let binding = appVM.activeBinding {
             AppLogger.debug("Reconnecting after config patch...", category: "Session")
-            await appVM.gatewayManager.reconnect(gatewayId: binding.gatewayId)
-            // Reload agents/sessions after reconnecting
+            await appVM.gatewayManager.reconnectWithRetry(
+                gatewayId: binding.gatewayId,
+                timeout: 30,
+                retryInterval: 2
+            )
             await appVM.loadInitialData()
         }
     }
@@ -601,11 +605,16 @@ final class AgentSettingsViewModel {
             // Phase 2: Waiting for gateway restart
             restartPhase = .waitingForRestart
             AppLogger.info("Agent '\(binding.agentId)' removed from config, waiting for restart...", category: "Session")
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
 
-            // Phase 3: Reconnecting
+            // Phase 3: Reconnecting with retry — the gateway may take several
+            // seconds to restart after a config.patch.
             restartPhase = .reconnecting
-            await appViewModel.gatewayManager.reconnect(gatewayId: binding.gatewayId)
+            await appViewModel.gatewayManager.reconnectWithRetry(
+                gatewayId: binding.gatewayId,
+                timeout: 30,
+                retryInterval: 2
+            )
             await appViewModel.loadInitialData()
 
             // Phase 4: Remove local binding and switch to another agent

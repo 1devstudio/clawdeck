@@ -193,14 +193,23 @@ final class CreateAgentViewModel {
             // Phase 2: Waiting for gateway restart
             restartPhase = .waitingForRestart
             AppLogger.info("Config patch applied for new agent '\(agentId)', waiting for restart...", category: "Session")
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            // Brief initial delay to give the gateway time to begin its restart
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
 
-            // Phase 3: Reconnecting — always force reconnect to ensure
-            // fresh agent summaries and a clean client state, even if
-            // the gateway auto-reconnected during the restart wait.
+            // Phase 3: Reconnecting with retry — the gateway may take several
+            // seconds to restart after a config.patch. Poll until connected.
             restartPhase = .reconnecting
             AppLogger.debug("Reconnecting after creating agent...", category: "Session")
-            await appViewModel.gatewayManager.reconnect(gatewayId: targetGatewayId)
+            let reconnected = await appViewModel.gatewayManager.reconnectWithRetry(
+                gatewayId: targetGatewayId,
+                timeout: 30,
+                retryInterval: 2
+            )
+
+            guard reconnected else {
+                throw CreateAgentError.noActiveConnection
+            }
+
             await appViewModel.loadInitialData()
 
             // Phase 4: Create agent binding and add to rail
@@ -222,7 +231,11 @@ final class CreateAgentViewModel {
             await appViewModel.switchAgent(binding)
 
             // Phase 5: Send a kick-off message to trigger BOOTSTRAP.md onboarding
-            await sendBootstrapMessage(appViewModel: appViewModel, binding: binding)
+            if appViewModel.gatewayManager.isConnected(targetGatewayId) {
+                await sendBootstrapMessage(appViewModel: appViewModel, binding: binding)
+            } else {
+                AppLogger.warning("Skipping bootstrap message: gateway not connected after agent creation", category: "Session")
+            }
 
             return true
         } catch {
