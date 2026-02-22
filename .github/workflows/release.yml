@@ -211,7 +211,6 @@ jobs:
           RELEASE_BODY: ${{ github.event.release.body }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          FILESIZE=$(stat -f%z "$APP_NAME-$VERSION.dmg")
           PUBDATE=$(date -R)
 
           cat > appcast.xml << 'APPCAST_EOF'
@@ -231,7 +230,6 @@ jobs:
                 <enclosure
                   url="DOWNLOAD_URL_PLACEHOLDER"
                   SPARKLE_SIG_PLACEHOLDER
-                  length="FILESIZE_PLACEHOLDER"
                   type="application/octet-stream"
                   sparkle:version="VERSION_PLACEHOLDER"
                   sparkle:shortVersionString="VERSION_PLACEHOLDER" />
@@ -244,7 +242,6 @@ jobs:
           # Safe substitutions via sed (no shell expansion issues)
           sed -i '' "s|DOWNLOAD_URL_PLACEHOLDER|https://github.com/1devstudio/clawdeck/releases/download/v$VERSION/$APP_NAME-$VERSION.dmg|g" appcast.xml
           sed -i '' "s|SPARKLE_SIG_PLACEHOLDER|$SPARKLE_SIGNATURE|g" appcast.xml
-          sed -i '' "s|FILESIZE_PLACEHOLDER|$FILESIZE|g" appcast.xml
           sed -i '' "s|VERSION_PLACEHOLDER|$VERSION|g" appcast.xml
           sed -i '' "s|PUBDATE_PLACEHOLDER|$PUBDATE|g" appcast.xml
           sed -i '' "s|<title>PLACEHOLDER</title>|<title>Version $VERSION</title>|g" appcast.xml
