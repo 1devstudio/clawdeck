@@ -279,8 +279,16 @@ final class AppViewModel {
         }
         
         do {
-            let result = try await client.listSessions(agentId: binding.agentId)
-            AppLogger.debug("sessions.list returned \(result.sessions.count) sessions for agent \(binding.agentId) on gateway \(binding.gatewayId)", category: "Session")
+            AppLogger.info("[refreshSessions] Fetching sessions for binding agentId='\(binding.agentId)' gatewayId='\(binding.gatewayId)'", category: "Session")
+            let result = try await client.listSessions()
+            AppLogger.info("[refreshSessions] Gateway returned \(result.sessions.count) sessions", category: "Session")
+
+            // Log each session key and its parsed agentId for debugging
+            for summary in result.sessions {
+                let parts = summary.key.split(separator: ":")
+                let parsedAgentId = (parts.count >= 3 && parts[0] == "agent") ? String(parts[1]) : "nil"
+                AppLogger.debug("[refreshSessions]   key='\(summary.key)' → parsedAgentId='\(parsedAgentId)'", category: "Session")
+            }
 
             // Build a lookup of existing createdAt values so we don't lose them on refresh.
             let existingCreatedAt = Dictionary(uniqueKeysWithValues:
@@ -302,7 +310,9 @@ final class AppViewModel {
                     }
                     return session
                 }
-            
+
+            AppLogger.info("[refreshSessions] allGatewaySessions=\(allGatewaySessions.count), now filtering...", category: "Session")
+
             // Filter to the active agent
             filterSessionsToActiveAgent()
 
@@ -320,11 +330,19 @@ final class AppViewModel {
             sessions.removeAll()
             return
         }
-        
+
+        AppLogger.info("[filterSessions] Filtering \(allGatewaySessions.count) cached sessions for agentId='\(binding.agentId)'", category: "Session")
+        for session in allGatewaySessions {
+            let match = session.agentId == binding.agentId
+            AppLogger.debug("[filterSessions]   key='\(session.key)' agentId='\(session.agentId ?? "nil")' match=\(match)", category: "Session")
+        }
+
         sessions = allGatewaySessions.filter { session in
             session.agentId == binding.agentId
         }
-        
+
+        AppLogger.info("[filterSessions] Result: \(sessions.count) sessions pass filter", category: "Session")
+
         // Clear selection if the selected session doesn't belong to this agent
         if let selectedKey = selectedSessionKey,
            !sessions.contains(where: { $0.key == selectedKey }) {
@@ -510,10 +528,9 @@ final class AppViewModel {
     /// Refresh a session's token counts from the gateway (sessions.list).
     /// Called after a response completes to update the context usage indicator.
     private func refreshSessionTokens(for sessionKey: String) async {
-        guard let client = activeClient,
-              let binding = activeBinding else { return }
+        guard let client = activeClient else { return }
         do {
-            let result = try await client.listSessions(agentId: binding.agentId)
+            let result = try await client.listSessions()
             if let summary = result.sessions.first(where: { $0.key == sessionKey }),
                let session = sessions.first(where: { $0.key == sessionKey }) {
                 session.totalTokens = summary.totalTokens

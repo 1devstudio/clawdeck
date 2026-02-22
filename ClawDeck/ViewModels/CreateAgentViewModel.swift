@@ -179,6 +179,9 @@ final class CreateAgentViewModel {
                 throw CreateAgentError.jsonSerializationFailed
             }
 
+            AppLogger.info("[createAgent] Config patch payload:\n\(patchString)", category: "Session")
+            AppLogger.info("[createAgent] Existing agents: \(existingAgents.map { $0.id })", category: "Session")
+
             // Phase 1: Applying config
             restartPhase = .applyingConfig
             try await client.configPatch(
