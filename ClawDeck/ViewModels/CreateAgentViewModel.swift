@@ -216,6 +216,9 @@ final class CreateAgentViewModel {
             // Switch to the new agent
             await appViewModel.switchAgent(binding)
 
+            // Phase 5: Send a kick-off message to trigger BOOTSTRAP.md onboarding
+            await sendBootstrapMessage(appViewModel: appViewModel, binding: binding)
+
             return true
         } catch {
             errorMessage = "Failed to create agent: \(error.localizedDescription)"
@@ -264,6 +267,40 @@ final class CreateAgentViewModel {
 
         patch["agents"] = agentsPatch
         return patch
+    }
+
+    /// Send an initial message to the newly created agent to trigger BOOTSTRAP.md onboarding.
+    private func sendBootstrapMessage(appViewModel: AppViewModel, binding: AgentBinding) async {
+        // Create a new session for the agent
+        await appViewModel.createNewSession()
+
+        guard let sessionKey = appViewModel.selectedSessionKey,
+              let client = appViewModel.gatewayManager.client(for: binding.gatewayId) else {
+            AppLogger.error("Could not send bootstrap message: no active session or client", category: "Session")
+            return
+        }
+
+        let message = "Hey! I just created you. Let's set you up."
+
+        // Add the outgoing message to the UI
+        let outgoing = ChatMessage.outgoing(content: message, sessionKey: sessionKey)
+        appViewModel.messageStore.addMessage(outgoing)
+
+        do {
+            let _ = try await client.chatSend(sessionKey: sessionKey, message: message)
+            appViewModel.messageStore.markSent(messageId: outgoing.id, sessionKey: sessionKey)
+            // Mark the ChatViewModel as awaiting so the streaming response shows up
+            let chatVM = appViewModel.chatViewModel(for: sessionKey)
+            chatVM.isAwaitingResponse = true
+            AppLogger.info("Bootstrap message sent to new agent '\(binding.agentId)'", category: "Session")
+        } catch {
+            appViewModel.messageStore.markError(
+                messageId: outgoing.id,
+                sessionKey: sessionKey,
+                error: "Failed to send bootstrap message: \(error.localizedDescription)"
+            )
+            AppLogger.error("Failed to send bootstrap message: \(error)", category: "Session")
+        }
     }
 }
 
