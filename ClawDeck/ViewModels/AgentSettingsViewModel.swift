@@ -138,10 +138,11 @@ final class AgentSettingsViewModel {
     
     /// Load current values from gateway config and local settings.
     func loadConfig() async {
-        guard let appViewModel, 
+        guard let appViewModel,
               let client = appViewModel.activeClient,
               let binding = appViewModel.activeBinding else {
             errorMessage = "No active gateway connection"
+            isLoading = false
             return
         }
         
