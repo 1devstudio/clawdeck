@@ -12,23 +12,28 @@ import Sparkle
 final class SoftwareUpdateViewModel {
     var canCheckForUpdates = false
 
-    private let updaterController: SPUStandardUpdaterController
+    private let updaterController: SPUStandardUpdaterController?
     private var cancellable: AnyCancellable?
 
     /// The underlying Sparkle updater — exposed so the settings view can
     /// bind to ``SPUUpdater/automaticallyChecksForUpdates`` if needed.
-    var updater: SPUUpdater { updaterController.updater }
+    var updater: SPUUpdater? { updaterController?.updater }
 
     init() {
-        // `startingUpdater: true` begins the update cycle on launch
-        // (background check respecting SUEnableAutomaticChecks).
+        // Sparkle's XPC services require Developer ID signing which is only
+        // present in Release/Archive builds. Skip in DEBUG to avoid the
+        // "Unable to Check For Updates" error when running from Xcode.
+        #if DEBUG
+        updaterController = nil
+        #else
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        #endif
 
-        cancellable = updater.publisher(for: \.canCheckForUpdates)
+        cancellable = updater?.publisher(for: \.canCheckForUpdates)
             .sink { [weak self] value in
                 self?.canCheckForUpdates = value
             }
@@ -36,6 +41,6 @@ final class SoftwareUpdateViewModel {
 
     /// Trigger a user-initiated update check (shows UI).
     func checkForUpdates() {
-        updater.checkForUpdates()
+        updater?.checkForUpdates()
     }
 }
