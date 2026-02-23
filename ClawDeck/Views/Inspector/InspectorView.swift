@@ -1,80 +1,21 @@
 import SwiftUI
 
-/// Inspector tab selection.
-enum InspectorTab: String, CaseIterable {
-    case session = "Session"
-    case cron = "Cron Jobs"
-
-    var icon: String {
-        switch self {
-        case .session: return "info.circle"
-        case .cron: return "clock"
-        }
-    }
-}
-
-/// Right panel showing details about the selected session or cron jobs.
+/// Right panel showing details about the selected session.
 struct InspectorView: View {
     let session: Session
     let appViewModel: AppViewModel
 
-    @State private var selectedTab: InspectorTab = .session
-    @State private var cronViewModel: CronViewModel
-
-    init(session: Session, appViewModel: AppViewModel) {
-        self.session = session
-        self.appViewModel = appViewModel
-        self._cronViewModel = State(initialValue: CronViewModel(appViewModel: appViewModel))
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab picker
-            HStack(spacing: 0) {
-                ForEach(InspectorTab.allCases, id: \.self) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 10))
-                            Text(tab.rawValue)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
-                        )
-                        .foregroundStyle(selectedTab == tab ? .primary : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            // Tab content
-            switch selectedTab {
-            case .session:
-                SessionInfoContent(
-                    session: session,
-                    appViewModel: appViewModel
-                )
-            case .cron:
-                CronJobsView(viewModel: cronViewModel)
-            }
-        }
+        SessionInfoContent(
+            session: session,
+            appViewModel: appViewModel
+        )
     }
 }
 
-// MARK: - Session Info Content (extracted from old InspectorView)
+// MARK: - Session Info Content
 
-/// The session info tab content.
+/// The session info content.
 struct SessionInfoContent: View {
     let session: Session
     let appViewModel: AppViewModel

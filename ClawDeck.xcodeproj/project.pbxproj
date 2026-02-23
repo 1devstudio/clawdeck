@@ -139,7 +139,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-
 /* Begin PBXSourcesBuildPhase section */
 		ECC43D582F450DF000D8EB54 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
