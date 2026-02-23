@@ -437,15 +437,15 @@ final class AppViewModel {
         chatVM.isLoadingHistory = true
 
         historyLoadTask = Task {
-            await loadHistory(for: sessionKey)
+            let success = await loadHistory(for: sessionKey)
 
             if historyLoadingKey == sessionKey {
                 historyLoadingKey = nil
             }
             chatVM.isLoadingHistory = false
 
-            // If still no messages after load, show error so the user can retry.
-            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+            // Only show error if the load actually failed, not just empty (e.g. new session).
+            if !success && !Task.isCancelled {
                 chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
             }
         }
@@ -462,14 +462,14 @@ final class AppViewModel {
         chatVM.isLoadingHistory = true
 
         historyLoadTask = Task {
-            await loadHistory(for: sessionKey)
+            let success = await loadHistory(for: sessionKey)
 
             if historyLoadingKey == sessionKey {
                 historyLoadingKey = nil
             }
             chatVM.isLoadingHistory = false
 
-            if !messageStore.hasMessages(for: sessionKey) && !Task.isCancelled {
+            if !success && !Task.isCancelled {
                 chatVM.errorMessage = "Failed to load messages. Check your connection and try again."
             }
         }
@@ -553,14 +553,15 @@ final class AppViewModel {
 
     /// Load chat history for a session, retrying with smaller limits if the
     /// response is too large for the gateway's send buffer.
-    func loadHistory(for sessionKey: String) async {
-        guard activeClient != nil else { return }
-        guard !Task.isCancelled else { return }
+    @discardableResult
+    func loadHistory(for sessionKey: String) async -> Bool {
+        guard activeClient != nil else { return false }
+        guard !Task.isCancelled else { return false }
 
         for limit in Self.historyLimits {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
             let success = await loadHistoryAttempt(for: sessionKey, limit: limit)
-            if success { return }
+            if success { return true }
 
             // If we got here, the load failed (likely connection dropped).
             // Wait for actual reconnection before retrying with a smaller limit.
@@ -568,11 +569,12 @@ final class AppViewModel {
             let reconnected = await waitForReconnection(timeout: 15)
             guard reconnected else {
                 AppLogger.error("Reconnection timed out for \(sessionKey)", category: "Session")
-                return
+                return false
             }
             AppLogger.info("Reconnected, retrying with smaller limit...", category: "Session")
         }
         AppLogger.error("All history load attempts failed for \(sessionKey)", category: "Session")
+        return false
     }
 
     /// Whether the active binding's gateway is connected.
