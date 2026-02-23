@@ -29,14 +29,6 @@ struct AgentRailView: View {
                             onSettings: { onSettings(binding) },
                             onCronJobs: { onCronJobs(binding) }
                         )
-                        .contextMenu {
-                            AgentContextMenu(
-                                binding: binding,
-                                gatewayManager: gatewayManager,
-                                onSettings: { onSettings(binding) },
-                                onCronJobs: { onCronJobs(binding) }
-                            )
-                        }
                     }
                 }
                 .padding(.vertical, 8)
@@ -214,53 +206,6 @@ struct AgentRailItem: View {
             .appendingPathComponent("clawdeck/avatars")
         guard let url = avatarDir?.appendingPathComponent(filename) else { return nil }
         return NSImage(contentsOf: url)
-    }
-}
-
-/// Context menu for agent rail items.
-struct AgentContextMenu: View {
-    let binding: AgentBinding
-    let gatewayManager: GatewayManager
-    let onSettings: () -> Void
-    let onCronJobs: () -> Void
-
-    private var gatewayProfile: GatewayProfile? {
-        gatewayManager.gatewayProfiles.first { $0.id == binding.gatewayId }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            // Agent name (label)
-            Text(binding.displayName(from: gatewayManager))
-                .font(.headline)
-
-            // Gateway address (dimmed label)
-            if let gateway = gatewayProfile {
-                Text(gateway.displayAddress)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Divider()
-
-            Button("Agent Settings…") {
-                onSettings()
-            }
-
-            Button("Cron Jobs…") {
-                onCronJobs()
-            }
-
-            Button("Gateway Settings…") {
-                // TODO: Open gateway settings
-            }
-
-            Divider()
-
-            Button("Remove from Sidebar") {
-                gatewayManager.removeAgentBinding(binding)
-            }
-        }
     }
 }
 

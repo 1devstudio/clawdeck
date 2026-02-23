@@ -70,7 +70,6 @@
 				ECC43D582F450DF000D8EB54 /* Sources */,
 				ECC43D592F450DF000D8EB54 /* Frameworks */,
 				ECC43D5A2F450DF000D8EB54 /* Resources */,
-				ECE133612F4860A000C02621 /* Copy Sparkle XPC Services */,
 			);
 			buildRules = (
 			);
@@ -140,29 +139,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		ECE133612F4860A000C02621 /* Copy Sparkle XPC Services */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework",
-			);
-			name = "Copy Sparkle XPC Services";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/XPCServices/Installer.xpc",
-				"$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/XPCServices/Downloader.xpc",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "SPARKLE_FRAMEWORK=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\"\nXPC_SERVICES_DIR=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/XPCServices\"\n\nmkdir -p \"$XPC_SERVICES_DIR\"\ncp -R \"$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc\" \"$XPC_SERVICES_DIR/\"\ncp -R \"$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc\" \"$XPC_SERVICES_DIR/\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		ECC43D582F450DF000D8EB54 /* Sources */ = {
@@ -213,7 +189,7 @@
 				DEVELOPMENT_TEAM = LE9Q47C92D;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -277,7 +253,7 @@
 				DEVELOPMENT_TEAM = LE9Q47C92D;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
