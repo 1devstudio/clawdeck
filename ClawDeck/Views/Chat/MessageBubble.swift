@@ -214,7 +214,7 @@ struct MessageBubble: View {
         // Short plain text doesn't need Markdown block layout
         if trimmed.count < 200 && !trimmed.contains("```") && !trimmed.contains("[") {
             // Check for common markdown patterns
-            let patterns: [String] = ["**", "__", "~~", "# ", "- ", "* ", "> ", "| ", "1. "]
+            let patterns: [String] = ["`", "**", "__", "~~", "# ", "- ", "* ", "> ", "| ", "1. "]
             return patterns.contains { trimmed.contains($0) }
         }
         return true
