@@ -7,5 +7,10 @@
     <false/>
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+        <string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+    </array>
 </dict>
 </plist>
