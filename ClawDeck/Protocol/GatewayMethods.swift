@@ -575,6 +575,74 @@ struct CronRemoveParams: Codable, Sendable {
     let jobId: String
 }
 
+// MARK: - Gateway Status / Health
+
+/// Result of the `status` RPC.
+///
+/// The gateway response shape may evolve, so we decode known fields
+/// and keep the full payload as `raw` for forward-compatibility.
+struct GatewayStatusResult: Codable, Sendable {
+    let version: String?
+    let commit: String?
+    let uptimeMs: Double?
+    let channels: [ChannelStatus]?
+    let memory: MemoryInfo?
+    let agents: Int?
+    let sessions: Int?
+    let raw: AnyCodable?
+
+    struct ChannelStatus: Codable, Sendable, Identifiable {
+        let id: String
+        let plugin: String?
+        let status: String?       // "ok" | "degraded" | "error"
+        let accountId: String?
+        let label: String?
+    }
+
+    struct MemoryInfo: Codable, Sendable {
+        let rss: Int?             // bytes
+        let heapUsed: Int?        // bytes
+        let heapTotal: Int?       // bytes
+        let external: Int?        // bytes
+    }
+
+    /// Custom decoder that captures the raw response alongside typed fields.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(String.self, forKey: .version)
+        commit = try container.decodeIfPresent(String.self, forKey: .commit)
+        uptimeMs = try container.decodeIfPresent(Double.self, forKey: .uptimeMs)
+        channels = try container.decodeIfPresent([ChannelStatus].self, forKey: .channels)
+        memory = try container.decodeIfPresent(MemoryInfo.self, forKey: .memory)
+        agents = try container.decodeIfPresent(Int.self, forKey: .agents)
+        sessions = try container.decodeIfPresent(Int.self, forKey: .sessions)
+        raw = try? AnyCodable(from: decoder)
+    }
+}
+
+/// Result of the `health` RPC.
+struct GatewayHealthResult: Codable, Sendable {
+    let healthy: Bool?
+    let components: [HealthComponent]?
+    let raw: AnyCodable?
+
+    struct HealthComponent: Codable, Sendable, Identifiable {
+        let name: String
+        let status: String?       // "ok" | "degraded" | "error"
+        let message: String?
+        let latencyMs: Double?
+
+        var id: String { name }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        healthy = try container.decodeIfPresent(Bool.self, forKey: .healthy)
+        components = try container.decodeIfPresent([HealthComponent].self, forKey: .components)
+        raw = try? AnyCodable(from: decoder)
+    }
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.

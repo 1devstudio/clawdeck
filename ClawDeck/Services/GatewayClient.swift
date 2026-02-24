@@ -369,6 +369,26 @@ actor GatewayClient {
         }
     }
 
+    // MARK: - Status / Health
+
+    /// Fetch gateway status (version, uptime, channels, memory).
+    func gatewayStatus() async throws -> GatewayStatusResult {
+        let response = try await send(method: GatewayMethod.gatewayStatus)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(GatewayStatusResult.self)
+    }
+
+    /// Fetch gateway health (per-component checks).
+    func gatewayHealth() async throws -> GatewayHealthResult {
+        let response = try await send(method: GatewayMethod.gatewayHealth)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(GatewayHealthResult.self)
+    }
+
     // MARK: - Private: Handshake
 
     private func performHandshake() async throws {

@@ -38,6 +38,8 @@ enum GatewayMethod {
     static let cronRuns = "cron.runs"
     static let cronUpdate = "cron.update"
     static let cronRemove = "cron.remove"
+    static let gatewayStatus = "status"
+    static let gatewayHealth = "health"
 }
 
 /// Gateway event names.
