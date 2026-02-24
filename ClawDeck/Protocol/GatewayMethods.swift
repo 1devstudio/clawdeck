@@ -400,6 +400,23 @@ struct PresencePayload: Codable, Sendable {
     let status: String?  // "online", "offline"
 }
 
+/// A single connected instance in the gateway presence list.
+struct PresenceInstance: Codable, Sendable, Identifiable {
+    let id: String           // connId
+    let deviceId: String?
+    let client: String?      // "clawdbot-macos", "control-ui", etc.
+    let platform: String?
+    let version: String?
+    let role: String?
+    let connectedAt: Double?
+    let status: String?
+}
+
+/// Result of system-presence.
+struct SystemPresenceResult: Codable, Sendable {
+    let instances: [PresenceInstance]
+}
+
 // MARK: - Config types
 
 /// Result of config.get.

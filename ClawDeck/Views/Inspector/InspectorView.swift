@@ -1,15 +1,71 @@
 import SwiftUI
 
+/// Inspector tabs.
+enum InspectorTab: String, CaseIterable {
+    case session = "Session"
+    case instances = "Instances"
+
+    var icon: String {
+        switch self {
+        case .session: return "info.circle"
+        case .instances: return "network"
+        }
+    }
+}
+
 /// Right panel showing details about the selected session.
 struct InspectorView: View {
     let session: Session
     let appViewModel: AppViewModel
 
+    @State private var selectedTab: InspectorTab = .session
+
     var body: some View {
-        SessionInfoContent(
-            session: session,
-            appViewModel: appViewModel
-        )
+        VStack(spacing: 0) {
+            // Tab picker
+            HStack(spacing: 0) {
+                ForEach(InspectorTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 10))
+                            Text(tab.rawValue)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            selectedTab == tab
+                                ? Color.accentColor.opacity(0.12)
+                                : Color.clear
+                        )
+                        .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+
+            Divider()
+                .padding(.horizontal, 8)
+
+            // Tab content
+            switch selectedTab {
+            case .session:
+                SessionInfoContent(
+                    session: session,
+                    appViewModel: appViewModel
+                )
+            case .instances:
+                PresenceView(appViewModel: appViewModel)
+            }
+        }
     }
 }
 

@@ -360,6 +360,17 @@ actor GatewayClient {
         return try payload.decode(ModelsListResult.self)
     }
 
+    // MARK: - Presence
+
+    /// Fetch connected instances from the gateway.
+    func systemPresence() async throws -> SystemPresenceResult {
+        let response = try await send(method: GatewayMethod.systemPresence)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(SystemPresenceResult.self)
+    }
+
     /// Patch the gateway config (merge partial update).
     func configPatch(raw: String, baseHash: String, sessionKey: String? = nil, note: String? = nil) async throws {
         let params = ConfigPatchParams(raw: raw, baseHash: baseHash, sessionKey: sessionKey, note: note)
