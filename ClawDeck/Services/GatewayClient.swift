@@ -333,6 +333,18 @@ actor GatewayClient {
         }
     }
 
+        // MARK: - Logs
+
+    /// Fetch recent gateway log entries (live tail).
+    func logsTail(limit: Int? = 200, level: String? = nil, since: Double? = nil) async throws -> LogsTailResult {
+        let params = LogsTailParams(limit: limit, level: level, since: since)
+        let response = try await send(method: GatewayMethod.logsTail, params: params)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return try payload.decode(LogsTailResult.self)
+    }
+
     /// Fetch the current gateway config.
     func configGet() async throws -> ConfigGetResult {
         let response = try await send(method: GatewayMethod.configGet)

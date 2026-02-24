@@ -253,6 +253,11 @@ struct ClawdDeckApp: App {
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
 
+                Button("Gateway Logs") {
+                    openWindow(id: "gateway-logs")
+                }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+
                 Divider()
 
                 Button("Quick Open") {
@@ -303,6 +308,15 @@ struct ClawdDeckApp: App {
         
         Window("Application Log", id: "application-log") {
             LogView()
+                .environment(\.messageTextSize, messageTextSize)
+                .environment(\.codeHighlightTheme, codeHighlightTheme)
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 1000, height: 600)
+
+        Window("Gateway Logs", id: "gateway-logs") {
+            GatewayLogsView(client: appViewModel.activeClient)
                 .environment(\.messageTextSize, messageTextSize)
                 .environment(\.codeHighlightTheme, codeHighlightTheme)
         }

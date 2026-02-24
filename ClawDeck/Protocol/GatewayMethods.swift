@@ -575,6 +575,51 @@ struct CronRemoveParams: Codable, Sendable {
     let jobId: String
 }
 
+// MARK: - Logs
+
+/// Parameters for logs.tail.
+struct LogsTailParams: Codable, Sendable {
+    let limit: Int?
+    let level: String?   // "debug", "info", "warn", "error"
+    let since: Double?   // epoch ms
+}
+
+/// A single gateway log entry.
+struct GatewayLogEntry: Codable, Sendable, Identifiable {
+    let id: String
+    let timestamp: String?
+    let level: String?
+    let category: String?
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp, level, category, message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Generate a UUID if the gateway doesn't provide one
+        id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+        level = try container.decodeIfPresent(String.self, forKey: .level)
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+    }
+
+    init(id: String = UUID().uuidString, timestamp: String?, level: String?, category: String?, message: String?) {
+        self.id = id
+        self.timestamp = timestamp
+        self.level = level
+        self.category = category
+        self.message = message
+    }
+}
+
+/// Result of logs.tail.
+struct LogsTailResult: Codable, Sendable {
+    let entries: [GatewayLogEntry]
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.
