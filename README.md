@@ -1,15 +1,13 @@
 # ClawDeck
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Download](https://img.shields.io/badge/Download-Latest-blue.svg)](https://github.com/1devstudio/clawdeck/releases/latest/download/ClawDeck.dmg)
+[![Download](https://img.shields.io/badge/Download-Latest-blue.svg)](https://github.com/1devstudio/clawdeck/releases/latest)
 
 Native macOS desktop app for [Clawdbot](https://github.com/clawdbot/clawdbot).
 
 ## Download
 
-[**⬇ Download ClawDeck.dmg**](https://github.com/1devstudio/clawdeck/releases/latest/download/ClawDeck.dmg)
-
-Or browse all releases on the [Releases page](https://github.com/1devstudio/clawdeck/releases).
+[**⬇ Download Latest Release**](https://github.com/1devstudio/clawdeck/releases/latest)
 
 ## Requirements
 
