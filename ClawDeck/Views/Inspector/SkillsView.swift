@@ -105,6 +105,7 @@ struct SkillsView: View {
             onToggleExpand: { viewModel.toggleExpanded(skill.key) },
             onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
             onInstall: { Task { await viewModel.installSkill(skill) } },
+            onInstallOption: { option in Task { await viewModel.installSkill(skill, option: option) } },
             onEditApiKey: {
                 viewModel.editingApiKeyFor = skill.key
                 viewModel.apiKeyText = ""
@@ -209,9 +210,21 @@ struct SkillRow: View {
     var onToggleExpand: () -> Void
     var onToggleEnabled: () -> Void
     var onInstall: () -> Void
+    var onInstallOption: (SkillInstallOption) -> Void
     var onEditApiKey: () -> Void
     var onSaveApiKey: () -> Void
     var onCancelApiKey: () -> Void
+    
+    private func iconForKind(_ kind: String) -> String {
+        switch kind {
+        case "brew": return "mug"
+        case "node": return "shippingbox"
+        case "go": return "hare"
+        case "uv": return "bolt"
+        case "download": return "arrow.down.doc"
+        default: return "arrow.down.circle"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -559,20 +572,42 @@ struct SkillRow: View {
                         .disabled(isBusy)
                     }
                 } else if skill.canInstall {
-                    Button {
-                        onInstall()
-                    } label: {
-                        if isInstalling {
-                            Label("Installing…", systemImage: "arrow.down.circle")
-                                .font(.system(size: 11))
-                        } else {
-                            Label(skill.installOptions.first?.displayLabel ?? "Install", systemImage: "arrow.down.circle")
-                                .font(.system(size: 11))
+                    if skill.installOptions.count == 1 {
+                        Button {
+                            onInstall()
+                        } label: {
+                            if isInstalling {
+                                Label("Installing…", systemImage: "arrow.down.circle")
+                                    .font(.system(size: 11))
+                            } else {
+                                Label(skill.installOptions.first?.displayLabel ?? "Install", systemImage: "arrow.down.circle")
+                                    .font(.system(size: 11))
+                            }
                         }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isInstalling)
+                    } else {
+                        Menu {
+                            ForEach(skill.installOptions) { option in
+                                Button {
+                                    onInstallOption(option)
+                                } label: {
+                                    Label(option.displayLabel, systemImage: iconForKind(option.kind))
+                                }
+                            }
+                        } label: {
+                            if isInstalling {
+                                Label("Installing…", systemImage: "arrow.down.circle")
+                                    .font(.system(size: 11))
+                            } else {
+                                Label("Install…", systemImage: "arrow.down.circle")
+                                    .font(.system(size: 11))
+                            }
+                        }
+                        .menuStyle(.borderlessButton)
+                        .disabled(isInstalling)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(isInstalling)
                 } else if skill.blockedByAllowlist {
                     Label("Blocked by allowlist", systemImage: "lock")
                         .font(.system(size: 10))
@@ -588,14 +623,22 @@ struct SkillRow: View {
             
             // Install result feedback
             if let result = installResult {
-                HStack(spacing: 4) {
-                    Image(systemName: result.ok ? "checkmark.circle" : "xmark.circle")
-                        .font(.system(size: 10))
-                    Text(result.message)
-                        .font(.system(size: 10))
-                        .lineLimit(2)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: result.ok ? "checkmark.circle" : "xmark.circle")
+                            .font(.system(size: 10))
+                        Text(result.ok ? "Installed successfully" : "Install failed")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(result.ok ? .green : .red)
+                    
+                    if !result.ok {
+                        Text(result.message)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
                 }
-                .foregroundStyle(result.ok ? .green : .red)
             }
         }
         .padding(.top, 4)
