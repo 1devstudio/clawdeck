@@ -4,11 +4,15 @@ import SwiftUI
 enum InspectorTab: String, CaseIterable {
     case session = "Session"
     case cron = "Cron Jobs"
+    case channels = "Channels"
+    case skills = "Skills"
 
     var icon: String {
         switch self {
         case .session: return "info.circle"
         case .cron: return "clock"
+        case .channels: return "antenna.radiowaves.left.and.right"
+        case .skills: return "puzzlepiece"
         }
     }
 }
@@ -20,11 +24,15 @@ struct InspectorView: View {
 
     @State private var selectedTab: InspectorTab = .session
     @State private var cronViewModel: CronViewModel
+    @State private var channelsViewModel: ChannelsViewModel
+    @State private var skillsViewModel: SkillsViewModel
 
     init(session: Session, appViewModel: AppViewModel) {
         self.session = session
         self.appViewModel = appViewModel
         self._cronViewModel = State(initialValue: CronViewModel(appViewModel: appViewModel))
+        self._channelsViewModel = State(initialValue: ChannelsViewModel(appViewModel: appViewModel))
+        self._skillsViewModel = State(initialValue: SkillsViewModel(appViewModel: appViewModel))
     }
 
     var body: some View {
@@ -67,6 +75,10 @@ struct InspectorView: View {
                 )
             case .cron:
                 CronJobsView(viewModel: cronViewModel)
+            case .channels:
+                ChannelsView(viewModel: channelsViewModel)
+            case .skills:
+                SkillsView(viewModel: skillsViewModel)
             }
         }
     }

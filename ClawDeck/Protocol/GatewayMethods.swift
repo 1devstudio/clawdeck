@@ -575,6 +575,106 @@ struct CronRemoveParams: Codable, Sendable {
     let jobId: String
 }
 
+// MARK: - Channels
+
+struct ChannelsStatusParams: Codable, Sendable {
+    let probe: Bool?
+    let timeoutMs: Int?
+    init(probe: Bool? = nil, timeoutMs: Int? = nil) {
+        self.probe = probe
+        self.timeoutMs = timeoutMs
+    }
+}
+
+struct ChannelAccountSnapshot: Codable, Sendable, Identifiable {
+    let accountId: String
+    let configured: Bool?
+    let enabled: Bool?
+    let connected: Bool?
+    let loggedIn: Bool?
+    let error: String?
+    let lastInboundAt: Double?
+    let lastOutboundAt: Double?
+    let lastProbeAt: Double?
+    
+    var id: String { accountId }
+}
+
+struct ChannelSummary: Codable, Sendable {
+    let configured: Bool?
+    let connected: Bool?
+    let loggedIn: Bool?
+    let error: String?
+}
+
+struct ChannelsStatusResult: Codable, Sendable {
+    let ts: Double?
+    let channelOrder: [String]?
+    let channelLabels: [String: String]?
+    let channelDetailLabels: [String: String]?
+    let channelSystemImages: [String: String]?
+    let channels: [String: AnyCodable]?
+    let channelAccounts: [String: [AnyCodable]]?
+    let channelDefaultAccountId: [String: String]?
+}
+
+struct ChannelsLogoutParams: Codable, Sendable {
+    let channel: String
+    let accountId: String?
+}
+
+struct WebLoginStartParams: Codable, Sendable {
+    let force: Bool?
+    let timeoutMs: Int?
+    let verbose: Bool?
+    let accountId: String?
+}
+
+struct WebLoginStartResult: Codable, Sendable {
+    let qrCode: String?
+}
+
+struct WebLoginWaitParams: Codable, Sendable {
+    let timeoutMs: Int?
+    let accountId: String?
+}
+
+struct WebLoginWaitResult: Codable, Sendable {
+    let connected: Bool
+}
+
+// MARK: - Skills
+
+struct SkillsStatusParams: Codable, Sendable {}
+
+struct SkillGating: Codable, Sendable {
+    let status: String?
+    let missingBins: [String]?
+    let missingEnv: [String]?
+    let apiKeyConfigured: Bool?
+    let primaryEnvKey: String?
+}
+
+struct SkillsUpdateParams: Codable, Sendable {
+    let skillKey: String
+    let enabled: Bool?
+    let apiKey: String?
+    let env: [String: String]?
+    
+    init(skillKey: String, enabled: Bool? = nil, apiKey: String? = nil, env: [String: String]? = nil) {
+        self.skillKey = skillKey
+        self.enabled = enabled
+        self.apiKey = apiKey
+        self.env = env
+    }
+}
+
+struct SkillsInstallParams: Codable, Sendable {
+    let name: String
+    let installId: String?
+    let timeoutMs: Int?
+}
+
 // MARK: - Error shape
 
 /// Gateway error details — used in response.error.
