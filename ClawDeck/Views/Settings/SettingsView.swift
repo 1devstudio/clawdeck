@@ -81,8 +81,10 @@ struct SkillsSettingsView: View {
     @Bindable var viewModel: SkillsViewModel
 
     var body: some View {
-        SkillsView(viewModel: viewModel)
+        SkillsView(viewModel: viewModel, useGroupedStyle: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .padding(.horizontal, 8)
     }
 }
 

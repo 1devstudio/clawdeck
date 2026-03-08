@@ -3,6 +3,7 @@ import SwiftUI
 /// Skills list view — displayed as a tab in the Inspector panel.
 struct SkillsView: View {
     @Bindable var viewModel: SkillsViewModel
+    var useGroupedStyle: Bool = false
 
     var body: some View {
         Group {
@@ -13,7 +14,11 @@ struct SkillsView: View {
             } else if viewModel.skills.isEmpty {
                 emptyView
             } else {
-                skillsList
+                if useGroupedStyle {
+                    groupedSkillsList
+                } else {
+                    skillsList
+                }
             }
         }
         .task {
@@ -90,6 +95,61 @@ struct SkillsView: View {
         .refreshable {
             await viewModel.loadSkills()
         }
+    }
+
+    private var groupedSkillsList: some View {
+        Form {
+            let grouped = viewModel.groupedSkills
+
+            if !grouped.enabled.isEmpty {
+                Section {
+                    ForEach(grouped.enabled) { skill in
+                        SkillRow(
+                            skill: skill,
+                            isExpanded: viewModel.expandedSkillKey == skill.key,
+                            isBusy: viewModel.busySkillKeys.contains(skill.key),
+                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
+                            apiKeyText: $viewModel.apiKeyText,
+                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
+                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
+                            onEditApiKey: {
+                                viewModel.editingApiKeyFor = skill.key
+                                viewModel.apiKeyText = ""
+                            },
+                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
+                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
+                        )
+                    }
+                } header: {
+                    Label("Enabled", systemImage: "checkmark.circle")
+                }
+            }
+
+            if !grouped.disabled.isEmpty {
+                Section {
+                    ForEach(grouped.disabled) { skill in
+                        SkillRow(
+                            skill: skill,
+                            isExpanded: viewModel.expandedSkillKey == skill.key,
+                            isBusy: viewModel.busySkillKeys.contains(skill.key),
+                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
+                            apiKeyText: $viewModel.apiKeyText,
+                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
+                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
+                            onEditApiKey: {
+                                viewModel.editingApiKeyFor = skill.key
+                                viewModel.apiKeyText = ""
+                            },
+                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
+                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
+                        )
+                    }
+                } header: {
+                    Label("Disabled", systemImage: "pause.circle")
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 
     // MARK: - States
