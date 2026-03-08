@@ -98,10 +98,13 @@ struct SkillsView: View {
             skill: skill,
             isExpanded: viewModel.expandedSkillKey == skill.key,
             isBusy: viewModel.busySkillKeys.contains(skill.key),
+            isInstalling: viewModel.installingSkillKeys.contains(skill.key),
+            installResult: viewModel.installResults[skill.key],
             editingApiKey: viewModel.editingApiKeyFor == skill.key,
             apiKeyText: $viewModel.apiKeyText,
             onToggleExpand: { viewModel.toggleExpanded(skill.key) },
             onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
+            onInstall: { Task { await viewModel.installSkill(skill) } },
             onEditApiKey: {
                 viewModel.editingApiKeyFor = skill.key
                 viewModel.apiKeyText = ""
@@ -199,10 +202,13 @@ struct SkillRow: View {
     let skill: SkillInfo
     let isExpanded: Bool
     let isBusy: Bool
+    let isInstalling: Bool
+    let installResult: (ok: Bool, message: String)?
     let editingApiKey: Bool
     @Binding var apiKeyText: String
     var onToggleExpand: () -> Void
     var onToggleEnabled: () -> Void
+    var onInstall: () -> Void
     var onEditApiKey: () -> Void
     var onSaveApiKey: () -> Void
     var onCancelApiKey: () -> Void
@@ -295,7 +301,7 @@ struct SkillRow: View {
 
     private var statusIndicator: some View {
         Group {
-            if isBusy {
+            if isBusy || isInstalling {
                 ProgressView()
                     .controlSize(.mini)
                     .frame(width: 12, height: 12)
@@ -513,40 +519,69 @@ struct SkillRow: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 8) {
-            if skill.canToggle {
-                if skill.enabled {
-                    Button {
-                        onToggleEnabled()
-                    } label: {
-                        Label("Disable", systemImage: "pause")
-                            .font(.system(size: 11))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if skill.canToggle {
+                    if skill.enabled {
+                        Button {
+                            onToggleEnabled()
+                        } label: {
+                            Label("Disable", systemImage: "pause")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isBusy)
+                    } else {
+                        Button {
+                            onToggleEnabled()
+                        } label: {
+                            Label("Enable", systemImage: "play")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isBusy)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isBusy)
-                } else {
+                } else if skill.canInstall {
                     Button {
-                        onToggleEnabled()
+                        onInstall()
                     } label: {
-                        Label("Enable", systemImage: "play")
-                            .font(.system(size: 11))
+                        if isInstalling {
+                            Label("Installing…", systemImage: "arrow.down.circle")
+                                .font(.system(size: 11))
+                        } else {
+                            Label(skill.installOptions.first?.displayLabel ?? "Install", systemImage: "arrow.down.circle")
+                                .font(.system(size: 11))
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(isBusy)
+                    .disabled(isInstalling)
+                } else if skill.blockedByAllowlist {
+                    Label("Blocked by allowlist", systemImage: "lock")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                } else if !skill.missingOs.isEmpty {
+                    Label("Not available on this platform", systemImage: "desktopcomputer")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
                 }
-            } else if skill.blockedByAllowlist {
-                Label("Blocked by allowlist", systemImage: "lock")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            } else if skill.hasMissingDeps {
-                Label("Install dependencies to enable", systemImage: "arrow.down.circle")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
 
-            Spacer()
+                Spacer()
+            }
+            
+            // Install result feedback
+            if let result = installResult {
+                HStack(spacing: 4) {
+                    Image(systemName: result.ok ? "checkmark.circle" : "xmark.circle")
+                        .font(.system(size: 10))
+                    Text(result.message)
+                        .font(.system(size: 10))
+                        .lineLimit(2)
+                }
+                .foregroundStyle(result.ok ? .green : .red)
+            }
         }
         .padding(.top, 4)
     }

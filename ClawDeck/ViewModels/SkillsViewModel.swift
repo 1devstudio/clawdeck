@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// An install option for a skill dependency.
+struct SkillInstallOption: Identifiable {
+    let id: String
+    let kind: String       // "brew", "node", "go", "uv", "download"
+    let label: String
+    let bins: [String]
+    
+    var displayLabel: String { label.isEmpty ? "Install (\(kind))" : label }
+}
+
 /// Represents a skill for the UI.
 struct SkillInfo: Identifiable {
     let key: String
@@ -17,6 +27,7 @@ struct SkillInfo: Identifiable {
     let apiKeyConfigured: Bool
     let primaryEnvKey: String?
     let blockedByAllowlist: Bool
+    let installOptions: [SkillInstallOption]
     
     var id: String { key }
     
@@ -25,6 +36,7 @@ struct SkillInfo: Identifiable {
     var isUnavailable: Bool { !eligible && enabled }
     var needsApiKey: Bool { primaryEnvKey != nil && !apiKeyConfigured }
     var hasMissingDeps: Bool { !missingBins.isEmpty || !missingEnv.isEmpty || !missingOs.isEmpty }
+    var canInstall: Bool { !installOptions.isEmpty && hasMissingDeps && !blockedByAllowlist && missingOs.isEmpty }
     
     /// Whether the user can meaningfully toggle this skill
     var canToggle: Bool { eligible || isDisabledByUser }
@@ -44,6 +56,10 @@ final class SkillsViewModel {
     // API key editing
     var editingApiKeyFor: String?
     var apiKeyText: String = ""
+    
+    // Install state
+    var installingSkillKeys: Set<String> = []
+    var installResults: [String: (ok: Bool, message: String)] = [:]
     
     init(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel
@@ -116,6 +132,24 @@ final class SkillsViewModel {
         }
     }
     
+    func installSkill(_ skill: SkillInfo, option: SkillInstallOption? = nil) async {
+        guard let appViewModel = appViewModel,
+              let client = appViewModel.activeClient else { return }
+        
+        installingSkillKeys.insert(skill.key)
+        installResults.removeValue(forKey: skill.key)
+        defer { installingSkillKeys.remove(skill.key) }
+        
+        do {
+            let _ = try await client.skillsInstall(name: skill.name)
+            installResults[skill.key] = (ok: true, message: "Installed successfully")
+            // Refresh to show updated status
+            await loadSkills()
+        } catch {
+            installResults[skill.key] = (ok: false, message: error.localizedDescription)
+        }
+    }
+    
     // MARK: - Parsing
     
     private func parseSkillsStatus(_ payload: AnyCodable) {
@@ -165,13 +199,24 @@ final class SkillsViewModel {
             let primaryEnvKey = raw["primaryEnv"] as? String ?? gating["primaryEnvKey"] as? String
             let apiKeyConfigured = gating["apiKeyConfigured"] as? Bool ?? (primaryEnvKey != nil && !missingEnv.contains(primaryEnvKey!))
             
+            // Parse install options
+            let rawInstall = raw["install"] as? [[String: Any]] ?? []
+            let installOptions: [SkillInstallOption] = rawInstall.compactMap { spec in
+                let specId = spec["id"] as? String ?? ""
+                let kind = spec["kind"] as? String ?? ""
+                let label = spec["label"] as? String ?? ""
+                let bins = spec["bins"] as? [String] ?? []
+                guard !kind.isEmpty else { return nil }
+                return SkillInstallOption(id: specId, kind: kind, label: label, bins: bins)
+            }
+            
             parsed.append(SkillInfo(
                 key: key, name: name, description: description,
                 enabled: enabled, eligible: eligible, loaded: loaded, source: source,
                 location: location, gatingStatus: gatingStatus,
                 missingBins: missingBins, missingEnv: missingEnv, missingOs: missingOs,
                 apiKeyConfigured: apiKeyConfigured, primaryEnvKey: primaryEnvKey,
-                blockedByAllowlist: blockedByAllowlist
+                blockedByAllowlist: blockedByAllowlist, installOptions: installOptions
             ))
         }
         
