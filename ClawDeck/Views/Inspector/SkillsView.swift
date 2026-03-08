@@ -293,7 +293,7 @@ struct SkillRow: View {
                                 .foregroundStyle(.red)
                             ForEach(skill.missingBins, id: \.self) { bin in
                                 Text("• \(bin)")
-                                    .font(.system(size: 10, family: .monospaced))
+                                    .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -306,7 +306,7 @@ struct SkillRow: View {
                                 .foregroundStyle(.red)
                             ForEach(skill.missingEnv, id: \.self) { env in
                                 Text("• \(env)")
-                                    .font(.system(size: 10, family: .monospaced))
+                                    .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -336,7 +336,7 @@ struct SkillRow: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 65, alignment: .leading)
                     Text(location)
-                        .font(.system(size: 10, family: .monospaced))
+                        .font(.system(size: 10, design: .monospaced))
                         .lineLimit(2)
                 }
             }
@@ -387,7 +387,7 @@ struct SkillRow: View {
                 VStack(spacing: 6) {
                     SecureField("Enter API key", text: $apiKeyText)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11, family: .monospaced))
+                        .font(.system(size: 11, design: .monospaced))
                         .onSubmit(onSaveApiKey)
                     
                     HStack {

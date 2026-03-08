@@ -121,9 +121,12 @@ final class SkillsViewModel {
         let rawSkills = dict["skills"] as? [[String: Any]] ?? []
         
         var parsed: [SkillInfo] = []
-        
+        var seenKeys: Set<String> = []
+
         for raw in rawSkills {
             let key = raw["key"] as? String ?? ""
+            guard !key.isEmpty, !seenKeys.contains(key) else { continue }
+            seenKeys.insert(key)
             let name = raw["name"] as? String ?? key
             let description = raw["description"] as? String
             let enabled = raw["enabled"] as? Bool ?? true
