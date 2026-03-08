@@ -369,6 +369,47 @@ actor GatewayClient {
         }
     }
 
+    // MARK: - Channels
+
+    /// Fetch channel status from the gateway.
+    func channelsStatus(probe: Bool = false) async throws -> AnyCodable {
+        let params = ChannelsStatusParams(probe: probe)
+        let response = try await send(method: GatewayMethod.channelsStatus, params: params, timeout: probe ? 15 : 10)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return payload
+    }
+
+    /// Logout a channel account.
+    func channelsLogout(channel: String, accountId: String? = nil) async throws {
+        let params = ChannelsLogoutParams(channel: channel, accountId: accountId)
+        let response = try await send(method: GatewayMethod.channelsLogout, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Logout failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+    }
+
+    /// Start a web login flow (WhatsApp QR).
+    func webLoginStart(force: Bool = false, accountId: String? = nil) async throws -> AnyCodable {
+        let params = WebLoginStartParams(force: force, timeoutMs: 60000, verbose: true, accountId: accountId)
+        let response = try await send(method: GatewayMethod.webLoginStart, params: params, timeout: 65)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Login start failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return payload
+    }
+
+    /// Wait for web login to complete.
+    func webLoginWait(accountId: String? = nil) async throws -> AnyCodable {
+        let params = WebLoginWaitParams(timeoutMs: 120000, accountId: accountId)
+        let response = try await send(method: GatewayMethod.webLoginWait, params: params, timeout: 125)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Login wait failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return payload
+    }
+
     // MARK: - Private: Handshake
 
     private func performHandshake() async throws {

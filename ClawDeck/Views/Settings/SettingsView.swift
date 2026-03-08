@@ -6,9 +6,11 @@ import HighlightSwift
 struct SettingsView: View {
     let appViewModel: AppViewModel
     @State private var selectedTab: SettingsTab = .appearance
+    @State private var channelsViewModel: ChannelsViewModel?
 
     enum SettingsTab: String, CaseIterable {
         case appearance = "Appearance"
+        case channels = "Channels"
         case shortcuts = "Shortcuts"
         case advanced = "Advanced"
     }
@@ -20,6 +22,12 @@ struct SettingsView: View {
                     Label("Appearance", systemImage: "paintbrush")
                 }
                 .tag(SettingsTab.appearance)
+
+            ChannelsSettingsView(appViewModel: appViewModel, viewModel: channelsViewModel ?? ChannelsViewModel(appViewModel: appViewModel))
+                .tabItem {
+                    Label("Channels", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .tag(SettingsTab.channels)
 
             ShortcutSettingsView()
                 .tabItem {
@@ -33,7 +41,25 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.advanced)
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 580, height: 620)
+        .onAppear {
+            if channelsViewModel == nil {
+                channelsViewModel = ChannelsViewModel(appViewModel: appViewModel)
+            }
+        }
+    }
+}
+
+// MARK: - Channels Settings
+
+/// Wrapper that embeds ChannelsView in the Settings window.
+struct ChannelsSettingsView: View {
+    let appViewModel: AppViewModel
+    @Bindable var viewModel: ChannelsViewModel
+
+    var body: some View {
+        ChannelsView(viewModel: viewModel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
