@@ -137,12 +137,14 @@ final class SkillsViewModel {
         guard let appViewModel = appViewModel,
               let client = appViewModel.activeClient else { return }
         
+        let installOption = option ?? skill.installOptions.first
+        
         installingSkillKeys.insert(skill.key)
         installResults.removeValue(forKey: skill.key)
         defer { installingSkillKeys.remove(skill.key) }
         
         do {
-            let _ = try await client.skillsInstall(name: skill.name)
+            let _ = try await client.skillsInstall(name: skill.name, installId: installOption?.id)
             installResults[skill.key] = (ok: true, message: "Installed successfully")
             // Refresh to show updated status
             await loadSkills()

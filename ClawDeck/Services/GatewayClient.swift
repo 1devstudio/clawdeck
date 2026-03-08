@@ -431,8 +431,8 @@ actor GatewayClient {
     }
 
     /// Install a skill by name.
-    func skillsInstall(name: String) async throws -> AnyCodable {
-        let params = SkillsInstallParams(name: name, installId: UUID().uuidString, timeoutMs: 60000)
+    func skillsInstall(name: String, installId: String? = nil) async throws -> AnyCodable {
+        let params = SkillsInstallParams(name: name, installId: installId, timeoutMs: 60000)
         let response = try await send(method: GatewayMethod.skillsInstall, params: params, timeout: 65)
         guard response.ok, let payload = response.payload else {
             throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Install failed", details: nil, retryable: nil, retryAfterMs: nil))
