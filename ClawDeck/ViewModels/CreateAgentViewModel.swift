@@ -167,10 +167,8 @@ final class CreateAgentViewModel {
                 await fetchConfigHash()
             }
 
-            // Build the config.patch payload — include existing agents so the
-            // merge-patch doesn't replace the list with only the new agent.
-            let existingAgents = appViewModel.gatewayManager.agentSummaries[targetGatewayId] ?? []
-            let patch = buildConfigPatch(existingAgents: existingAgents)
+            // Build the config.patch payload
+            let patch = buildConfigPatch()
             let patchData = try JSONSerialization.data(
                 withJSONObject: patch,
                 options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -178,9 +176,6 @@ final class CreateAgentViewModel {
             guard let patchString = String(data: patchData, encoding: .utf8) else {
                 throw CreateAgentError.jsonSerializationFailed
             }
-
-            AppLogger.info("[createAgent] Config patch payload:\n\(patchString)", category: "Session")
-            AppLogger.info("[createAgent] Existing agents: \(existingAgents.map { $0.id })", category: "Session")
 
             // Phase 1: Applying config
             restartPhase = .applyingConfig
@@ -193,23 +188,14 @@ final class CreateAgentViewModel {
             // Phase 2: Waiting for gateway restart
             restartPhase = .waitingForRestart
             AppLogger.info("Config patch applied for new agent '\(agentId)', waiting for restart...", category: "Session")
-            // Brief initial delay to give the gateway time to begin its restart
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
 
-            // Phase 3: Reconnecting with retry — the gateway may take several
-            // seconds to restart after a config.patch. Poll until connected.
+            // Phase 3: Reconnecting — always force reconnect to ensure
+            // fresh agent summaries and a clean client state, even if
+            // the gateway auto-reconnected during the restart wait.
             restartPhase = .reconnecting
             AppLogger.debug("Reconnecting after creating agent...", category: "Session")
-            let reconnected = await appViewModel.gatewayManager.reconnectWithRetry(
-                gatewayId: targetGatewayId,
-                timeout: 30,
-                retryInterval: 2
-            )
-
-            guard reconnected else {
-                throw CreateAgentError.noActiveConnection
-            }
-
+            await appViewModel.gatewayManager.reconnect(gatewayId: targetGatewayId)
             await appViewModel.loadInitialData()
 
             // Phase 4: Create agent binding and add to rail
@@ -231,11 +217,7 @@ final class CreateAgentViewModel {
             await appViewModel.switchAgent(binding)
 
             // Phase 5: Send a kick-off message to trigger BOOTSTRAP.md onboarding
-            if appViewModel.gatewayManager.isConnected(targetGatewayId) {
-                await sendBootstrapMessage(appViewModel: appViewModel, binding: binding)
-            } else {
-                AppLogger.warning("Skipping bootstrap message: gateway not connected after agent creation", category: "Session")
-            }
+            await sendBootstrapMessage(appViewModel: appViewModel, binding: binding)
 
             return true
         } catch {
@@ -249,10 +231,7 @@ final class CreateAgentViewModel {
     // MARK: - Private helpers
 
     /// Build the config.patch JSON payload for adding a new agent.
-    ///
-    /// Includes existing agents (by ID only) so the merge-patch preserves them
-    /// rather than replacing the entire `agents.list` with just the new entry.
-    private func buildConfigPatch(existingAgents: [AgentSummary]) -> [String: Any] {
+    private func buildConfigPatch() -> [String: Any] {
         let trimmedId = agentId.trimmingCharacters(in: .whitespaces)
 
         var agentEntry: [String: Any] = ["id": trimmedId]
@@ -274,12 +253,9 @@ final class CreateAgentViewModel {
             agentEntry["identity"] = identity
         }
 
-        // Preserve existing agents — include only their IDs so we don't
-        // clobber gateway-managed fields (workspace, config, etc.).
-        var agentsList: [[String: Any]] = existingAgents.map { ["id": $0.id] }
-        agentsList.append(agentEntry)
-
-        var agentsPatch: [String: Any] = ["list": agentsList]
+        var patch: [String: Any] = [:]
+        var agentsPatch: [String: Any] = [:]
+        agentsPatch["list"] = [agentEntry]
 
         // Model (only if explicitly selected)
         let model = selectedModel.trimmingCharacters(in: .whitespaces)
@@ -289,7 +265,8 @@ final class CreateAgentViewModel {
             ]
         }
 
-        return ["agents": agentsPatch]
+        patch["agents"] = agentsPatch
+        return patch
     }
 
     /// Send an initial message to the newly created agent to trigger BOOTSTRAP.md onboarding.

@@ -49,3 +49,5 @@ dist/
 # Playgrounds
 timeline.xctimeline
 playground.xcworkspace
+
+firebase-debug.log
