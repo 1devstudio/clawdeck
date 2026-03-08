@@ -572,7 +572,8 @@ struct SkillRow: View {
                         .disabled(isBusy)
                     }
                 } else if skill.canInstall {
-                    if skill.installOptions.count == 1 {
+                    let viable = skill.viableInstallOptions
+                    if viable.count == 1 {
                         Button {
                             onInstall()
                         } label: {
@@ -580,7 +581,7 @@ struct SkillRow: View {
                                 Label("Installing…", systemImage: "arrow.down.circle")
                                     .font(.system(size: 11))
                             } else {
-                                Label(skill.installOptions.first?.displayLabel ?? "Install", systemImage: "arrow.down.circle")
+                                Label(viable.first?.displayLabel ?? "Install", systemImage: "arrow.down.circle")
                                     .font(.system(size: 11))
                             }
                         }
@@ -589,7 +590,7 @@ struct SkillRow: View {
                         .disabled(isInstalling)
                     } else {
                         Menu {
-                            ForEach(skill.installOptions) { option in
+                            ForEach(viable) { option in
                                 Button {
                                     onInstallOption(option)
                                 } label: {
@@ -608,6 +609,11 @@ struct SkillRow: View {
                         .menuStyle(.borderlessButton)
                         .disabled(isInstalling)
                     }
+                } else if skill.allInstallersUnavailable {
+                    let reasons = Set(skill.installOptions.compactMap(\.unavailableReason))
+                    Label(reasons.first ?? "No compatible installer", systemImage: "xmark.app")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
                 } else if skill.blockedByAllowlist {
                     Label("Blocked by allowlist", systemImage: "lock")
                         .font(.system(size: 10))

@@ -8,6 +8,12 @@ struct SkillInstallOption: Identifiable {
     let bins: [String]
     
     var displayLabel: String { label.isEmpty ? "Install (\(kind))" : label }
+    
+    /// Whether this option's package manager is known to be unavailable on the server.
+    /// Set by SkillsViewModel after install failures are detected.
+    var unavailableReason: String?
+    
+    var isAvailable: Bool { unavailableReason == nil }
 }
 
 /// Represents a skill for the UI.
@@ -28,7 +34,7 @@ struct SkillInfo: Identifiable {
     let apiKeyConfigured: Bool
     let primaryEnvKey: String?
     let blockedByAllowlist: Bool
-    let installOptions: [SkillInstallOption]
+    var installOptions: [SkillInstallOption]
     
     var id: String { key }
     
@@ -37,7 +43,13 @@ struct SkillInfo: Identifiable {
     var isUnavailable: Bool { !eligible && enabled }
     var needsApiKey: Bool { primaryEnvKey != nil && !apiKeyConfigured }
     var hasMissingDeps: Bool { !missingBins.isEmpty || !missingAnyBins.isEmpty || !missingEnv.isEmpty || !missingOs.isEmpty }
-    var canInstall: Bool { !installOptions.isEmpty && hasMissingDeps && !blockedByAllowlist && missingOs.isEmpty }
+    var canInstall: Bool { !viableInstallOptions.isEmpty && hasMissingDeps && !blockedByAllowlist && missingOs.isEmpty }
+    
+    /// Install options filtered to only those with available package managers.
+    var viableInstallOptions: [SkillInstallOption] { installOptions.filter(\.isAvailable) }
+    
+    /// Whether all install options are blocked by unavailable package managers.
+    var allInstallersUnavailable: Bool { !installOptions.isEmpty && viableInstallOptions.isEmpty && missingOs.isEmpty }
     
     /// Whether the user can meaningfully toggle this skill
     var canToggle: Bool { eligible || isDisabledByUser }
@@ -61,6 +73,10 @@ final class SkillsViewModel {
     // Install state
     var installingSkillKeys: Set<String> = []
     var installResults: [String: (ok: Bool, message: String)] = [:]
+    
+    /// Package manager kinds that have failed with "not installed" errors.
+    /// Persists for the session so we can mark other skills' install options as unavailable.
+    private(set) var unavailableManagers: Set<String> = []
     
     init(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel
@@ -137,7 +153,7 @@ final class SkillsViewModel {
         guard let appViewModel = appViewModel,
               let client = appViewModel.activeClient else { return }
         
-        let installOption = option ?? skill.installOptions.first
+        let installOption = option ?? skill.viableInstallOptions.first
         
         installingSkillKeys.insert(skill.key)
         installResults.removeValue(forKey: skill.key)
@@ -149,7 +165,66 @@ final class SkillsViewModel {
             // Refresh to show updated status
             await loadSkills()
         } catch {
-            installResults[skill.key] = (ok: false, message: error.localizedDescription)
+            let message = error.localizedDescription
+            let friendly = Self.friendlyInstallError(message, kind: installOption?.kind)
+            
+            // Detect "not installed" errors and cache the failed manager kind
+            if let kind = installOption?.kind, Self.isManagerNotInstalled(message, kind: kind) {
+                unavailableManagers.insert(kind)
+                applyUnavailableManagers()
+            }
+            
+            installResults[skill.key] = (ok: false, message: friendly)
+        }
+    }
+    
+    // MARK: - Error handling
+    
+    /// Known patterns for "package manager not found" errors from the gateway.
+    private static func isManagerNotInstalled(_ message: String, kind: String) -> Bool {
+        let lower = message.lowercased()
+        // Gateway returns messages like "brew not installed", "go not installed (install via brew)"
+        if lower.contains("\(kind) not installed") { return true }
+        if lower.contains("\(kind) not found") { return true }
+        // Also catch binary-not-found patterns
+        if lower.contains("command not found") && lower.contains(kind) { return true }
+        return false
+    }
+    
+    /// Convert raw gateway error messages into user-friendly text.
+    private static func friendlyInstallError(_ message: String, kind: String?) -> String {
+        let lower = message.lowercased()
+        
+        if let kind = kind {
+            let managerNames: [String: String] = [
+                "brew": "Homebrew", "npm": "npm", "pnpm": "pnpm",
+                "go": "Go", "uv": "uv", "cargo": "Cargo"
+            ]
+            let name = managerNames[kind] ?? kind
+            
+            if lower.contains("\(kind) not installed") || lower.contains("\(kind) not found") {
+                return "\(name) is not available on this server"
+            }
+        }
+        
+        return message
+    }
+    
+    /// Mark install options across all skills when a manager is known to be unavailable.
+    private func applyUnavailableManagers() {
+        guard !unavailableManagers.isEmpty else { return }
+        let managerNames: [String: String] = [
+            "brew": "Homebrew", "npm": "npm", "pnpm": "pnpm",
+            "go": "Go", "uv": "uv", "cargo": "Cargo"
+        ]
+        for i in skills.indices {
+            for j in skills[i].installOptions.indices {
+                let kind = skills[i].installOptions[j].kind
+                if unavailableManagers.contains(kind) {
+                    let name = managerNames[kind] ?? kind
+                    skills[i].installOptions[j].unavailableReason = "\(name) not available on server"
+                }
+            }
         }
     }
     
@@ -226,5 +301,6 @@ final class SkillsViewModel {
         }
         
         skills = parsed.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        applyUnavailableManagers()
     }
 }
