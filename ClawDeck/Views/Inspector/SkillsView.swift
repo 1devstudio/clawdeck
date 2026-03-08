@@ -32,61 +32,57 @@ struct SkillsView: View {
         List {
             let grouped = viewModel.groupedSkills
             
-            if !grouped.enabled.isEmpty {
+            if !grouped.ready.isEmpty {
                 Section {
-                    ForEach(grouped.enabled) { skill in
-                        SkillRow(
-                            skill: skill,
-                            isExpanded: viewModel.expandedSkillKey == skill.key,
-                            isBusy: viewModel.busySkillKeys.contains(skill.key),
-                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
-                            apiKeyText: $viewModel.apiKeyText,
-                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
-                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
-                            onEditApiKey: { 
-                                viewModel.editingApiKeyFor = skill.key
-                                viewModel.apiKeyText = ""
-                            },
-                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
-                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
-                        )
+                    ForEach(grouped.ready) { skill in
+                        skillRow(for: skill)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
                 } header: {
-                    Label("Enabled", systemImage: "checkmark.circle")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(nil)
+                    HStack(spacing: 4) {
+                        Label("Ready (\(grouped.ready.count))", systemImage: "checkmark.circle")
+                        Spacer()
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
                 }
             }
             
             if !grouped.disabled.isEmpty {
                 Section {
                     ForEach(grouped.disabled) { skill in
-                        SkillRow(
-                            skill: skill,
-                            isExpanded: viewModel.expandedSkillKey == skill.key,
-                            isBusy: viewModel.busySkillKeys.contains(skill.key),
-                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
-                            apiKeyText: $viewModel.apiKeyText,
-                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
-                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
-                            onEditApiKey: { 
-                                viewModel.editingApiKeyFor = skill.key
-                                viewModel.apiKeyText = ""
-                            },
-                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
-                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
-                        )
+                        skillRow(for: skill)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
                 } header: {
-                    Label("Disabled", systemImage: "pause.circle")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(nil)
+                    HStack(spacing: 4) {
+                        Label("Disabled (\(grouped.disabled.count))", systemImage: "pause.circle")
+                        Spacer()
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
+                }
+            }
+            
+            if !grouped.unavailable.isEmpty {
+                Section {
+                    ForEach(grouped.unavailable) { skill in
+                        skillRow(for: skill)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                } header: {
+                    HStack(spacing: 4) {
+                        Label("Unavailable (\(grouped.unavailable.count))", systemImage: "exclamationmark.triangle")
+                        Spacer()
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
                 }
             }
         }
@@ -96,56 +92,56 @@ struct SkillsView: View {
             await viewModel.loadSkills()
         }
     }
+    
+    private func skillRow(for skill: SkillInfo) -> some View {
+        SkillRow(
+            skill: skill,
+            isExpanded: viewModel.expandedSkillKey == skill.key,
+            isBusy: viewModel.busySkillKeys.contains(skill.key),
+            editingApiKey: viewModel.editingApiKeyFor == skill.key,
+            apiKeyText: $viewModel.apiKeyText,
+            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
+            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
+            onEditApiKey: {
+                viewModel.editingApiKeyFor = skill.key
+                viewModel.apiKeyText = ""
+            },
+            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
+            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
+        )
+    }
 
     private var groupedSkillsList: some View {
         Form {
             let grouped = viewModel.groupedSkills
 
-            if !grouped.enabled.isEmpty {
+            if !grouped.ready.isEmpty {
                 Section {
-                    ForEach(grouped.enabled) { skill in
-                        SkillRow(
-                            skill: skill,
-                            isExpanded: viewModel.expandedSkillKey == skill.key,
-                            isBusy: viewModel.busySkillKeys.contains(skill.key),
-                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
-                            apiKeyText: $viewModel.apiKeyText,
-                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
-                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
-                            onEditApiKey: {
-                                viewModel.editingApiKeyFor = skill.key
-                                viewModel.apiKeyText = ""
-                            },
-                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
-                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
-                        )
+                    ForEach(grouped.ready) { skill in
+                        skillRow(for: skill)
                     }
                 } header: {
-                    Label("Enabled", systemImage: "checkmark.circle")
+                    Label("Ready (\(grouped.ready.count))", systemImage: "checkmark.circle")
                 }
             }
 
             if !grouped.disabled.isEmpty {
                 Section {
                     ForEach(grouped.disabled) { skill in
-                        SkillRow(
-                            skill: skill,
-                            isExpanded: viewModel.expandedSkillKey == skill.key,
-                            isBusy: viewModel.busySkillKeys.contains(skill.key),
-                            editingApiKey: viewModel.editingApiKeyFor == skill.key,
-                            apiKeyText: $viewModel.apiKeyText,
-                            onToggleExpand: { viewModel.toggleExpanded(skill.key) },
-                            onToggleEnabled: { Task { await viewModel.toggleEnabled(skill) } },
-                            onEditApiKey: {
-                                viewModel.editingApiKeyFor = skill.key
-                                viewModel.apiKeyText = ""
-                            },
-                            onSaveApiKey: { Task { await viewModel.saveApiKey(for: skill.key) } },
-                            onCancelApiKey: { viewModel.editingApiKeyFor = nil }
-                        )
+                        skillRow(for: skill)
                     }
                 } header: {
-                    Label("Disabled", systemImage: "pause.circle")
+                    Label("Disabled (\(grouped.disabled.count))", systemImage: "pause.circle")
+                }
+            }
+            
+            if !grouped.unavailable.isEmpty {
+                Section {
+                    ForEach(grouped.unavailable) { skill in
+                        skillRow(for: skill)
+                    }
+                } header: {
+                    Label("Unavailable (\(grouped.unavailable.count))", systemImage: "exclamationmark.triangle")
                 }
             }
         }
@@ -259,14 +255,26 @@ struct SkillRow: View {
 
                 // Status line
                 HStack(spacing: 6) {
-                    if skill.needsApiKey {
+                    if skill.isDisabledByUser {
+                        Label("Disabled", systemImage: "pause.circle")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    } else if skill.blockedByAllowlist {
+                        Label("Blocked", systemImage: "lock")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    } else if skill.needsApiKey {
                         Label("API key required", systemImage: "key")
                             .font(.system(size: 10))
                             .foregroundStyle(.orange)
+                    } else if !skill.missingOs.isEmpty {
+                        Label("Requires \(skill.missingOs.joined(separator: ", "))", systemImage: "desktopcomputer")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     } else if skill.hasMissingDeps {
                         Label("Missing dependencies", systemImage: "exclamationmark.triangle")
                             .font(.system(size: 10))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.orange)
                     } else if skill.isReady {
                         Label("Ready", systemImage: "checkmark.circle")
                             .font(.system(size: 10))
@@ -350,7 +358,7 @@ struct SkillRow: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Binaries:")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(.orange)
                             ForEach(skill.missingBins, id: \.self) { bin in
                                 Text("• \(bin)")
                                     .font(.system(size: 10, design: .monospaced))
@@ -361,11 +369,24 @@ struct SkillRow: View {
                     
                     if !skill.missingEnv.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Environment:")
+                            Text("Environment variables:")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(.orange)
                             ForEach(skill.missingEnv, id: \.self) { env in
                                 Text("• \(env)")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    
+                    if !skill.missingOs.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Requires platform:")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            ForEach(skill.missingOs, id: \.self) { os in
+                                Text("• \(os)")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
@@ -493,26 +514,36 @@ struct SkillRow: View {
 
     private var actionButtons: some View {
         HStack(spacing: 8) {
-            if skill.enabled {
-                Button {
-                    onToggleEnabled()
-                } label: {
-                    Label("Disable", systemImage: "pause")
-                        .font(.system(size: 11))
+            if skill.canToggle {
+                if skill.enabled {
+                    Button {
+                        onToggleEnabled()
+                    } label: {
+                        Label("Disable", systemImage: "pause")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isBusy)
+                } else {
+                    Button {
+                        onToggleEnabled()
+                    } label: {
+                        Label("Enable", systemImage: "play")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isBusy)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isBusy)
-            } else {
-                Button {
-                    onToggleEnabled()
-                } label: {
-                    Label("Enable", systemImage: "play")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isBusy)
+            } else if skill.blockedByAllowlist {
+                Label("Blocked by allowlist", systemImage: "lock")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else if skill.hasMissingDeps {
+                Label("Install dependencies to enable", systemImage: "arrow.down.circle")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()

@@ -6,20 +6,28 @@ struct SkillInfo: Identifiable {
     let name: String
     let description: String?
     var enabled: Bool
+    let eligible: Bool
     let loaded: Bool
     let source: String?
     let location: String?
     let gatingStatus: String?
     let missingBins: [String]
     let missingEnv: [String]
+    let missingOs: [String]
     let apiKeyConfigured: Bool
     let primaryEnvKey: String?
+    let blockedByAllowlist: Bool
     
     var id: String { key }
     
-    var isReady: Bool { gatingStatus == "ready" }
+    var isReady: Bool { eligible && enabled }
+    var isDisabledByUser: Bool { !enabled && eligible }
+    var isUnavailable: Bool { !eligible && enabled }
     var needsApiKey: Bool { primaryEnvKey != nil && !apiKeyConfigured }
-    var hasMissingDeps: Bool { !missingBins.isEmpty || !missingEnv.isEmpty }
+    var hasMissingDeps: Bool { !missingBins.isEmpty || !missingEnv.isEmpty || !missingOs.isEmpty }
+    
+    /// Whether the user can meaningfully toggle this skill
+    var canToggle: Bool { eligible || isDisabledByUser }
 }
 
 @Observable
@@ -41,10 +49,11 @@ final class SkillsViewModel {
         self.appViewModel = appViewModel
     }
     
-    var groupedSkills: (enabled: [SkillInfo], disabled: [SkillInfo]) {
-        let enabled = skills.filter { $0.enabled }
-        let disabled = skills.filter { !$0.enabled }
-        return (enabled, disabled)
+    var groupedSkills: (ready: [SkillInfo], disabled: [SkillInfo], unavailable: [SkillInfo]) {
+        let ready = skills.filter { $0.isReady }
+        let disabled = skills.filter { $0.isDisabledByUser }
+        let unavailable = skills.filter { $0.isUnavailable }
+        return (ready, disabled, unavailable)
     }
     
     func loadSkills() async {
@@ -73,6 +82,7 @@ final class SkillsViewModel {
     }
     
     func toggleEnabled(_ skill: SkillInfo) async {
+        guard skill.canToggle else { return }
         guard let appViewModel = appViewModel,
               let client = appViewModel.activeClient else { return }
         busySkillKeys.insert(skill.key)
@@ -80,16 +90,8 @@ final class SkillsViewModel {
         
         do {
             try await client.skillsUpdate(skillKey: skill.key, enabled: !skill.enabled)
-            // Update local state
-            if let index = skills.firstIndex(where: { $0.key == skill.key }) {
-                skills[index] = SkillInfo(
-                    key: skill.key, name: skill.name, description: skill.description,
-                    enabled: !skill.enabled, loaded: skill.loaded, source: skill.source,
-                    location: skill.location, gatingStatus: skill.gatingStatus,
-                    missingBins: skill.missingBins, missingEnv: skill.missingEnv,
-                    apiKeyConfigured: skill.apiKeyConfigured, primaryEnvKey: skill.primaryEnvKey
-                )
-            }
+            // Refresh from gateway to get accurate state
+            await loadSkills()
         } catch {
             errorMessage = "Failed to update skill: \(error.localizedDescription)"
         }
@@ -135,9 +137,10 @@ final class SkillsViewModel {
             let disabled = raw["disabled"] as? Bool ?? false
             let enabled = raw["enabled"] as? Bool ?? !disabled
             
-            // Gateway sends "eligible" instead of "loaded"
+            // Gateway sends "eligible" — skill has all deps and is not blocked
             let eligible = raw["eligible"] as? Bool ?? false
             let loaded = raw["loaded"] as? Bool ?? eligible
+            let blockedByAllowlist = raw["blockedByAllowlist"] as? Bool ?? false
             
             let source = raw["source"] as? String
             let location = raw["filePath"] as? String ?? raw["location"] as? String
@@ -156,6 +159,7 @@ final class SkillsViewModel {
             
             let missingBins = missing["bins"] as? [String] ?? gating["missingBins"] as? [String] ?? []
             let missingEnv = missing["env"] as? [String] ?? gating["missingEnv"] as? [String] ?? []
+            let missingOs = missing["os"] as? [String] ?? []
             
             // Check if apiKey is configured via primaryEnv
             let primaryEnvKey = raw["primaryEnv"] as? String ?? gating["primaryEnvKey"] as? String
@@ -163,10 +167,11 @@ final class SkillsViewModel {
             
             parsed.append(SkillInfo(
                 key: key, name: name, description: description,
-                enabled: enabled, loaded: loaded, source: source,
+                enabled: enabled, eligible: eligible, loaded: loaded, source: source,
                 location: location, gatingStatus: gatingStatus,
-                missingBins: missingBins, missingEnv: missingEnv,
-                apiKeyConfigured: apiKeyConfigured, primaryEnvKey: primaryEnvKey
+                missingBins: missingBins, missingEnv: missingEnv, missingOs: missingOs,
+                apiKeyConfigured: apiKeyConfigured, primaryEnvKey: primaryEnvKey,
+                blockedByAllowlist: blockedByAllowlist
             ))
         }
         
