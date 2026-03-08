@@ -3,6 +3,7 @@ import SwiftUI
 /// Channels list view — displayed as a tab in the Inspector panel.
 struct ChannelsView: View {
     @Bindable var viewModel: ChannelsViewModel
+    var useGroupedStyle: Bool = false
 
     var body: some View {
         Group {
@@ -13,7 +14,11 @@ struct ChannelsView: View {
             } else if viewModel.channels.isEmpty {
                 emptyView
             } else {
-                channelsList
+                if useGroupedStyle {
+                    groupedChannelsList
+                } else {
+                    channelsList
+                }
             }
         }
         .task {
@@ -45,6 +50,25 @@ struct ChannelsView: View {
         .refreshable {
             await viewModel.loadChannels()
         }
+    }
+
+    private var groupedChannelsList: some View {
+        Form {
+            Section {
+                ForEach(viewModel.channels) { channel in
+                    ChannelRow(
+                        channel: channel,
+                        isExpanded: viewModel.expandedChannelId == channel.id,
+                        onToggleExpand: { viewModel.toggleExpanded(channel.id) },
+                        onLogin: { Task { await viewModel.startLogin(channel: channel.id) } },
+                        onLogout: { accountId in Task { await viewModel.logout(channel: channel.id, accountId: accountId) } }
+                    )
+                }
+            } header: {
+                Label("Connections", systemImage: "antenna.radiowaves.left.and.right")
+            }
+        }
+        .formStyle(.grouped)
     }
 
     // MARK: - States

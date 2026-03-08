@@ -58,8 +58,10 @@ struct ChannelsSettingsView: View {
     @Bindable var viewModel: ChannelsViewModel
 
     var body: some View {
-        ChannelsView(viewModel: viewModel)
+        ChannelsView(viewModel: viewModel, useGroupedStyle: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .padding(.horizontal, 8)
     }
 }
 
