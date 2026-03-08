@@ -11,7 +11,7 @@ struct InnerPanelBackground: View {
     @State private var isLoading = false
 
     var body: some View {
-        GeometryReader { geo in
+        ZStack {
             switch config.mode {
             case .none:
                 Color(nsColor: .windowBackgroundColor)
@@ -29,7 +29,7 @@ struct InnerPanelBackground: View {
                     Image(nsImage: nsImage)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
                 } else {
                     Rectangle()
