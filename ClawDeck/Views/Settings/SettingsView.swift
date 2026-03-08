@@ -6,9 +6,13 @@ import HighlightSwift
 struct SettingsView: View {
     let appViewModel: AppViewModel
     @State private var selectedTab: SettingsTab = .appearance
+    @State private var channelsViewModel: ChannelsViewModel?
+    @State private var skillsViewModel: SkillsViewModel?
 
     enum SettingsTab: String, CaseIterable {
         case appearance = "Appearance"
+        case channels = "Channels"
+        case skills = "Skills"
         case shortcuts = "Shortcuts"
         case advanced = "Advanced"
     }
@@ -20,6 +24,18 @@ struct SettingsView: View {
                     Label("Appearance", systemImage: "paintbrush")
                 }
                 .tag(SettingsTab.appearance)
+
+            ChannelsSettingsView(appViewModel: appViewModel, viewModel: channelsViewModel ?? ChannelsViewModel(appViewModel: appViewModel))
+                .tabItem {
+                    Label("Channels", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .tag(SettingsTab.channels)
+
+            SkillsSettingsView(appViewModel: appViewModel, viewModel: skillsViewModel ?? SkillsViewModel(appViewModel: appViewModel))
+                .tabItem {
+                    Label("Skills", systemImage: "puzzlepiece")
+                }
+                .tag(SettingsTab.skills)
 
             ShortcutSettingsView()
                 .tabItem {
@@ -33,7 +49,41 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.advanced)
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 580, height: 620)
+        .onAppear {
+            if channelsViewModel == nil {
+                channelsViewModel = ChannelsViewModel(appViewModel: appViewModel)
+            }
+            if skillsViewModel == nil {
+                skillsViewModel = SkillsViewModel(appViewModel: appViewModel)
+            }
+        }
+    }
+}
+
+// MARK: - Channels Settings
+
+/// Wrapper that embeds ChannelsView in the Settings window with proper padding.
+struct ChannelsSettingsView: View {
+    let appViewModel: AppViewModel
+    @Bindable var viewModel: ChannelsViewModel
+
+    var body: some View {
+        ChannelsView(viewModel: viewModel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Skills Settings
+
+/// Wrapper that embeds SkillsView in the Settings window with proper padding.
+struct SkillsSettingsView: View {
+    let appViewModel: AppViewModel
+    @Bindable var viewModel: SkillsViewModel
+
+    var body: some View {
+        SkillsView(viewModel: viewModel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
