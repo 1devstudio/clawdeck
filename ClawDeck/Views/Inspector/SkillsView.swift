@@ -277,6 +277,10 @@ struct SkillRow: View {
                         Label("Requires \(skill.missingOs.joined(separator: ", "))", systemImage: "desktopcomputer")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                    } else if !skill.missingAnyBins.isEmpty {
+                        Label("Needs: \(skill.missingAnyBins.joined(separator: " / "))", systemImage: "puzzlepiece")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
                     } else if skill.hasMissingDeps {
                         Label("Missing dependencies", systemImage: "exclamationmark.triangle")
                             .font(.system(size: 10))
@@ -370,6 +374,17 @@ struct SkillRow: View {
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                    }
+                    
+                    if !skill.missingAnyBins.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Requires one of:")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.orange)
+                            Text(skill.missingAnyBins.joined(separator: ", "))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
                         }
                     }
                     

@@ -22,6 +22,7 @@ struct SkillInfo: Identifiable {
     let location: String?
     let gatingStatus: String?
     let missingBins: [String]
+    let missingAnyBins: [String]
     let missingEnv: [String]
     let missingOs: [String]
     let apiKeyConfigured: Bool
@@ -35,7 +36,7 @@ struct SkillInfo: Identifiable {
     var isDisabledByUser: Bool { !enabled && eligible }
     var isUnavailable: Bool { !eligible && enabled }
     var needsApiKey: Bool { primaryEnvKey != nil && !apiKeyConfigured }
-    var hasMissingDeps: Bool { !missingBins.isEmpty || !missingEnv.isEmpty || !missingOs.isEmpty }
+    var hasMissingDeps: Bool { !missingBins.isEmpty || !missingAnyBins.isEmpty || !missingEnv.isEmpty || !missingOs.isEmpty }
     var canInstall: Bool { !installOptions.isEmpty && hasMissingDeps && !blockedByAllowlist && missingOs.isEmpty }
     
     /// Whether the user can meaningfully toggle this skill
@@ -192,6 +193,7 @@ final class SkillsViewModel {
             }()
             
             let missingBins = missing["bins"] as? [String] ?? gating["missingBins"] as? [String] ?? []
+            let missingAnyBins = missing["anyBins"] as? [String] ?? []
             let missingEnv = missing["env"] as? [String] ?? gating["missingEnv"] as? [String] ?? []
             let missingOs = missing["os"] as? [String] ?? []
             
@@ -214,7 +216,8 @@ final class SkillsViewModel {
                 key: key, name: name, description: description,
                 enabled: enabled, eligible: eligible, loaded: loaded, source: source,
                 location: location, gatingStatus: gatingStatus,
-                missingBins: missingBins, missingEnv: missingEnv, missingOs: missingOs,
+                missingBins: missingBins, missingAnyBins: missingAnyBins,
+                missingEnv: missingEnv, missingOs: missingOs,
                 apiKeyConfigured: apiKeyConfigured, primaryEnvKey: primaryEnvKey,
                 blockedByAllowlist: blockedByAllowlist, installOptions: installOptions
             ))
