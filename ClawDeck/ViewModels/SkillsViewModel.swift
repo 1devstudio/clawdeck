@@ -124,22 +124,42 @@ final class SkillsViewModel {
         var seenKeys: Set<String> = []
 
         for raw in rawSkills {
-            let key = raw["key"] as? String ?? ""
+            // Gateway sends "skillKey", not "key"
+            let key = raw["skillKey"] as? String ?? raw["key"] as? String ?? ""
             guard !key.isEmpty, !seenKeys.contains(key) else { continue }
             seenKeys.insert(key)
             let name = raw["name"] as? String ?? key
             let description = raw["description"] as? String
-            let enabled = raw["enabled"] as? Bool ?? true
-            let loaded = raw["loaded"] as? Bool ?? false
-            let source = raw["source"] as? String
-            let location = raw["location"] as? String
             
+            // Gateway sends "disabled" (inverted), not "enabled"
+            let disabled = raw["disabled"] as? Bool ?? false
+            let enabled = raw["enabled"] as? Bool ?? !disabled
+            
+            // Gateway sends "eligible" instead of "loaded"
+            let eligible = raw["eligible"] as? Bool ?? false
+            let loaded = raw["loaded"] as? Bool ?? eligible
+            
+            let source = raw["source"] as? String
+            let location = raw["filePath"] as? String ?? raw["location"] as? String
+            
+            // Gateway nests missing deps under "missing", not "gating"
+            let missing = raw["missing"] as? [String: Any] ?? [:]
             let gating = raw["gating"] as? [String: Any] ?? [:]
-            let gatingStatus = gating["status"] as? String
-            let missingBins = gating["missingBins"] as? [String] ?? []
-            let missingEnv = gating["missingEnv"] as? [String] ?? []
-            let apiKeyConfigured = gating["apiKeyConfigured"] as? Bool ?? false
-            let primaryEnvKey = gating["primaryEnvKey"] as? String
+            
+            // Derive gating status from eligible/disabled
+            let gatingStatus: String? = gating["status"] as? String ?? {
+                if disabled { return "disabled" }
+                if raw["blockedByAllowlist"] as? Bool == true { return "blocked" }
+                if eligible { return "ready" }
+                return "missing"
+            }()
+            
+            let missingBins = missing["bins"] as? [String] ?? gating["missingBins"] as? [String] ?? []
+            let missingEnv = missing["env"] as? [String] ?? gating["missingEnv"] as? [String] ?? []
+            
+            // Check if apiKey is configured via primaryEnv
+            let primaryEnvKey = raw["primaryEnv"] as? String ?? gating["primaryEnvKey"] as? String
+            let apiKeyConfigured = gating["apiKeyConfigured"] as? Bool ?? (primaryEnvKey != nil && !missingEnv.contains(primaryEnvKey!))
             
             parsed.append(SkillInfo(
                 key: key, name: name, description: description,
