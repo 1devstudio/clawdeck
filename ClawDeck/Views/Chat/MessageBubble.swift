@@ -57,7 +57,7 @@ struct MessageBubble: View {
                 if message.role == .assistant {
                     // Container groups header + bubble so steps pill aligns to bubble width
                     if message.hasSegments {
-                        let segments = consolidatedSegments
+                        let segments = message.consolidatedSegments
                         let textContent = segments.compactMap { seg -> String? in
                             if case .text(let t) = seg.kind { return t }
                             return nil
@@ -91,8 +91,6 @@ struct MessageBubble: View {
                                 }
                             }
                         }
-                        .fixedSize(horizontal: message.state != .streaming && !useMarkdown, vertical: false)
-
                     } else if hasTextContent {
                         let useMarkdown = needsMarkdown(message.content)
 
@@ -100,7 +98,6 @@ struct MessageBubble: View {
                             assistantHeaderRow()
                             textBubble(content: message.content)
                         }
-                        .fixedSize(horizontal: message.state != .streaming && !useMarkdown, vertical: false)
 
                     } else {
                         // No text content — just header (pill sits beside name)
@@ -430,99 +427,6 @@ struct MessageBubble: View {
         codeHighlightTheme.keywordColor(for: colorScheme)
     }
 
-    // MARK: - Segment consolidation
-
-    /// Merge text segments into as few bubbles as possible.
-    ///
-    /// For completed messages, all text segments are joined into a single bubble
-    /// with tool groups collected separately. This prevents multi-step tool use
-    /// turns from rendering 20+ tiny narration bubbles.
-    ///
-    /// For streaming messages, we keep the interleaved order so the user can
-    /// see progress as it happens.
-    private var consolidatedSegments: [ConsolidatedSegment] {
-        if message.state == .streaming {
-            return streamingConsolidatedSegments
-        }
-        return completedConsolidatedSegments
-    }
-
-    /// Streaming: collect all text into one bubble, keep thinking inline
-    /// for live feedback, skip tool groups (shown via the pill + sidebar).
-    private var streamingConsolidatedSegments: [ConsolidatedSegment] {
-        var result: [ConsolidatedSegment] = []
-        var allTexts: [String] = []
-        var firstTextId: String?
-
-        for segment in message.segments {
-            switch segment {
-            case .text(_, let content):
-                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { continue }
-                if firstTextId == nil { firstTextId = segment.id }
-                allTexts.append(content)
-
-            case .toolGroup:
-                // Shown in the pill + sidebar, not inline
-                break
-
-            case .thinking(let id, let content):
-                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
-            }
-        }
-
-        if !allTexts.isEmpty, let id = firstTextId {
-            let joined = allTexts.joined(separator: "\n\n")
-            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
-        }
-
-        return result
-    }
-
-    /// Completed: collect all text into one bubble. Tool groups and thinking
-    /// blocks are omitted (shown via the pill + sidebar).
-    private var completedConsolidatedSegments: [ConsolidatedSegment] {
-        var allTexts: [String] = []
-        var firstTextId: String?
-
-        for segment in message.segments {
-            switch segment {
-            case .text(_, let content):
-                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { continue }
-                if firstTextId == nil { firstTextId = segment.id }
-                allTexts.append(content)
-
-            case .toolGroup:
-                // Shown in the sidebar, not inline
-                break
-
-            case .thinking:
-                // Shown in the sidebar, not inline
-                break
-            }
-        }
-
-        var result: [ConsolidatedSegment] = []
-        if !allTexts.isEmpty, let id = firstTextId {
-            let joined = allTexts.joined(separator: "\n\n")
-            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
-        }
-
-        return result
-    }
-}
-
-/// A consolidated rendering segment — adjacent text segments merged into one.
-private struct ConsolidatedSegment: Identifiable {
-    let id: String
-    let kind: Kind
-
-    enum Kind {
-        case text(String)
-        case toolGroup([ToolCall])
-        case thinking(String)
-    }
 }
 
 // MARK: - Usage Badge View

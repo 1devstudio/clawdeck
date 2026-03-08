@@ -56,13 +56,20 @@ struct ChatView: View {
                             .id("load-more-button")
                         }
 
+                        // Read ViewModel properties once *outside* the ForEach
+                        // to avoid creating per-bubble observation dependencies.
+                        let displayName = viewModel.agentDisplayName
+                        let avatarEmoji = viewModel.agentAvatarEmoji
+                        let query = viewModel.searchQuery
+                        let matchId = viewModel.focusedMatchId
+
                         ForEach(viewModel.messages) { message in
                             MessageBubble(
                                 message: message,
-                                agentDisplayName: viewModel.agentDisplayName,
-                                agentAvatarEmoji: viewModel.agentAvatarEmoji,
-                                searchQuery: viewModel.searchQuery,
-                                isCurrentMatch: message.id == viewModel.focusedMatchId,
+                                agentDisplayName: displayName,
+                                agentAvatarEmoji: avatarEmoji,
+                                searchQuery: query,
+                                isCurrentMatch: message.id == matchId,
                                 onStepsTapped: { _ in
                                     withAnimation(.easeInOut(duration: 0.2)) {
                                         if sidebarMessage != nil {

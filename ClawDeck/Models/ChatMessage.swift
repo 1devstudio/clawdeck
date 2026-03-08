@@ -108,6 +108,18 @@ struct MessageCost {
     var total: Double = 0
 }
 
+/// A consolidated rendering segment — adjacent text segments merged into one.
+struct ConsolidatedSegment: Identifiable {
+    let id: String
+    let kind: Kind
+
+    enum Kind {
+        case text(String)
+        case toolGroup([ToolCall])
+        case thinking(String)
+    }
+}
+
 /// A single message within a chat session.
 @Observable
 final class ChatMessage: Identifiable {
@@ -133,6 +145,17 @@ final class ChatMessage: Identifiable {
     /// Token usage and cost information (for assistant messages).
     var usage: MessageUsage?
 
+    // MARK: - Cached derived data (ObservationIgnored to avoid spurious invalidations)
+
+    @ObservationIgnored private var _cachedSidebarSteps: [SidebarStep]?
+    @ObservationIgnored private var _cachedConsolidated: [ConsolidatedSegment]?
+    @ObservationIgnored private var _cacheKey: String = ""
+
+    /// Invalidation key based on segments count and state.
+    private var currentCacheKey: String {
+        "\(segments.count)-\(state.rawValue)"
+    }
+
     /// Flat list of all tool calls (convenience accessor for search/merge).
     var toolCalls: [ToolCall] {
         segments.flatMap { segment in
@@ -142,7 +165,37 @@ final class ChatMessage: Identifiable {
     }
 
     /// Ordered list of sidebar steps (thinking + tool calls) preserving segment order.
+    /// Cached to avoid re-iterating segments on every view body evaluation.
     var sidebarSteps: [SidebarStep] {
+        let key = currentCacheKey
+        if key == _cacheKey, let cached = _cachedSidebarSteps {
+            return cached
+        }
+        let result = computeSidebarSteps()
+        _cachedSidebarSteps = result
+        // Don't update _cacheKey here — let consolidatedSegments do it too
+        return result
+    }
+
+    /// Consolidated segments for rendering — merges adjacent text into fewer bubbles.
+    /// Cached to avoid re-iterating and re-joining on every view body evaluation.
+    var consolidatedSegments: [ConsolidatedSegment] {
+        let key = currentCacheKey
+        if key == _cacheKey, let cached = _cachedConsolidated {
+            return cached
+        }
+        let result: [ConsolidatedSegment]
+        if state == .streaming {
+            result = computeStreamingConsolidated()
+        } else {
+            result = computeCompletedConsolidated()
+        }
+        _cachedConsolidated = result
+        _cacheKey = key
+        return result
+    }
+
+    private func computeSidebarSteps() -> [SidebarStep] {
         var steps: [SidebarStep] = []
         for segment in segments {
             switch segment {
@@ -160,6 +213,61 @@ final class ChatMessage: Identifiable {
             }
         }
         return steps
+    }
+
+    /// Streaming: collect all text into one bubble, keep thinking inline.
+    private func computeStreamingConsolidated() -> [ConsolidatedSegment] {
+        var result: [ConsolidatedSegment] = []
+        var allTexts: [String] = []
+        var firstTextId: String?
+
+        for segment in segments {
+            switch segment {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
+            case .toolGroup:
+                break
+            case .thinking(let id, let content):
+                result.append(ConsolidatedSegment(id: id, kind: .thinking(content)))
+            }
+        }
+
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+        }
+
+        return result
+    }
+
+    /// Completed: collect all text into one bubble. Tool groups and thinking
+    /// blocks are omitted (shown via the pill + sidebar).
+    private func computeCompletedConsolidated() -> [ConsolidatedSegment] {
+        var allTexts: [String] = []
+        var firstTextId: String?
+
+        for segment in segments {
+            switch segment {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if firstTextId == nil { firstTextId = segment.id }
+                allTexts.append(content)
+            case .toolGroup, .thinking:
+                break
+            }
+        }
+
+        var result: [ConsolidatedSegment] = []
+        if !allTexts.isEmpty, let id = firstTextId {
+            let joined = allTexts.joined(separator: "\n\n")
+            result.append(ConsolidatedSegment(id: id, kind: .text(joined)))
+        }
+
+        return result
     }
 
     /// Tracks where the current streaming segment starts within `content`.

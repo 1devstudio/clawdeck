@@ -34,8 +34,25 @@ final class MessageStore {
     /// Tracks which thinking segment index we're currently streaming into per runId.
     private var currentThinkingSegmentIndex: [String: Int] = [:]
 
-    /// Incremented on every streaming delta — observe this to trigger auto-scroll.
+    /// Incremented on streaming deltas — observe this to trigger auto-scroll.
+    /// Updates are coalesced to at most once per run-loop cycle to avoid
+    /// cascading SwiftUI invalidations from rapid delta/tool events.
     private(set) var streamingContentVersion: Int = 0
+
+    /// Whether a coalesced version bump is already scheduled.
+    @ObservationIgnored private var versionBumpScheduled = false
+
+    /// Coalesce streamingContentVersion increments: schedules a single
+    /// bump on the next run-loop cycle, deduplicating rapid calls.
+    private func scheduleVersionBump() {
+        guard !versionBumpScheduled else { return }
+        versionBumpScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.versionBumpScheduled = false
+            self.streamingContentVersion += 1
+        }
+    }
 
     // MARK: - LRU eviction
 
@@ -222,7 +239,7 @@ final class MessageStore {
                         AppLogger.debug("Stale delta skipped for runId=\(runId): candidate \(candidate.count) < existing \(existing.content.count)", category: "Protocol")
                     }
                 }
-                streamingContentVersion += 1
+                scheduleVersionBump()
             } else {
                 // First delta for this run — create streaming message
                 AppLogger.debug("Streaming started for runId=\(runId) sessionKey=\(sessionKey) length=\(newContent.count)", category: "Protocol")
@@ -410,7 +427,7 @@ final class MessageStore {
             break
         }
 
-        streamingContentVersion += 1
+        scheduleVersionBump()
     }
 
     // MARK: - Usage parsing
