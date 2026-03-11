@@ -288,15 +288,37 @@ final class MessageStore {
                     if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         AppLogger.debug("Final for runId=\(runId): no delta content, using final (\(content.count) chars)", category: "Protocol")
                         existing.content = content
+                        // No deltas arrived — build a single text segment from the final content.
+                        existing.updateLastTextSegment(content)
                     } else if content.count > existing.content.count {
                         AppLogger.debug("Final for runId=\(runId): final longer (\(content.count) > \(existing.content.count)), using final", category: "Protocol")
+                        // The final text has more content than our accumulated deltas.
+                        // This happens because the gateway throttles deltas at 150ms intervals,
+                        // so the last tokens may only appear in the final event.
+                        //
+                        // The final event's content is the full cumulative text for the
+                        // current text block. For single-segment messages this is the entire text.
+                        // For multi-segment messages (text → tool calls → text), the gateway buffer
+                        // holds the full cumulative text, so `content` may span multiple segments.
+                        //
+                        // Strategy: compute what the last text segment SHOULD contain by subtracting
+                        // the prefix (all earlier segments' text) from the final content.
+                        let prefixLength = existing.segmentOffset
+                        if prefixLength > 0 && content.count > prefixLength {
+                            // Multi-segment: extract only the last segment's portion
+                            let lastSegmentText = String(content.suffix(content.count - prefixLength))
+                            existing.updateLastTextSegment(lastSegmentText)
+                        } else {
+                            // Single segment (or segmentOffset is 0): the final content IS the segment
+                            existing.updateLastTextSegment(content)
+                        }
                         existing.content = content
                     } else {
                         AppLogger.debug("Final for runId=\(runId): keeping accumulated (\(existing.content.count) chars, final was \(content.count))", category: "Protocol")
                     }
-                } else {
-                    AppLogger.debug("Final for runId=\(runId): no final content, keeping accumulated (\(existing.content.count) chars)", category: "Protocol")
                 }
+                // Always sync content ↔ segments on finalization for consistency.
+                existing.syncContentFromSegments()
                 existing.state = .complete
                 existing.usage = parsedUsage
                 streamingMessages.removeValue(forKey: runId)
