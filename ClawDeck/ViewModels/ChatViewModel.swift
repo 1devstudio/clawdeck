@@ -160,6 +160,43 @@ final class ChatViewModel {
         await appViewModel.setSessionModel(modelId, for: sessionKey)
     }
 
+    // MARK: - Thinking & Verbose
+
+    /// The session's thinking level override (nil = using default).
+    var thinkingLevel: String? {
+        session?.thinkingLevel
+    }
+
+    /// The session's verbose level override (nil = using default).
+    var verboseLevel: String? {
+        session?.verboseLevel
+    }
+
+    /// Whether the current effective model supports reasoning/thinking.
+    var supportsThinking: Bool {
+        let modelId = currentModelId ?? defaultModelId ?? ""
+        let parts = modelId.split(separator: "/", maxSplits: 1)
+        let bareId = parts.count == 2 ? String(parts[1]) : modelId
+        // Check if the model is marked as reasoning in the model list
+        if let model = availableModels.first(where: { $0.id == bareId }), model.reasoning == true {
+            return true
+        }
+        // Fallback heuristic for known reasoning model families
+        let lower = bareId.lowercased()
+        return lower.contains("claude") || lower.contains("o3") || lower.contains("o4") ||
+               lower.contains("deepseek-r1") || lower.contains("gemini")
+    }
+
+    /// Set thinking level for this session.
+    func setThinkingLevel(_ level: String?) async {
+        await appViewModel.setSessionThinkingLevel(level, for: sessionKey)
+    }
+
+    /// Set verbose level for this session.
+    func setVerboseLevel(_ level: String?) async {
+        await appViewModel.setSessionVerboseLevel(level, for: sessionKey)
+    }
+
     /// Focus composer trigger — relays from AppViewModel.
     var focusComposerTrigger: Int {
         appViewModel.focusComposerTrigger
@@ -350,8 +387,27 @@ final class ChatViewModel {
     /// Maximum image dimension (width or height) — images are scaled down to fit.
     private static let maxImageDimension: CGFloat = 1200
 
+    /// Maximum file size before compression (DECK-64: reject obviously too-large files early).
+    private static let maxSourceFileBytes = 50_000_000 // 50 MB
+
+    /// Maximum number of attachments per message.
+    private static let maxAttachments = 5
+
     /// Add an image from a file URL.
     func addAttachment(from url: URL) {
+        // DECK-64: Validate file size before loading into memory
+        if let fileSize = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int,
+           fileSize > Self.maxSourceFileBytes {
+            let mbSize = Double(fileSize) / 1_000_000
+            errorMessage = String(format: "Image too large (%.0f MB). Maximum is %d MB.", mbSize, Self.maxSourceFileBytes / 1_000_000)
+            return
+        }
+
+        if pendingAttachments.count >= Self.maxAttachments {
+            errorMessage = "Maximum \(Self.maxAttachments) attachments per message"
+            return
+        }
+
         guard let image = NSImage(contentsOf: url) else {
             errorMessage = "Could not load image from file"
             return
@@ -371,6 +427,11 @@ final class ChatViewModel {
 
     /// Add an image from NSImage (e.g. pasted from clipboard).
     func addAttachment(image: NSImage, fileName: String? = nil) {
+        if pendingAttachments.count >= Self.maxAttachments {
+            errorMessage = "Maximum \(Self.maxAttachments) attachments per message"
+            return
+        }
+
         guard let data = compressForUpload(image: image) else {
             errorMessage = "Could not compress image for upload"
             return

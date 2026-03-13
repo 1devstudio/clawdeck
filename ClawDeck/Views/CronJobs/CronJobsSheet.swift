@@ -69,6 +69,7 @@ struct CronJobsSheet: View {
                     runHistory: viewModel.runHistory[job.id],
                     onBack: { withAnimation(.easeInOut(duration: 0.15)) { selectedJobId = nil } },
                     onDismiss: { dismiss() },
+                    onRunNow: { Task { await viewModel.runNow(job) } },
                     onToggleEnabled: {
                         let wasEnabled = job.enabled
                         Task {
@@ -245,6 +246,7 @@ struct CronJobsSheet: View {
                                 Task { await viewModel.loadRunHistory(for: job.id) }
                                 withAnimation(.easeInOut(duration: 0.15)) { selectedJobId = job.id }
                             },
+                            onRunNow: { Task { await viewModel.runNow(job) } },
                             onToggleEnabled: {
                                 let wasEnabled = job.enabled
                                 Task {
@@ -277,6 +279,7 @@ struct CronJobCard: View {
     let job: CronJobSummary
     let isBusy: Bool
     var onSelect: () -> Void
+    var onRunNow: () -> Void
     var onToggleEnabled: () -> Void
     var onRemove: () -> Void
 
@@ -410,6 +413,14 @@ struct CronJobCard: View {
             Spacer()
 
             HStack(spacing: 6) {
+                Button { onRunNow() } label: {
+                    Label("Run Now", systemImage: "play.circle")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(isBusy)
+
                 if job.enabled {
                     Button { onToggleEnabled() } label: {
                         Label("Disable", systemImage: "pause")
@@ -449,6 +460,7 @@ struct CronJobDetailView: View {
     let runHistory: [CronRunEntry]?
     var onBack: () -> Void
     var onDismiss: () -> Void
+    var onRunNow: () -> Void
     var onToggleEnabled: () -> Void
     var onRemove: () -> Void
     var onUpdatePrompt: ((String) async -> Bool)?
@@ -741,6 +753,14 @@ struct CronJobDetailView: View {
 
     private var actionButtons: some View {
         HStack(spacing: 8) {
+            Button { onRunNow() } label: {
+                Label("Run Now", systemImage: "play.circle")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .disabled(isBusy)
+
             if job.enabled {
                 Button { onToggleEnabled() } label: {
                     Label("Disable", systemImage: "pause")

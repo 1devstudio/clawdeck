@@ -282,8 +282,10 @@ actor GatewayClient {
     }
 
     /// Patch a session.
-    func patchSession(key: String, label: String? = nil, model: String? = nil) async throws {
-        let params = SessionsPatchParams(key: key, label: label, model: model)
+    func patchSession(key: String, label: String? = nil, model: String? = nil,
+                      thinkingLevel: String? = nil, verboseLevel: String? = nil) async throws {
+        let params = SessionsPatchParams(key: key, label: label, model: model,
+                                         thinkingLevel: thinkingLevel, verboseLevel: verboseLevel)
         let _ = try await send(method: GatewayMethod.sessionsPatch, params: params)
     }
 
@@ -319,6 +321,15 @@ actor GatewayClient {
         let patch = CronUpdateParams.CronUpdatePatch(enabled: enabled, payload: payloadPatch)
         let params = CronUpdateParams(id: jobId, patch: patch)
         let response = try await send(method: GatewayMethod.cronUpdate, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+    }
+
+    /// Trigger a cron job to run immediately.
+    func cronRun(jobId: String) async throws {
+        let params = CronRunParams(id: jobId)
+        let response = try await send(method: GatewayMethod.cronRun, params: params)
         guard response.ok else {
             throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
         }

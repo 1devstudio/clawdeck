@@ -38,6 +38,7 @@ enum GatewayMethod {
     static let cronRuns = "cron.runs"
     static let cronUpdate = "cron.update"
     static let cronRemove = "cron.remove"
+    static let cronRun = "cron.run"
     static let channelsStatus = "channels.status"
     static let channelsLogout = "channels.logout"
     static let webLoginStart = "web.login.start"

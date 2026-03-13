@@ -132,6 +132,8 @@ struct SessionSummary: Codable, Sendable {
     let outputTokens: Int?
     let totalTokens: Int?
     let contextTokens: Int?
+    let thinkingLevel: String?
+    let verboseLevel: String?
     let updatedAt: Double?          // epoch ms
     let systemSent: Bool?
     let abortedLastRun: Bool?
@@ -190,11 +192,22 @@ struct SessionsListResult: Codable, Sendable {
 }
 
 /// Parameters for sessions.patch.
-/// The gateway schema is flat: { key, label?, model?, ... }
+/// The gateway schema is flat: { key, label?, model?, thinkingLevel?, verboseLevel?, ... }
 struct SessionsPatchParams: Codable, Sendable {
     let key: String
     let label: String?
     let model: String?
+    let thinkingLevel: String?
+    let verboseLevel: String?
+    
+    init(key: String, label: String? = nil, model: String? = nil,
+         thinkingLevel: String? = nil, verboseLevel: String? = nil) {
+        self.key = key
+        self.label = label
+        self.model = model
+        self.thinkingLevel = thinkingLevel
+        self.verboseLevel = verboseLevel
+    }
 }
 
 /// Parameters for sessions.delete.
@@ -472,8 +485,39 @@ struct CronListParams: Codable, Sendable {
 }
 
 /// Result of cron.list.
-struct CronListResult: Codable, Sendable {
+/// DECK-95: Uses tolerant decoding — malformed individual jobs are skipped
+/// rather than failing the entire list.
+struct CronListResult: Sendable {
     let jobs: [CronJobSummary]
+}
+
+extension CronListResult: Decodable {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Decode each job individually; skip any that fail
+        var jobsContainer = try container.nestedUnkeyedContainer(forKey: .jobs)
+        var decoded: [CronJobSummary] = []
+        while !jobsContainer.isAtEnd {
+            if let job = try? jobsContainer.decode(CronJobSummary.self) {
+                decoded.append(job)
+            } else {
+                // Skip the malformed entry by decoding as AnyCodable
+                _ = try? jobsContainer.decode(AnyCodable.self)
+            }
+        }
+        self.jobs = decoded
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case jobs
+    }
+}
+
+extension CronListResult: Encodable {
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(jobs, forKey: .jobs)
+    }
 }
 
 /// A single cron job from the gateway.
@@ -526,6 +570,11 @@ struct CronJobState: Codable, Sendable {
     let lastRunAtMs: Double?
     let lastStatus: String?           // "ok" | "error"
     let lastDurationMs: Double?
+}
+
+/// Parameters for cron.run (trigger a job immediately).
+struct CronRunParams: Codable, Sendable {
+    let id: String
 }
 
 /// Parameters for cron.runs.

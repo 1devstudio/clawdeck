@@ -397,10 +397,43 @@ final class AppViewModel {
                     session.model = nil
                     session.modelProvider = nil
                 }
+                // DECK-96: Clear stale context token count — the new model may have
+                // a different context window, and the old totalTokens is meaningless
+                // until the gateway reports fresh usage after the next turn.
+                session.contextTokens = nil
+                session.totalTokens = nil
             }
             AppLogger.info("Set model for \(sessionKey): \(patchModel)", category: "Session")
         } catch {
             AppLogger.error("Failed to set model for \(sessionKey): \(error)", category: "Session")
+        }
+    }
+
+    /// Set the thinking level for a session. Pass `nil` to reset to default.
+    func setSessionThinkingLevel(_ level: String?, for sessionKey: String) async {
+        guard let client = activeClient else { return }
+        do {
+            try await client.patchSession(key: sessionKey, thinkingLevel: level ?? "off")
+            if let session = sessions.first(where: { $0.key == sessionKey }) {
+                session.thinkingLevel = level
+            }
+            AppLogger.info("Set thinking for \(sessionKey): \(level ?? "off")", category: "Session")
+        } catch {
+            AppLogger.error("Failed to set thinking for \(sessionKey): \(error)", category: "Session")
+        }
+    }
+
+    /// Set the verbose level for a session. Pass `nil` to reset to default.
+    func setSessionVerboseLevel(_ level: String?, for sessionKey: String) async {
+        guard let client = activeClient else { return }
+        do {
+            try await client.patchSession(key: sessionKey, verboseLevel: level ?? "off")
+            if let session = sessions.first(where: { $0.key == sessionKey }) {
+                session.verboseLevel = level
+            }
+            AppLogger.info("Set verbose for \(sessionKey): \(level ?? "off")", category: "Session")
+        } catch {
+            AppLogger.error("Failed to set verbose for \(sessionKey): \(error)", category: "Session")
         }
     }
 

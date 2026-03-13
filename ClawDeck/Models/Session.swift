@@ -21,6 +21,8 @@ final class Session: Identifiable, Hashable {
     var isActive: Bool
     var totalTokens: Int?
     var contextTokens: Int?
+    var thinkingLevel: String?
+    var verboseLevel: String?
 
     /// Display title: explicit label > display name > derived title > session key
     var displayTitle: String {
@@ -68,7 +70,9 @@ final class Session: Identifiable, Hashable {
         updatedAt: Date = Date(),
         isActive: Bool = true,
         totalTokens: Int? = nil,
-        contextTokens: Int? = nil
+        contextTokens: Int? = nil,
+        thinkingLevel: String? = nil,
+        verboseLevel: String? = nil
     ) {
         self.id = id
         self.key = key
@@ -87,6 +91,8 @@ final class Session: Identifiable, Hashable {
         self.isActive = isActive
         self.totalTokens = totalTokens
         self.contextTokens = contextTokens
+        self.thinkingLevel = thinkingLevel
+        self.verboseLevel = verboseLevel
     }
 
     static func == (lhs: Session, rhs: Session) -> Bool {
@@ -145,7 +151,9 @@ extension Session {
             updatedAt: updatedDate,
             isActive: true,
             totalTokens: summary.totalTokens,
-            contextTokens: summary.contextTokens
+            contextTokens: summary.contextTokens,
+            thinkingLevel: summary.thinkingLevel,
+            verboseLevel: summary.verboseLevel
         )
     }
 }

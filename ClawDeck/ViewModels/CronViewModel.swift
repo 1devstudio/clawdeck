@@ -129,6 +129,25 @@ final class CronViewModel {
         }
     }
 
+    func runNow(_ job: CronJobSummary) async {
+        guard let client = appViewModel?.activeClient else { return }
+        busyJobIds.insert(job.id)
+        defer { busyJobIds.remove(job.id) }
+
+        do {
+            try await client.cronRun(jobId: job.id)
+            showFeedback("Job triggered")
+            // Refresh run history after a short delay to show the new run
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await loadRunHistory(for: job.id)
+            }
+        } catch {
+            showFeedback("Failed to run job", isError: true)
+            AppLogger.error("Failed to run cron job \(job.id): \(error)", category: "Cron")
+        }
+    }
+
     func removeJob(_ job: CronJobSummary) async {
         guard let client = appViewModel?.activeClient else { return }
         busyJobIds.insert(job.id)

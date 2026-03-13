@@ -166,7 +166,7 @@ struct ChatView: View {
                             .background(.yellow.opacity(0.1))
                         }
 
-                        // Model selector + context usage — right-aligned
+                        // Model selector + thinking level + context usage — right-aligned
                         if !viewModel.availableModels.isEmpty {
                             HStack(spacing: 8) {
                                 Spacer()
@@ -175,6 +175,15 @@ struct ChatView: View {
                                     ContextUsageView(
                                         totalTokens: total,
                                         contextTokens: viewModel.contextTokens
+                                    )
+                                }
+
+                                if viewModel.supportsThinking {
+                                    ThinkingLevelPicker(
+                                        currentLevel: viewModel.thinkingLevel,
+                                        onSelect: { level in
+                                            Task { await viewModel.setThinkingLevel(level) }
+                                        }
                                     )
                                 }
 
