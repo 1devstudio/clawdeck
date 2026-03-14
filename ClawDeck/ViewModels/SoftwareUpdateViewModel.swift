@@ -13,7 +13,7 @@ final class SoftwareUpdateViewModel {
     var canCheckForUpdates = false
 
     private let updaterController: SPUStandardUpdaterController?
-    private var cancellable: AnyCancellable?
+    private var observation: NSKeyValueObservation?
 
     /// The underlying Sparkle updater — exposed so the settings view can
     /// bind to ``SPUUpdater/automaticallyChecksForUpdates`` if needed.
@@ -33,10 +33,16 @@ final class SoftwareUpdateViewModel {
         )
         #endif
 
-        cancellable = updater?.publisher(for: \.canCheckForUpdates)
-            .sink { [weak self] value in
-                self?.canCheckForUpdates = value
+        // Use KVO directly instead of Combine publisher to avoid issues
+        // with @Observable macro and Combine sink interaction.
+        observation = updater?.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] _, change in
+            DispatchQueue.main.async {
+                let newValue = change.newValue ?? false
+                if self?.canCheckForUpdates != newValue {
+                    self?.canCheckForUpdates = newValue
+                }
             }
+        }
     }
 
     /// Trigger a user-initiated update check (shows UI).
