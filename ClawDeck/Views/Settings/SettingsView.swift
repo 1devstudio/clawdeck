@@ -7,10 +7,12 @@ struct SettingsView: View {
     let appViewModel: AppViewModel
     @State private var selectedTab: SettingsTab = .appearance
     @State private var channelsViewModel: ChannelsViewModel?
+    @State private var skillsViewModel: SkillsViewModel?
 
     enum SettingsTab: String, CaseIterable {
         case appearance = "Appearance"
         case channels = "Channels"
+        case skills = "Skills"
         case shortcuts = "Shortcuts"
         case advanced = "Advanced"
     }
@@ -29,6 +31,12 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.channels)
 
+            SkillsSettingsView(appViewModel: appViewModel, viewModel: skillsViewModel ?? SkillsViewModel(appViewModel: appViewModel))
+                .tabItem {
+                    Label("Skills", systemImage: "puzzlepiece")
+                }
+                .tag(SettingsTab.skills)
+
             ShortcutSettingsView()
                 .tabItem {
                     Label("Shortcuts", systemImage: "keyboard")
@@ -43,8 +51,8 @@ struct SettingsView: View {
         }
         .frame(width: 580, height: 620)
         .onAppear {
-            if channelsViewModel == nil {
-                channelsViewModel = ChannelsViewModel(appViewModel: appViewModel)
+            if skillsViewModel == nil {
+                skillsViewModel = SkillsViewModel(appViewModel: appViewModel)
             }
         }
     }
@@ -59,6 +67,21 @@ struct ChannelsSettingsView: View {
 
     var body: some View {
         ChannelsView(viewModel: viewModel, useGroupedStyle: true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .padding(.horizontal, 8)
+    }
+}
+
+// MARK: - Skills Settings
+
+/// Wrapper that embeds SkillsView in the Settings window.
+struct SkillsSettingsView: View {
+    let appViewModel: AppViewModel
+    @Bindable var viewModel: SkillsViewModel
+
+    var body: some View {
+        SkillsView(viewModel: viewModel, useGroupedStyle: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
             .padding(.horizontal, 8)

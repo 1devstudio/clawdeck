@@ -410,6 +410,36 @@ actor GatewayClient {
         return payload
     }
 
+    // MARK: - Skills
+
+    /// Fetch skills status from the gateway.
+    func skillsStatus() async throws -> AnyCodable {
+        let response = try await send(method: GatewayMethod.skillsStatus, params: SkillsStatusParams())
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Unknown error", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return payload
+    }
+
+    /// Update a skill's configuration.
+    func skillsUpdate(skillKey: String, enabled: Bool? = nil, apiKey: String? = nil, env: [String: String]? = nil) async throws {
+        let params = SkillsUpdateParams(skillKey: skillKey, enabled: enabled, apiKey: apiKey, env: env)
+        let response = try await send(method: GatewayMethod.skillsUpdate, params: params)
+        guard response.ok else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Update failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+    }
+
+    /// Install a skill by name.
+    func skillsInstall(name: String, installId: String? = nil) async throws -> AnyCodable {
+        let params = SkillsInstallParams(name: name, installId: installId, timeoutMs: 60000)
+        let response = try await send(method: GatewayMethod.skillsInstall, params: params, timeout: 65)
+        guard response.ok, let payload = response.payload else {
+            throw GatewayClientError.requestFailed(response.error ?? ErrorShape(code: nil, message: "Install failed", details: nil, retryable: nil, retryAfterMs: nil))
+        }
+        return payload
+    }
+
     // MARK: - Private: Handshake
 
     private func performHandshake() async throws {

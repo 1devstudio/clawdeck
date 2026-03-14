@@ -575,6 +575,38 @@ struct CronRemoveParams: Codable, Sendable {
     let jobId: String
 }
 
+// MARK: - Skills
+
+struct SkillsStatusParams: Codable, Sendable {}
+
+struct SkillGating: Codable, Sendable {
+    let status: String?
+    let missingBins: [String]?
+    let missingEnv: [String]?
+    let apiKeyConfigured: Bool?
+    let primaryEnvKey: String?
+}
+
+struct SkillsUpdateParams: Codable, Sendable {
+    let skillKey: String
+    let enabled: Bool?
+    let apiKey: String?
+    let env: [String: String]?
+    
+    init(skillKey: String, enabled: Bool? = nil, apiKey: String? = nil, env: [String: String]? = nil) {
+        self.skillKey = skillKey
+        self.enabled = enabled
+        self.apiKey = apiKey
+        self.env = env
+    }
+}
+
+struct SkillsInstallParams: Codable, Sendable {
+    let name: String
+    let installId: String?
+    let timeoutMs: Int?
+}
+
 // MARK: - Channels
 
 struct ChannelsStatusParams: Codable, Sendable {
