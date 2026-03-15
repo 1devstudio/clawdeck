@@ -169,6 +169,17 @@ final class AppViewModel {
             }
         }
 
+        // When a streaming run finishes, reload authoritative history from
+        // the gateway. This is the "stream then replace" pattern — streaming
+        // deltas are ephemeral previews; gateway history is the source of truth.
+        messageStore.onRunFinished = { [weak self] sessionKey, _ in
+            Task { @MainActor in
+                // Brief delay to let the gateway finalize the transcript
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                await self?.loadHistory(for: sessionKey)
+            }
+        }
+
         // Load persisted accent color and theme
         loadAccentColor()
         loadThemeConfig()
@@ -879,18 +890,11 @@ final class AppViewModel {
                     }
                 }
 
-                // Backfill usage data if the final event didn't include it.
-                // The gateway's WebSocket broadcast omits usage; fetch it from history.
-                // After stream completes, refresh session token counts and
-                // backfill per-message usage (gateway omits both from WebSocket events).
+                // History reload (triggered by messageStore.onRunFinished) will
+                // include full usage data. Just refresh session-level token counts.
                 let sessionKey = chatEvent.sessionKey
-                let runId = chatEvent.runId
                 Task {
-                    // Brief delay to let the gateway finalize the transcript
                     try? await Task.sleep(nanoseconds: 500_000_000)
-                    if chatEvent.usage == nil || chatEvent.usage?.dictValue == nil {
-                        await backfillUsage(for: sessionKey, runId: runId)
-                    }
                     await refreshSessionTokens(for: sessionKey)
                 }
             }

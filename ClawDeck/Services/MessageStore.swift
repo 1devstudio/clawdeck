@@ -17,6 +17,11 @@ final class MessageStore {
     /// Number of additional messages to load when scrolling up.
     static let pageSize = 50
 
+    /// Called when a streaming run reaches "final" state and the session's
+    /// messages should be reloaded from gateway history (the authoritative source).
+    /// Parameters: (sessionKey, runId).
+    var onRunFinished: ((String, String) -> Void)?
+
     /// Active streaming messages by runId.
     private var streamingMessages: [String: ChatMessage] = [:]
 
@@ -280,68 +285,28 @@ final class MessageStore {
             }
 
         case "final":
-            // Extract usage from the final event
-            let parsedUsage = Self.parseUsage(from: event.usage)
+            // Stream-then-replace: don't try to patch streaming deltas.
+            // Just mark the streaming message as complete and signal a history
+            // reload. The gateway history is the authoritative source of the
+            // complete response — this avoids truncation from dropped deltas.
+            AppLogger.debug("Final for runId=\(runId): marking complete, will reload from history", category: "Protocol")
 
             if let existing = streamingMessages[runId] {
-                if let content = event.message?.content, !content.isEmpty {
-                    if existing.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        AppLogger.debug("Final for runId=\(runId): no delta content, using final (\(content.count) chars)", category: "Protocol")
-                        existing.content = content
-                        // No deltas arrived — build a single text segment from the final content.
-                        existing.updateLastTextSegment(content)
-                    } else if content.count > existing.content.count {
-                        AppLogger.debug("Final for runId=\(runId): final longer (\(content.count) > \(existing.content.count)), using final", category: "Protocol")
-                        // The final text has more content than our accumulated deltas.
-                        // This happens because the gateway throttles deltas at 150ms intervals,
-                        // so the last tokens may only appear in the final event.
-                        //
-                        // The final event's content is the full cumulative text for the
-                        // current text block. For single-segment messages this is the entire text.
-                        // For multi-segment messages (text → tool calls → text), the gateway buffer
-                        // holds the full cumulative text, so `content` may span multiple segments.
-                        //
-                        // Strategy: compute what the last text segment SHOULD contain by subtracting
-                        // the prefix (all earlier segments' text) from the final content.
-                        let prefixLength = existing.segmentOffset
-                        if prefixLength > 0 && content.count > prefixLength {
-                            // Multi-segment: extract only the last segment's portion
-                            let lastSegmentText = String(content.suffix(content.count - prefixLength))
-                            existing.updateLastTextSegment(lastSegmentText)
-                        } else {
-                            // Single segment (or segmentOffset is 0): the final content IS the segment
-                            existing.updateLastTextSegment(content)
-                        }
-                        existing.content = content
-                    } else {
-                        AppLogger.debug("Final for runId=\(runId): keeping accumulated (\(existing.content.count) chars, final was \(content.count))", category: "Protocol")
-                    }
-                }
-                // Always sync content ↔ segments on finalization for consistency.
-                existing.syncContentFromSegments()
+                // Mark as complete so the UI stops showing typing indicators.
+                // Keep the accumulated content visible as a placeholder until
+                // loadHistory replaces it with the authoritative version.
                 existing.state = .complete
-                existing.usage = parsedUsage
-                streamingMessages.removeValue(forKey: runId)
-                lastDeltaLength.removeValue(forKey: runId)
-                currentTextSegmentIndex.removeValue(forKey: runId)
-                lastThinkingDeltaLength.removeValue(forKey: runId)
-                currentThinkingSegmentIndex.removeValue(forKey: runId)
-            } else {
-                let contentLength = event.message?.content?.count ?? 0
-                AppLogger.debug("Final without prior deltas for runId=\(runId): \(contentLength) chars", category: "Protocol")
-                let message = ChatMessage(
-                    role: .assistant,
-                    content: event.message?.content ?? "",
-                    sessionKey: sessionKey,
-                    state: .complete,
-                    agentId: event.message?.agentId,
-                    runId: runId
-                )
-                message.usage = parsedUsage
-                allMessagesBySession[sessionKey, default: []].append(message)
-                let currentVisible = visibleCountBySession[sessionKey] ?? Self.initialPageSize
-                visibleCountBySession[sessionKey] = currentVisible + 1
+                existing.usage = Self.parseUsage(from: event.usage)
             }
+
+            streamingMessages.removeValue(forKey: runId)
+            lastDeltaLength.removeValue(forKey: runId)
+            currentTextSegmentIndex.removeValue(forKey: runId)
+            lastThinkingDeltaLength.removeValue(forKey: runId)
+            currentThinkingSegmentIndex.removeValue(forKey: runId)
+
+            // Notify that history should be reloaded for this session.
+            onRunFinished?(sessionKey, runId)
 
         case "error":
             if let existing = streamingMessages[runId] {
